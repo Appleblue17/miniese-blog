@@ -5,25 +5,26 @@
  * They will be skipped if the database is not available.
  */
 
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
-import { cleanDraftsDir, createTestDraft, removeTestDraft } from "./setup";
-import { toNextRequest } from "./helpers";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { cleanDraftsDir, createTestDraft, removeTestDraft, isDatabaseAvailable } from "./setup";
+import { toNextRequest, skipIfNoDb } from "./helpers";
 
 let isDbAvailable = false;
 let cleanupFns: (() => Promise<void>)[] = [];
 
-beforeAll(async () => {
-  try {
-    const { isDatabaseAvailable } = await import("./setup");
-    isDbAvailable = await isDatabaseAvailable();
-  } catch {
-    isDbAvailable = false;
-  }
-});
+// Synchronous check at module load time
+isDbAvailable = await isDatabaseAvailable();
 
 beforeEach(async () => {
   await cleanDraftsDir();
   cleanupFns = [];
+  if (isDbAvailable) {
+    const { prisma } = await import("./db-client");
+    // Clean up any articles created by previous test runs
+    await prisma.article.deleteMany({
+      where: { slug: { startsWith: "test-" } },
+    }).catch(() => {});
+  }
 });
 
 afterAll(async () => {
@@ -33,11 +34,9 @@ afterAll(async () => {
   }
 });
 
-function describeIfDb(condition: boolean) {
-  return condition ? describe : describe.skip;
-}
+const describeDb = isDbAvailable ? describe : describe.skip;
 
-describeIfDb(isDbAvailable)("POST /api/articles/publish", () => {
+describeDb("POST /api/articles/publish", () => {
   it("publishes a valid draft and creates database record", async () => {
     const draftContent = `---
 title: "Test Article"
@@ -74,7 +73,7 @@ This is a test article.`;
     expect(data.article.url).toContain("/zh/test-article");
 
     // Verify database record
-    const { prisma } = await import("@/lib/db");
+    const { prisma } = await import("./db-client");
     const article = await prisma.article.findUnique({
       where: { slug_language: { slug: "test-article", language: "zh" } },
     });
@@ -165,7 +164,7 @@ Body`;
     await createTestDraft("dup.md", draftContent);
 
     const { POST } = await import("@/app/api/articles/publish/route");
-    const { prisma } = await import("@/lib/db");
+    const { prisma } = await import("./db-client");
 
     // First publish
     const req1 = toNextRequest(

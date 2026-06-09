@@ -11,7 +11,7 @@
  * will be skipped automatically.
  */
 
-import { mkdir, writeFile, unlink, rm } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { existsSync } from "fs";
 
@@ -71,7 +71,7 @@ export async function cleanDraftsDir(): Promise<void> {
  */
 export async function isDatabaseAvailable(): Promise<boolean> {
   try {
-    const { prisma } = await import("@/lib/db");
+    const { prisma } = await import("./db-client");
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch {

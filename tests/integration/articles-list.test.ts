@@ -8,80 +8,74 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { toNextRequest } from "./helpers";
 
+import { isDatabaseAvailable } from "./setup";
+
 let isDbAvailable = false;
 let createdArticleIds: string[] = [];
 
-beforeAll(async () => {
-  try {
-    const { isDatabaseAvailable } = await import("./setup");
-    isDbAvailable = await isDatabaseAvailable();
-  } catch {
-    isDbAvailable = false;
-  }
+// Synchronous check at module load time
+isDbAvailable = await isDatabaseAvailable();
 
-  // Seed test data if DB is available
-  if (isDbAvailable) {
-    const { prisma } = await import("@/lib/db");
+// Seed test data if DB is available
+if (isDbAvailable) {
+  const { prisma } = await import("./db-client");
 
-    // Clean up any leftover test data
-    await prisma.article.deleteMany({
-      where: { slug: { in: ["list-test-1", "list-test-2", "list-test-3"] } },
-    });
+  // Clean up any leftover test data
+  await prisma.article.deleteMany({
+    where: { slug: { in: ["list-test-1", "list-test-2", "list-test-3"] } },
+  });
 
-    const now = new Date();
-    const articles: { id: string }[] = await Promise.all([
-      prisma.article.create({
-        data: {
-          slug: "list-test-1",
-          title: "First Article",
-          language: "zh",
-          contentPath: "content/articles/zh/list-test-1.md",
-          tags: ["tech", "react"],
-          status: "published",
-          publishedAt: new Date(now.getTime() - 10000),
-        },
-      }),
-      prisma.article.create({
-        data: {
-          slug: "list-test-2",
-          title: "Second Article",
-          language: "en",
-          contentPath: "content/articles/en/list-test-2.md",
-          tags: ["tech", "node"],
-          status: "published",
-          publishedAt: new Date(now.getTime() - 5000),
-        },
-      }),
-      prisma.article.create({
-        data: {
-          slug: "list-test-3",
-          title: "Draft Article",
-          language: "zh",
-          contentPath: "content/articles/drafts/list-test-3.md",
-          tags: ["draft"],
-          status: "draft",
-          publishedAt: null,
-        },
-      }),
-    ]);
-    createdArticleIds = articles.map((a) => a.id);
-  }
-});
+  const now = new Date();
+  const articles: { id: string }[] = await Promise.all([
+    prisma.article.create({
+      data: {
+        slug: "list-test-1",
+        title: "First Article",
+        language: "zh",
+        contentPath: "content/articles/zh/list-test-1.md",
+        tags: ["tech", "react"],
+        status: "published",
+        publishedAt: new Date(now.getTime() - 10000),
+      },
+    }),
+    prisma.article.create({
+      data: {
+        slug: "list-test-2",
+        title: "Second Article",
+        language: "en",
+        contentPath: "content/articles/en/list-test-2.md",
+        tags: ["tech", "node"],
+        status: "published",
+        publishedAt: new Date(now.getTime() - 5000),
+      },
+    }),
+    prisma.article.create({
+      data: {
+        slug: "list-test-3",
+        title: "Draft Article",
+        language: "zh",
+        contentPath: "content/articles/drafts/list-test-3.md",
+        tags: ["draft"],
+        status: "draft",
+        publishedAt: null,
+      },
+    }),
+  ]);
+  createdArticleIds = articles.map((a) => a.id);
+}
 
 afterAll(async () => {
   if (isDbAvailable && createdArticleIds.length > 0) {
-    const { prisma } = await import("@/lib/db");
+    const { prisma } = await import("./db-client");
     await prisma.article.deleteMany({
       where: { id: { in: createdArticleIds } },
     });
   }
 });
 
-function describeIfDb(condition: boolean) {
-  return condition ? describe : describe.skip;
-}
+const describeDb = isDbAvailable ? describe : describe.skip;
 
-describeIfDb(isDbAvailable)("GET /api/articles", () => {
+describeDb("GET /api/articles", () => {
   it("returns published articles with pagination", async () => {
     const { GET } = await import("@/app/api/articles/route");
 
@@ -171,7 +165,8 @@ describeIfDb(isDbAvailable)("GET /api/articles", () => {
 
     expect(response.status).toBe(200);
     expect(data.articles).toEqual([]);
-    expect(data.total).toBe(0);
+    // total should reflect the count of matching articles, not the current page
+    expect(data.total).toBeGreaterThanOrEqual(1);
   });
 
   it("returns empty array when tag matches no articles", async () => {

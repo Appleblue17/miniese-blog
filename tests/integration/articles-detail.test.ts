@@ -8,56 +8,50 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { toNextRequest } from "./helpers";
 
+import { isDatabaseAvailable } from "./setup";
+
 let isDbAvailable = false;
 let testArticleId: string | null = null;
 
-beforeAll(async () => {
-  try {
-    const { isDatabaseAvailable } = await import("./setup");
-    isDbAvailable = await isDatabaseAvailable();
-  } catch {
-    isDbAvailable = false;
-  }
+// Synchronous check at module load time
+isDbAvailable = await isDatabaseAvailable();
 
-  if (isDbAvailable) {
-    const { prisma } = await import("@/lib/db");
+if (isDbAvailable) {
+  const { prisma } = await import("./db-client");
 
-    // Clean up any leftover test data
-    await prisma.article.deleteMany({
-      where: { slug: { in: ["detail-test"] } },
-    });
+  // Clean up any leftover test data
+  await prisma.article.deleteMany({
+    where: { slug: { in: ["detail-test"] } },
+  });
 
-    // Create a test article
-    const article = await prisma.article.create({
-      data: {
-        slug: "detail-test",
-        title: "Detail Test Article",
-        language: "zh",
-        contentPath: "content/articles/zh/detail-test.md",
-        renderedContent:
-          "<h1>Detail Test</h1>\n<p>This is the detail content.</p>",
-        tags: ["test", "detail"],
-        summary: "A test article for detail endpoint",
-        status: "published",
-        publishedAt: new Date(),
-      },
-    });
-    testArticleId = article.id;
-  }
-});
+  // Create a test article
+  const article = await prisma.article.create({
+    data: {
+      slug: "detail-test",
+      title: "Detail Test Article",
+      language: "zh",
+      contentPath: "content/articles/zh/detail-test.md",
+      renderedContent:
+        "<h1>Detail Test</h1>\n<p>This is the detail content.</p>",
+      tags: ["test", "detail"],
+      summary: "A test article for detail endpoint",
+      status: "published",
+      publishedAt: new Date(),
+    },
+  });
+  testArticleId = article.id;
+}
 
 afterAll(async () => {
   if (isDbAvailable && testArticleId) {
-    const { prisma } = await import("@/lib/db");
+    const { prisma } = await import("./db-client");
     await prisma.article.delete({ where: { id: testArticleId } });
   }
 });
 
-function describeIfDb(condition: boolean) {
-  return condition ? describe : describe.skip;
-}
+const describeDb = isDbAvailable ? describe : describe.skip;
 
-describeIfDb(isDbAvailable)("GET /api/articles/[slug]", () => {
+describeDb("GET /api/articles/[slug]", () => {
   it("returns article detail with rendered HTML", async () => {
     const { GET } = await import(
       "@/app/api/articles/[slug]/route"

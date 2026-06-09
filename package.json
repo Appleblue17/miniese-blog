@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@types/hast": "^3.0.4",
     "class-variance-authority": "^0.7.1",
