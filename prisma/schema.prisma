@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ArticleLanguage {
+  zh
+  en
+}
+
+enum ArticleStatus {
+  draft
+  published
+  review
+}
+
+enum AiTaskType {
+  review
+  translate
+  generate
+  scan
+}
+
+enum AiTaskStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model Article {
+  id          String          @id @default(uuid())
+  slug        String
+  title       String
+  language    ArticleLanguage
+  contentPath String
+  summary     String?
+  tags        String[]
+  status      ArticleStatus   @default(draft)
+  accessGroup String[]
+  publishedAt DateTime?
+  updatedAt   DateTime        @updatedAt
+  changelog   String?
+  author      String          @default("博主")
+
+  wikiLinks   ArticleWikiLink[]
+  comments    Comment[]
+
+  @@unique([slug, language])
+}
+
+model WikiEntry {
+  id            String          @id @default(uuid())
+  name          String
+  aliases       String[]
+  language      ArticleLanguage
+  definition    String
+  contentPath   String
+  tags          String[]
+  accessGroup   String[]
+  isAIGenerated Boolean         @default(false)
+  isReviewed    Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  articleLinks  ArticleWikiLink[]
+}
+
+model ArticleWikiLink {
+  id          String    @id @default(uuid())
+  articleId   String
+  wikiEntryId String
+  detectedAt  DateTime  @default(now())
+
+  article    Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  wikiEntry  WikiEntry @relation(fields: [wikiEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, wikiEntryId])
+}
+
+model AiTask {
+  id          String        @id @default(uuid())
+  type        AiTaskType
+  status      AiTaskStatus  @default(pending)
+  input       Json
+  output      Json?
+  error       String?
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  articleId  String
+  authorName String
+  content    String
+  isHidden   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
