@@ -159,6 +159,24 @@ miniese-blog/
 
 ## Development Workflow
 
+### Working Principles
+
+#### 1. Step-by-step Execution
+- Each task (e.g., Phase X.Y) must be broken down into small steps (e.g., create file → write test → implement → verify)
+- **After each step, pause and report** — wait for user confirmation before proceeding
+- Do NOT complete an entire task in one go
+
+#### 2. Stop on Blockers
+- Encounter any error, problem, or ambiguity? **Stop immediately**
+- Describe to the user: what happened, what you tried, where you're stuck
+- Wait for instructions before proceeding — do NOT skip or guess
+
+#### 3. Ask When Unsure
+- If PRD or architecture docs are unclear about an implementation detail
+- If two documents contradict each other
+- If a feature lacks clear acceptance criteria
+- **Ask first. Do NOT assume.**
+
 ### Prerequisites
 - **Node.js 20+**
 - **Docker** (for PostgreSQL and Redis)
@@ -195,10 +213,48 @@ npm run dev
 | `npm run format:check` | Check formatting without writing |
 
 ### Testing
-- **Unit tests**: Co-located with source files as `*.test.ts`
-- **Integration tests**: `tests/integration/`
-- **E2E tests**: `tests/e2e/` (Playwright, optional)
-- **Coverage target**: >= 80% for unit tests, all core APIs for integration tests
+
+**Test Framework**: Vitest v4 (`@vitest/coverage-v8` for coverage)
+
+#### Running Tests
+```bash
+npm test            # Run all tests (vitest run)
+npm run test:watch  # Watch mode for development
+npm run test:coverage  # With coverage report
+```
+
+#### Test Types & Locations
+| Type | Location | Convention |
+|------|----------|-----------|
+| Unit tests | Co-located as `*.test.ts` next to source files | One test file per module |
+| Integration tests | `tests/integration/` | Core APIs covered via Supertest |
+| E2E tests | `tests/e2e/` (Playwright, optional) | Critical paths only |
+
+#### Coverage Target
+- Lines: ≥ 80%
+- Branches: ≥ 80%
+- Functions: ≥ 80%
+- Integration tests: all core APIs covered
+
+#### Writing Tests
+```typescript
+import { describe, it, expect } from "vitest";
+
+describe("Module name", () => {
+  it("describes specific behavior", async () => {
+    const result = await someFunction();
+    expect(result).toContain("expected string");
+  });
+});
+```
+
+Common assertions: `.toContain()`, `.toBe()`, `.not.toContain()`, `.toMatch(/regex/)`, `.toHaveLength(n)`
+
+#### Key Patterns
+- `renderMarkdown` is **async** — always `await`
+- Rendering output is an HTML **fragment** (no `<html>/<head>/<body>` wrapper)
+- Test files use `.ts` extension (not `.tsx`)
+- For manual verification, create a `.mjs` file and run with `node` (recommended) or `npx tsx`
 
 ### Code Conventions
 - TypeScript strict mode (`strict: true`)
