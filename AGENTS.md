@@ -153,6 +153,7 @@ miniese-blog/
 | `tsconfig.json` | TypeScript strict mode config |
 | `postcss.config.mjs` | PostCSS with Tailwind CSS v4 |
 | `eslint.config.mjs` | ESLint flat config with Next.js presets |
+| `.prettierrc` | Prettier formatting config |
 | `docker-compose.yml` | Dev services (PostgreSQL + Redis) |
 | `.env.example` | Required environment variables |
 
@@ -190,6 +191,8 @@ npm run dev
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run format` | Format all source files with Prettier |
+| `npm run format:check` | Check formatting without writing |
 
 ### Testing
 - **Unit tests**: Co-located with source files as `*.test.ts`
@@ -204,6 +207,7 @@ npm run dev
 - No `any` types -- use `unknown` when necessary
 - Use `async/await` for asynchronous code
 - Error handling with `try/catch` and logging
+- Formatting enforced by Prettier (run `npm run format` before committing)
 
 ### Git Workflow
 - Branch: work on `dev`, merge to `main` after review

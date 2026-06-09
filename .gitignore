@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+get-docker.sh
 
 # debug
 npm-debug.log*
