@@ -35,3 +35,24 @@
 - **遇到的问题**：
   - `rehype-starry-night@2.2.0` + `@wooorm/starry-night@3.10.0` 存在 ESM 加载兼容问题，暂不启用
   - Notesaw 的 `parser.ts` 中 `import type` 路径需从 `./index.d.ts` 改为 `./index.ts`
+
+### 任务 阶段2.2：文章基础 CRUD
+- **开始时间**：01:00
+- **结束时间**：01:15
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 安装 gray-matter（frontmatter 解析）和 supertest（集成测试）依赖
+  - Prisma schema 添加 `renderedContent` 字段用于缓存 HTML
+  - 创建 `src/lib/articles/frontmatter.ts` + 16 个单元测试
+  - 创建 5 个 API 端点：
+    - `POST /api/articles/upload` — 上传 .md 文件到 drafts 目录
+    - `POST /api/articles/preview` — 渲染 MD/Notesaw 内容为 HTML
+    - `POST /api/articles/publish` — 发布草稿（文件移动 + 数据库写入）
+    - `GET /api/articles` — 分页列表，支持 tag/lang 筛选
+    - `GET /api/articles/[slug]` — 文章详情（元数据 + 渲染 HTML）
+  - 创建 10 个集成测试（上传 4 个、预览 6 个）
+  - 创建 16 个集成测试占位（发布 5 个、列表 7 个、详情 4 个，待数据库就绪后运行）
+- **测试结果**：67/67 通过（单元测试 16 + 集成测试 10 + 渲染器 41），16 个数据库相关测试跳过
+- **遇到的问题**：
+  - Docker 无法拉取镜像，数据库不可用，发布/列表/详情 API 的集成测试暂被跳过
+  - Next.js `NextRequest` 与标准 `Request` 类型不完全兼容，需使用 `as unknown as NextRequest` 转换

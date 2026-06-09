@@ -47,8 +47,9 @@ model Article {
   accessGroup String[]
   publishedAt DateTime?
   updatedAt   DateTime        @updatedAt
-  changelog   String?
-  author      String          @default("博主")
+  changelog        String?
+  renderedContent  String?
+  author           String          @default("博主")
 
   wikiLinks   ArticleWikiLink[]
   comments    Comment[]
