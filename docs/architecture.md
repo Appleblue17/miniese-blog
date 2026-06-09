@@ -6,9 +6,14 @@
 
 **最后更新**：2026-06-09
 
-### [版本] [修改时间]
+### v0.2.0 2026-06-09
 
-[分点列出修改内容概要]
+- 第 7 章：重写 Markdown 渲染设计，新增 Notesaw 语法说明、双渲染管线、集成实现细节
+- 新增第 7.4 节：Notesaw 语法详解（block / inline-block / box 语法、标签缩写、CSS 样式策略）
+- 新增第 7.5 节：Notesaw 渲染管线内部实现（Parser 架构、AST 节点类型、Transformer 转换）
+- 更新第 7.1 节：渲染流程改为双管线设计（标准 Markdown / Notesaw）
+- 新增第 7.6 节：内容类型判断策略
+- 新增第 7.7 节：CSS 与图标资源管理
 
 ---
 
@@ -311,24 +316,225 @@ interface ReviewReport {
 
 ## 7. Markdown 渲染设计
 
-### 7.1 渲染流程
+### 7.1 双渲染管线
 
-1. 读取 MD 文件
-2. 使用 unified 生态（remark/rehype）解析
-3. 集成 Notesaw 插件（处理 block 语法）
-4. 集成 remark-math（KaTeX）
-5. 输出 HTML
+系统支持两种内容格式，根据 `contentType` 字段选择渲染管线：
 
-### 7.2 词条链接检测
+| 管线 | 适用格式 | 特点 |
+|------|----------|------|
+| 标准 Markdown | 普通 `.md` 文件 | 使用 standard remark/rehype 管道 |
+| Notesaw | Notesaw 格式的 `.md` 文件 | 使用自定义 parser + block 转换插件 |
 
-- 渲染前扫描 MD 内容，匹配词条主名称和别名
-- 将匹配的文本替换为 `<a href="/wiki/...">` 标签
-- hover 数据（定义型内容）通过 `data-wiki` 属性存储，前端 JS 处理预览
+选择策略：Article 和 WikiEntry 模型的 `contentType` 字段（`"markdown"` | `"notesaw"`）决定使用哪条管线。若未指定，默认走标准 Markdown。
 
-### 7.3 渲染时机
+### 7.2 渲染器入口
 
-- **发布时渲染**：生成 HTML 存入数据库或缓存文件
-- 理由：文章更新频率低，避免每次请求解析
+统一渲染函数位于 `src/lib/markdown/renderer.ts`：
+
+```typescript
+export async function renderMarkdown(
+  content: string,
+  contentType: "markdown" | "notesaw"
+): Promise<string>
+```
+
+- 输出 HTML **片段**（无 `<html><head><body>` 包装），通过 React 的 `dangerouslySetInnerHTML` 注入页面
+- 空字符串或纯空白输入返回空字符串
+
+### 7.3 标准 Markdown 渲染管线
+
+```
+MD 文件内容
+  → remark-parse (GFM + math)
+  → remark-rehype
+  → rehype-katex (KaTeX 公式)
+  → rehype-stringify
+  → HTML 片段
+```
+
+依赖：
+- `remark-parse`, `remark-gfm`, `remark-math` — Markdown 解析
+- `remark-rehype` — MDAST→HAST 转换
+- `rehype-katex` — KaTeX 数学公式渲染
+- `rehype-stringify` — HAST→HTML 序列化
+
+### 7.4 Notesaw 渲染管线
+
+```
+Notesaw 文件内容
+  → noteParsePlugin (自定义 parser，识别 @block / @inline-block)
+  → noteBoxParsePlugin (处理 @[...] box 语法 + math wrapper)
+  → remark-rehype (MDAST → HAST)
+  → rehype-katex (KaTeX 数学渲染)
+  → noteTransformPlugin (block → 带样式/图标/颜色的 HTML 结构)
+  → rehype-stringify
+  → HTML 片段
+```
+
+> **说明**：Notesaw 自定义 parser (`noteParsePlugin`) 作为 unified 插件替换默认的 `remark-parse`。它线性扫描文档，将 block/inline-block 语法解析为 MDAST 节点，其余部分交由 remark-parse 分段处理。最终产出一个混合 MDAST。
+
+### 7.5 Notesaw 语法详解
+
+Notesaw 是 Markdown 的超集，向下兼容所有 GFM 语法。
+
+#### 7.5.1 Block 块语法
+
+```
+'+'? '@' label [?!*]? (' '+ title ' '*)? '{'
+    (缩进 4 空格的内容)
+'}'
+
+- label: [a-z]+，支持缩写映射
+- title: 可选，渲染为块标题行
+- 内容必须缩进 4 空格或 1 Tab
+```
+
+标签缩写映射（定义在 `parser.ts` 的 `abbrMap` 中）：
+
+| 缩写 | 全称 | 用途 |
+|------|------|------|
+| thm | theorem | 定理 |
+| prop | proposition | 命题 |
+| cor | corollary | 推论 |
+| def | definition | 定义 |
+| warn | warning | 警告 |
+| vars / var | variables | 变量说明 |
+| alg | algorithm | 算法 |
+| prob | problem | 问题 |
+| sol | solution | 解答 |
+| ref | reference | 参考 |
+
+示例：
+```
+@theorem 勾股定理 {
+    直角三角形两条直角边的平方和等于斜边的平方。
+
+    @proof {
+        略。
+    }
+}
+```
+
+#### 7.5.2 Inline Block 内联块语法
+
+```
+'+'? '@' label [?!*]? ' ' content '\n'
+```
+
+- 单行语法，不能换行
+- 不支持 title
+- 渲染为带左边框色条、图标的行内容器
+
+示例：
+```
+@note 注意缩进必须使用 4 个空格。
+```
+
+#### 7.5.3 Box 语法
+
+```
+@[content]
+```
+
+- 行内容器，不可嵌套
+- 用于强调关键词、行内定义、简短公式
+
+示例：
+```
+@[勾股定理]是几何学中最重要的定理之一。
+@[$a^2 + b^2 = c^2$]
+```
+
+### 7.6 Notesaw 渲染管线内部实现
+
+#### 7.6.1 Parser 架构 (`parser.ts`)
+
+核心解析函数 `parseNote(text: string): NoteNode`：
+
+1. **预处理**：将 Tab 展开为 4 空格，建立行列索引数组
+2. **块解析**：使用 `indentLevel` 栈逐字符扫描，识别：
+   - `parseBlockBegin()` — 匹配 `@label[?!*] title {`
+   - `parseInlineBlock()` — 匹配 `@label[?!*] content\n`
+3. **标记切割**：识别到 `}` 关闭符时，弹出块栈，将内容交由 `parseNativeMarkdown()` 用标准 remark 解析
+4. **合并**：Notesaw 块节点和标准 Markdown MDAST 节点合并为一个完整 MDAST
+
+`parseNativeMarkdown(str, trailSpaces, offset)`：
+- 用 `remark-parse + remark-gfm + remark-math` 解析文本
+- 修正位置偏移（trim 前导空格）
+- 标记为 `type: "markdown"` 节点
+
+#### 7.6.2 AST 节点类型
+
+| `type` | 说明 | data.hName | data.hProperties.class |
+|--------|------|-----------|----------------------|
+| `root` | 文档根节点 | div | markdown-body |
+| `block` | 块容器 | div | {label}-block-mdast |
+| `inline-block` | 内联块 | div | {label}-inline-block-mdast |
+| `markdown` | 标准 Markdown 片段 | 由 remark 决定 | — |
+| `math-wrapper` | KaTeX 数学公式包装 | div | — |
+
+#### 7.6.3 Transformer 转换 (`transformer.ts`)
+
+`noteTransformPlugin()` 是一个 rehype 插件，在 HAST 层面做最终样式化：
+
+1. **查找块节点**：遍历 HAST，匹配 className 中 `-block-mdast` / `-inline-block-mdast` / `box`
+2. **颜色生成**：`hashString(label)` → `hsl(hash % 360, 80%, 70%)` 生成唯一颜色
+3. **结构重构**：
+   - Block：`<div class="block-container">` → `<div class="block-title">`（图标 + label + 标题）+ `<div class="block-body">`（内容）
+   - Inline Block：`<div class="inline-block-container">` → 图标 + label + 内容
+   - Box：转化为 `<span class="box">`
+4. **图标注入**：根据 label 从 `iconMap` 查找对应 Feather 图标名称，生成 `<svg><use href="#icon-name"/>`
+
+> **精简说明**：与原版 Notesaw 相比，此版本移除了所有 VS Code 扩展专用逻辑（行号映射、partial rendering、光标同步、全局 counter/map 数组等），仅保留纯转换功能。
+
+### 7.7 词条链接检测
+
+- 渲染前扫描 MD 内容，匹配 WikiEntry 的主名称和别名
+- 将匹配的文本替换为 `<a href="/wiki/{slug}">` 标签
+- hover 数据（definition 字段）通过 `data-wiki` 属性存储，前端 JS 处理预览弹出
+- 链接检测应在渲染**之前**执行，替换文本后再送入渲染管线
+
+### 7.8 CSS 与图标资源管理
+
+Notesaw 渲染需要以下样式和资源：
+
+| 资源 | 来源 | 说明 |
+|------|------|------|
+| `note.css` | Notesaw 项目的样式文件 | Notesaw block 样式（容器、标题、body 布局） |
+| `katex.min.css` | KaTeX 包 | 数学公式样式 |
+| Feather SVG sprite | 图标 SVG 集合 | 所有 block 图标的 SVG 集合 |
+
+**Next.js 集成策略**：
+- 将 `note.css` 复制到 `public/` 目录，在全局布局中引用
+- Feather 图标：将 SVG sprite 嵌入到布局组件（`<div style="display:none">`），供所有 Notesaw 渲染内容引用
+- KaTeX CSS：从 `node_modules/katex/dist/katex.min.css` 引入
+
+### 7.9 渲染时机
+
+- **发布时渲染**：文章发布时调用渲染管线，生成 HTML 片段存入数据库 `renderedContent` 字段或缓存文件
+- 理由：文章更新频率低，避免每次请求都执行 unified 解析（解析成本较高）
+- 前台显示时直接使用预渲染的 HTML（通过 `dangerouslySetInnerHTML` 注入）
+- 仪表盘中编辑预览时按需实时渲染
+
+### 7.10 Notesaw 源代码位置
+
+Notesaw 的核心源码位于 `packages/notesaw/`：
+
+```
+packages/notesaw/
+├── package.json          # 包定义
+├── index.ts              # NoteNode 类型定义
+├── parser.ts             # 核心解析器 (noteParsePlugin, noteBoxParsePlugin)
+├── transformer.ts        # HAST 转换器 (noteTransformPlugin，精简版)
+├── lib/type-declare.d.ts
+└── utils/prettyprint.ts  # AST 调试工具
+```
+
+`renderer.ts` 通过相对路径引用：
+```typescript
+import noteParsePlugin, { noteBoxParsePlugin } from "../../../packages/notesaw/parser.ts";
+import { noteTransformPlugin } from "../../../packages/notesaw/transformer.ts";
+```
 
 ---
 
