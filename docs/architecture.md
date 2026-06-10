@@ -6,6 +6,19 @@
 
 **最后更新**：2026-06-10
 
+### v0.4.0 2026-06-10
+
+- 第 7.10 节：新增 buildFrontmatter 工具函数——将 UI 元信息写入文件 frontmatter，保留额外字段
+- 第 3.1 节：更新上传/发布流程——API 接收 UI 元信息，写文件前调用 buildFrontmatter
+- 第 11 节：更新发布流程 API 参数
+
+### v0.3.0 2026-06-10
+
+- 第 4.1 节：Article 模型新增 `draftOfId` 自引用字段，建立草稿-已发布文章绑定关系
+- 第 4.1 节：新增 `DraftRelation` 自关联，支持草稿查询
+- 第 10 节：重写开发顺序，新增发布流程三步骤拆分
+- 第 11.4 节：仪表盘路由新增草稿编辑和审查路由
+
 ### v0.2.1 2026-06-10
 
 - 第 4.1 节：Article 模型新增 `contentType` 字段、`viewCount` 字段、`likes` 字段
@@ -189,7 +202,7 @@ miniese-blog/
 | contentPath | String | MD 文件路径 |
 | summary | Text? | AI 生成的摘要 |
 | tags | String[] | 标签数组 |
-| status | Enum (draft, published) | 状态 |
+| status | Enum (draft, published, review) | 状态 |
 | accessGroup | String[] | 要求权限组，默认空（表示公开） |
 | publishedAt | DateTime? | 发布时间 |
 | updatedAt | DateTime | 更新时间 |
@@ -197,6 +210,19 @@ miniese-blog/
 | author | String | 作者（默认"博主"） |
 | viewCount | Int | 阅读量，默认 0（v0.2.1 新增） |
 | likes | Int | 点赞数，默认 0（v0.2.1 新增） |
+| draftOfId | String? | 草稿关联的已发布文章 ID（v0.3.0 新增） |
+
+##### 自关联说明
+
+Article 表通过 `draftOfId` 实现自关联，用于草稿-已发布文章绑定：
+
+- `draftOfId = null` 且 `status = published`：已发布文章
+- `draftOfId = null` 且 `status = draft`：新文章草稿（从未发布过）
+- `draftOfId = <文章ID>` 且 `status = draft/review`：编辑已有文章的草稿
+
+约束：
+- 每篇已发布文章至多一条草稿引用它（应用层保证）
+- `@@unique([slug, language])` 仅对已发布文章生效；草稿的 slug 可重复（最终发布时校验）
 
 #### WikiEntry（词条）
 
@@ -250,6 +276,7 @@ miniese-blog/
 
 ### 4.2 关系说明
 
+- Article 自关联（draftOfId）：草稿 → 已发布文章，一对多（应用层约束为一对一）
 - Article ↔ WikiEntry：多对多，通过 ArticleWikiLink 关联
 - Article ↔ Comment：一对多
 
@@ -609,7 +636,10 @@ SITE_URL="https://..."
 |------|------|------|
 | 1 | 基础环境（Docker Compose、Prisma、Next.js 启动） | 无 |
 | 2 | 文件存储 + Markdown 渲染 | 无 |
-| 3 | 文章 CRUD（发布、列表、阅读页） | 阶段 2 |
+| 3 | 文章 CRUD 基础（发布、列表、阅读页） | 阶段 2 |
+| 3a | 发布流程步骤一：上传页（上传+预览+元信息+存草稿/审查/发布入口） | 阶段 3 |
+| 3b | 发布流程步骤二：草稿页（编辑元信息+审查状态展示） | 阶段 3a |
+| 3c | 发布流程步骤三：确认页（diff+changelog+确认发布） | 阶段 3b |
 | 4 | 知识库 CRUD（手动词条、链接检测、hover） | 阶段 2 |
 | 5 | 队列基础设施（Bull、Worker 框架） | Redis |
 | 6 | AI 审查功能（队列任务 + 前端集成） | 阶段 3、5 |
@@ -663,9 +693,10 @@ SITE_URL="https://..."
 | 路径 | 功能 |
 |------|------|
 | `/admin` | 仪表盘首页 |
-| `/admin/articles` | 文章管理 |
-| `/admin/articles/new` | 发布文章 |
-| `/admin/articles/[id]/edit` | 编辑文章 |
+| `/admin/articles` | 文章管理（已发布+草稿绑定显示） |
+| `/admin/articles/new` | 发布文章（步骤一：上传页） |
+| `/admin/articles/[id]/edit` | 编辑草稿（步骤二：草稿页） |
+| `/admin/articles/[id]/confirm` | 发布确认（步骤三：确认页） |
 | `/admin/wiki` | 词条管理 |
 | `/admin/wiki/proposals` | 词条提议审批 |
 | `/admin/reviews` | 审查报告 |
@@ -716,19 +747,19 @@ SITE_URL="https://..."
 | POST | `/api/comments` | 发表评论 |
 | PUT | `/api/comments/[id]/hide` | 隐藏/显示评论（博主） |
 
-### 11.6 中间件实现
+### 11.6 Proxy 实现
 
-语言重定向和校验通过 `middleware.ts` 实现：
+语言重定向和校验通过 `proxy.ts`（Next.js 16 文件约定，取代废弃的 `middleware.ts`）实现：
 
 ```typescript
-// middleware.ts
+// proxy.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const SUPPORTED_LANGUAGES = ['zh', 'en']
 const DEFAULT_LANGUAGE = 'zh'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   
   // API、仪表盘、静态资源不处理

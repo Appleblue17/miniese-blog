@@ -1,6 +1,24 @@
 # 开发日志
 
-## [2026-06-09]
+## [2026-06-10]
+
+### 任务 阶段3a：发布流程步骤一——上传页
+- **开始时间**：00:00
+- **结束时间**：01:30
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 实现 `PublishForm.tsx`：上传 + 元信息 + 预览 + 存草稿/发布多步骤表单，包含 tag chip 输入
+  - 实现 `POST /api/articles/upload`：支持文件上传和直接 `fileContent` 两种方式，返回解析的 frontmatter
+  - 修复 tag 解析：从手写 regex 改为 `gray-matter` 解析 frontmatter，`buildFrontmatter` 输出内联 YAML 数组
+  - 仪表盘草稿页优化：草稿显示在文章下方、空草稿占位行、增加修改时间/行数/字符数
+  - 草稿文件命名统一为 slug（`draft/route.ts` 和 `publish/route.ts`）
+  - 新文章发布后草稿关联：`publish/route.ts` 接收 `draftId`，发布后设置 `draftOfId`
+  - `ArticleMeta` 新增 slug 保留逻辑：`buildFrontmatter` 从原始 frontmatter 保留 slug 字段
+- **测试结果**：84/84 全部通过（新增 publish 测试回归修复）
+- **遇到的问题**：
+  - `buildFrontmatter` 中 slug 在 `MANAGED_FIELDS` 但不在 `ArticleMeta` 中导致 slug 丢失
+  - 测试 `returns 409 when slug+language combination already exists` 因前次运行的 DB 残留记录失败
+  - 修复：在 `buildFrontmatter` 中用 `parsedFrontmatter` 变量保留原始 frontmatter 的 slug
 
 ### 任务 阶段1：基础环境搭建
 - **开始时间**：22:30

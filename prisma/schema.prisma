@@ -59,6 +59,11 @@ model Article {
   viewCount        Int             @default(0)
   likes            Int             @default(0)
 
+  // 草稿绑定：若此记录是草稿，指向它所属的已发布文章
+  draftOfId String?
+  draftOf   Article?  @relation("DraftRelation", fields: [draftOfId], references: [id])
+  drafts    Article[] @relation("DraftRelation")
+
   wikiLinks   ArticleWikiLink[]
   comments    Comment[]
 

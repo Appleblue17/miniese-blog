@@ -92,7 +92,7 @@ Body`;
     const result = parseFrontmatter(raw);
     expect(result.frontmatter.title).toBe("Version");
     // Extra fields not in interface are still accessible
-    expect((result.frontmatter as any).version).toBe(2);
+    expect((result.frontmatter as Record<string, unknown>).version).toBe(2);
   });
 });
 

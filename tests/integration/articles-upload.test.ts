@@ -39,7 +39,7 @@ describe("POST /api/articles/upload", () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.filePath).toContain("content/articles/drafts/test-article.md");
+    expect(data.fileName).toBe("test-article.md");
 
     // Verify the file was actually written
     const filePath = path.join(DRAFTS_DIR, "test-article.md");

@@ -24,6 +24,9 @@ beforeEach(async () => {
     await prisma.article.deleteMany({
       where: { slug: { startsWith: "test-" } },
     }).catch(() => {});
+    await prisma.article.deleteMany({
+      where: { slug: "duplicate-test" },
+    }).catch(() => {});
   }
 });
 
@@ -38,7 +41,7 @@ const describeDb = isDbAvailable ? describe : describe.skip;
 
 describeDb("POST /api/articles/publish", () => {
   it("publishes a valid draft and creates database record", async () => {
-    const draftContent = `---
+    const fileContent = `---
 title: "Test Article"
 language: zh
 tags: [test]
@@ -49,7 +52,7 @@ slug: test-article
 
 This is a test article.`;
 
-    await createTestDraft("test-article.md", draftContent);
+    await createTestDraft("test-article.md", fileContent);
 
     const { POST } = await import("@/app/api/articles/publish/route");
 
@@ -58,8 +61,16 @@ This is a test article.`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileName: "test-article.md",
           language: "zh",
+          meta: {
+            title: "Test Article",
+            language: "zh",
+            fileType: "markdown",
+            tags: ["test"],
+            author: "博主",
+            summary: "",
+          },
+          fileContent,
         }),
       }),
     );
@@ -70,7 +81,7 @@ This is a test article.`;
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.article.slug).toBe("test-article");
-    expect(data.article.url).toContain("/zh/test-article");
+    expect(data.article.url).toContain("/zh/articles/test-article");
 
     // Verify database record
     const { prisma } = await import("./db-client");
@@ -95,7 +106,7 @@ This is a test article.`;
     });
   });
 
-  it("returns 400 when fileName is missing", async () => {
+  it("returns 400 when fileContent is missing", async () => {
     const { POST } = await import("@/app/api/articles/publish/route");
 
     const request = toNextRequest(
@@ -110,7 +121,7 @@ This is a test article.`;
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain("fileName");
+    expect(data.error).toContain("fileContent");
   });
 
   it("returns 400 when language is invalid", async () => {
@@ -120,7 +131,18 @@ This is a test article.`;
       new Request("http://localhost:3000/api/articles/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: "test.md", language: "fr" }),
+        body: JSON.stringify({
+          language: "fr",
+          fileContent: "# Hello",
+          meta: {
+            title: "Test",
+            language: "zh",
+            fileType: "markdown",
+            tags: [],
+            author: "博主",
+            summary: "",
+          },
+        }),
       }),
     );
 
@@ -131,7 +153,7 @@ This is a test article.`;
     expect(data.error).toContain("language");
   });
 
-  it("returns 404 when draft file does not exist", async () => {
+  it("returns 404 when draft file does not exist (legacy path)", async () => {
     const { POST } = await import("@/app/api/articles/publish/route");
 
     const request = toNextRequest(
@@ -153,15 +175,13 @@ This is a test article.`;
   });
 
   it("returns 409 when slug+language combination already exists", async () => {
-    const draftContent = `---
+    const fileContent = `---
 title: "Duplicate"
 language: en
 slug: duplicate-test
 ---
 
 Body`;
-
-    await createTestDraft("dup.md", draftContent);
 
     const { POST } = await import("@/app/api/articles/publish/route");
     const { prisma } = await import("./db-client");
@@ -171,7 +191,18 @@ Body`;
       new Request("http://localhost:3000/api/articles/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: "dup.md", language: "en" }),
+        body: JSON.stringify({
+          language: "en",
+          meta: {
+            title: "Duplicate",
+            language: "en",
+            fileType: "markdown",
+            tags: [],
+            author: "博主",
+            summary: "",
+          },
+          fileContent,
+        }),
       }),
     );
     const res1 = await POST(req1);
@@ -179,21 +210,30 @@ Body`;
     const data1 = await res1.json();
     const firstId = data1.article.id;
 
-    // Cleanup first published file and try to publish duplicate
-    const draftContent2 = `---
+    // Try to publish with same slug
+    const req2 = toNextRequest(
+      new Request("http://localhost:3000/api/articles/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: "en",
+          slug: "duplicate-test",
+          meta: {
+            title: "Duplicate 2",
+            language: "en",
+            fileType: "markdown",
+            tags: [],
+            author: "博主",
+            summary: "",
+          },
+          fileContent: `---
 title: "Duplicate 2"
 language: en
 slug: duplicate-test
 ---
 
-Body 2`;
-    await createTestDraft("dup2.md", draftContent2);
-
-    const req2 = toNextRequest(
-      new Request("http://localhost:3000/api/articles/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: "dup2.md", language: "en" }),
+Body 2`,
+        }),
       }),
     );
     const res2 = await POST(req2);
@@ -203,8 +243,6 @@ Body 2`;
 
     // Cleanup
     cleanupFns.push(async () => {
-      await removeTestDraft("dup.md");
-      await removeTestDraft("dup2.md");
       const { unlink } = await import("fs/promises");
       const path = await import("path");
       await unlink(
