@@ -66,7 +66,7 @@
    │
 6. 更新 development-log.md
    │
-7. 提交代码（git commit）
+7. 提交代码（git commit），提交前请先向用户确认
    │
 8. 汇报完成
 ```

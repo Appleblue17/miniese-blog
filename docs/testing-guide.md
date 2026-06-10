@@ -1,6 +1,6 @@
 # 测试指南
 
-> **面向开发者**的测试参考文档，包含手动验证方法、当前测试清单和注意事项。
+> **面向开发者**的测试参考文档，包含手动验证方法、当前测试清单和注意事项；文末附有测试记录。
 > Agent 应优先参考 `AGENTS.md` 中的"Testing"小节了解规范，再查阅本文档获取具体细节。
 
 ## 快速开始
@@ -22,27 +22,6 @@ npm run test:coverage
 - **断言库**：Vitest 内置（兼容 Jest API，`describe` / `it` / `expect`）
 - **覆盖率**：c8 / v8 引擎（通过 `@vitest/coverage-v8`）
 - **配置**：`vitest.config.ts`
-
-## 当前测试
-
-### 阶段 2.1：Markdown 渲染器
-
-**文件**：`src/lib/markdown/renderer.test.ts`
-**数量**：41 个测试用例
-
-| 测试分组 | 数量 | 说明 |
-|----------|------|------|
-| 标准 Markdown | 18 | 标题、粗体、斜体、代码块、列表、引用、链接、图片、表格、删除线、任务列表等 |
-| KaTeX 数学公式 | 3 | 行内公式 `$...$`、块公式 `$$...$$`、Notesaw 模式下的公式 |
-| Notesaw 语法 | 16 | @def block（含/不含标题）、@note inline-block、@[box]、嵌套 block、缩写映射（thm→theorem）、样式修饰符（?!*）、多个 block、标准 Markdown 在 Notesaw 模式下的兼容性、公式在 block 内 |
-| 边界情况 | 4 | 空输入、空白输入、单字符、HTML 转义 |
-
-### 覆盖率目标
-
-- 分支（branches）≥ 80%
-- 函数（functions）≥ 80%
-- 行（lines）≥ 80%
-- 当前实际值：**100%**
 
 ## 如何手动验证渲染效果
 
@@ -94,7 +73,63 @@ describe("功能分组", () => {
 });
 ```
 
-## 注意事项
+## 测试记录
+
+### 阶段 2.1：Markdown 渲染器
+
+**更新时间**：2026-06-09
+**文件**：`src/lib/markdown/renderer.test.ts`
+**数量**：41 个测试用例
+
+| 测试分组 | 数量 | 说明 |
+|----------|------|------|
+| 标准 Markdown | 18 | 标题、粗体、斜体、代码块、列表、引用、链接、图片、表格、删除线、任务列表等 |
+| KaTeX 数学公式 | 3 | 行内公式 `$...$`、块公式 `$$...$$`、Notesaw 模式下的公式 |
+| Notesaw 语法 | 16 | @def block（含/不含标题）、@note inline-block、@[box]、嵌套 block、缩写映射（thm→theorem）、样式修饰符（?!*）、多个 block、标准 Markdown 在 Notesaw 模式下的兼容性、公式在 block 内 |
+| 边界情况 | 4 | 空输入、空白输入、单字符、HTML 转义 |
+
+### 阶段 2.2：文章基础 CRUD
+
+**更新时间**：2026-06-10
+**总览**：**83/83 全部通过**（单元 57 + 集成 26），0 跳过
+
+| 文件 | 类型 | 数量 | 说明 |
+|------|------|------|------|
+| `src/lib/articles/frontmatter.test.ts` | 单元测试 | 16 | frontmatter 解析、slug 生成 |
+| `tests/integration/articles-upload.test.ts` | 集成测试 | 4 | 上传 .md 文件到 drafts |
+| `tests/integration/articles-preview.test.ts` | 集成测试 | 6 | Markdown/Notesaw 渲染为 HTML |
+| `tests/integration/articles-publish.test.ts` | 集成测试 | 5 | 发布草稿（文件移动 + DB 写入） |
+| `tests/integration/articles-list.test.ts` | 集成测试 | 7 | 分页列表、tag/lang 筛选 |
+| `tests/integration/articles-detail.test.ts` | 集成测试 | 4 | 文章详情 + 渲染 HTML |
+
+#### 运行数据库依赖的集成测试
+
+发布/列表/详情 API 测试需要 PostgreSQL 数据库：
+
+```bash
+# 启动数据库
+docker compose up -d
+
+# 运行全部测试（含数据库）
+npm test
+
+# 仅运行集成测试
+npx vitest run tests/integration/
+```
+
+如果数据库不可用，数据库相关测试会自动跳过（不报错）。
+
+#### API 端点清单
+
+| 方法 | 路径 | 功能 |
+|------|------|------|
+| POST | `/api/articles/upload` | 上传 .md 到 drafts 目录 |
+| POST | `/api/articles/preview` | 渲染 Markdown/Notesaw 为 HTML |
+| POST | `/api/articles/publish` | 发布草稿（文件移至语言目录 + 写入 DB） |
+| GET | `/api/articles` | 分页列表（支持 `?tag=` `?lang=` 筛选） |
+| GET | `/api/articles/[slug]` | 文章详情（元数据 + 渲染 HTML） |
+
+#### 注意事项
 
 1. **`renderMarkdown` 是异步函数** — 测试中必须用 `await`
 2. **HTML 输出是片段** — 不包含 `<html>`、`<head>`、`<body>` 标签，适合通过 `dangerouslySetInnerHTML` 注入 React 组件
