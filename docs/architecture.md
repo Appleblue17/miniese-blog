@@ -613,7 +613,149 @@ SITE_URL="https://..."
 
 ---
 
-## 11. 后续扩展预留
+## 11. 路由规划
+
+> 本文档定义博客系统的所有路由。路由实现应遵循 RESTful 风格。
+
+### 11.1 公开路由（无需认证）
+
+| 路径 | 页面 | 说明 |
+|------|------|------|
+| `/` | 主页 | 介绍性内容 + 近期文章 |
+| `/articles` | 文章列表页 | 所有已发布文章，支持分页和筛选 |
+| `/articles/[slug]` | 文章阅读页 | 单篇文章，slug 包含语言信息（如 `/articles/zh/hello-world`） |
+| `/wiki` | 词条列表页 | 知识库词条列表 |
+| `/wiki/[name]` | 词条阅读页 | 单个词条 |
+| `/about` | 关于页 | 博客介绍、联系信息 |
+| `/rss.xml` | RSS Feed | 文章订阅 |
+| `/sitemap.xml` | 站点地图 | SEO |
+| `/login` | 登录页 | 读者登录（后续） |
+| `/settings` | 读者设置页 | 偏好设置（后续） |
+
+### 11.2 仪表盘路由（需要认证，仅博主）
+
+| 路径 | 功能 | 说明 |
+|------|------|------|
+| `/admin` | 仪表盘首页 | 概览 + 快速入口 |
+| `/admin/articles` | 文章管理 | 列表、新建、编辑、删除 |
+| `/admin/articles/new` | 发布文章 | 上传 MD、预览、填写 changelog、发布 |
+| `/admin/articles/[id]/edit` | 编辑文章 | 编辑已发布文章（产生草稿） |
+| `/admin/wiki` | 词条管理 | 列表、新建、编辑、删除 |
+| `/admin/wiki/proposals` | 词条提议审批 | AI 词条提议 + 读者申请 |
+| `/admin/reviews` | 审查报告 | AI 审查历史记录 |
+| `/admin/notifications` | 通知中心 | 评论违规、词条申请等 |
+| `/admin/settings` | 设置 | 站点配置、Prompt 配置等 |
+
+### 11.3 API 路由
+
+#### 文章相关
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/articles/upload` | 上传 MD 文件到草稿 |
+| POST | `/api/articles/preview` | 预览渲染 |
+| POST | `/api/articles/publish` | 发布文章 |
+| GET | `/api/articles` | 文章列表（分页、标签筛选） |
+| GET | `/api/articles/[slug]` | 文章详情 |
+| PUT | `/api/articles/[slug]` | 更新文章（v2） |
+| DELETE | `/api/articles/[slug]` | 删除文章（v2） |
+
+#### 词条相关
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/wiki` | 词条列表 |
+| GET | `/api/wiki/[name]` | 词条详情 |
+| POST | `/api/wiki` | 创建词条 |
+| PUT | `/api/wiki/[name]` | 更新词条 |
+| DELETE | `/api/wiki/[name]` | 删除词条 |
+| POST | `/api/wiki/proposals` | 提交词条申请（读者） |
+| POST | `/api/wiki/proposals/[id]/approve` | 审批词条提议（AI 生成） |
+
+#### AI 相关
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/ai/review` | 提交审查任务（返回 taskId） |
+| POST | `/api/ai/translate` | 提交翻译任务 |
+| POST | `/api/ai/generate` | 提交词条生成任务 |
+| GET | `/api/ai/status/[taskId]` | 查询任务状态 |
+| POST | `/api/chat` | 读者对话（调用 DeepSeek） |
+
+#### 评论相关
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/comments?articleId=xxx` | 获取评论列表 |
+| POST | `/api/comments` | 发表评论 |
+| PUT | `/api/comments/[id]/hide` | 隐藏/显示评论（博主） |
+
+#### 其他
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/health` | 健康检查 |
+| POST | `/api/auth/...` | 认证相关（v2） |
+
+### 11.4 认证策略（MVP）
+
+**MVP 阶段采用简单方案**：
+- 仪表盘路由（`/admin/*`）使用 **HTTP Basic Auth** 保护
+- 通过 Next.js 中间件（`middleware.ts`）实现
+- 密码存储在环境变量 `ADMIN_PASSWORD` 中
+
+**实现示例**：
+
+```typescript
+// middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  // 只保护 /admin 路由
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader) {
+      return new NextResponse('Unauthorized', {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Basic realm="Admin Area"' },
+      })
+    }
+    
+    const base64 = authHeader.split(' ')[1]
+    const [user, pass] = Buffer.from(base64, 'base64').toString().split(':')
+    
+    if (user !== 'admin' || pass !== process.env.ADMIN_PASSWORD) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+  }
+  
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: '/admin/:path*',
+}
+```
+
+**后续迭代**：引入 NextAuth.js，支持 OAuth 和更完善的用户管理。
+
+### 11.5 前端页面实现顺序
+
+| 顺序 | 页面 | 依赖 API | 说明 |
+|------|------|----------|------|
+| 1 | `/admin/articles/new` | upload, preview, publish | 发布流程 |
+| 2 | `/articles` | GET /api/articles | 文章列表 |
+| 3 | `/articles/[slug]` | GET /api/articles/[slug] | 文章阅读 |
+| 4 | `/admin/articles` | GET /api/articles, DELETE | 文章管理 |
+| 5 | `/wiki` | GET /api/wiki | 词条列表 |
+| 6 | `/wiki/[name]` | GET /api/wiki/[name] | 词条阅读 |
+| 7 | 其他仪表盘页面 | 相应 API | 后续阶段 |
+
+---
+
+## 12. 后续扩展预留
 
 - **向量数据库**：将 `AiTask` 中的输出改为可存储 embedding
 - **Git 集成**：在发布流程中增加 `git commit` 调用
