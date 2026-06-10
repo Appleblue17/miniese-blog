@@ -8,7 +8,7 @@
  *   page  - Page number (default: 1)
  *   limit - Items per page (default: 10, max: 100)
  *   tag   - Filter by tag (optional)
- *   lang  - Filter by language "zh" or "en" (optional)
+ *   lang  - Language code "zh" or "en" (required)
  *
  * Response: { articles: [...], total: number, page: number, totalPages: number }
  */
@@ -27,16 +27,20 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
 
+    // lang is required
+    if (language !== "zh" && language !== "en") {
+      return NextResponse.json(
+        { error: "lang query parameter is required. Must be 'zh' or 'en'." },
+        { status: 400 },
+      );
+    }
+
     // Build where clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = { status: "published" };
+    const where: any = { status: "published", language };
 
     if (tag) {
       where.tags = { has: tag };
-    }
-
-    if (language === "zh" || language === "en") {
-      where.language = language;
     }
 
     // Execute query and count in parallel

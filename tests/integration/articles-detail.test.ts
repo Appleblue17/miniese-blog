@@ -118,7 +118,7 @@ describeDb("GET /api/articles/[slug]", () => {
     expect(data.error).toContain("not found");
   });
 
-  it("defaults to zh language when lang param is not provided", async () => {
+  it("returns 400 when lang parameter is missing", async () => {
     const { GET } = await import(
       "@/app/api/articles/[slug]/route"
     );
@@ -131,8 +131,8 @@ describeDb("GET /api/articles/[slug]", () => {
       params: Promise.resolve({ slug: "detail-test" }),
     } as any);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
     const data = await response.json();
-    expect(data.article.slug).toBe("detail-test");
+    expect(data.error).toContain("lang");
   });
 });

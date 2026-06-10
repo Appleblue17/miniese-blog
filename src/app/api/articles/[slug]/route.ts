@@ -5,7 +5,7 @@
  * Includes rendered HTML and all metadata.
  *
  * Query params:
- *   lang - Language code "zh" or "en" (default: "zh")
+ *   lang - Language code "zh" or "en" (required)
  *
  * Response: { article: { ...metadata }, html: string }
  */
@@ -20,11 +20,11 @@ export async function GET(
   try {
     const { slug } = await params;
     const { searchParams } = new URL(request.url);
-    const language = searchParams.get("lang") || "zh";
+    const language = searchParams.get("lang");
 
     if (language !== "zh" && language !== "en") {
       return NextResponse.json(
-        { error: "lang must be 'zh' or 'en'." },
+        { error: "lang query parameter is required. Must be 'zh' or 'en'." },
         { status: 400 },
       );
     }

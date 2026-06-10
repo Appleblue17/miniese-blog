@@ -615,72 +615,90 @@ SITE_URL="https://..."
 
 ## 11. 路由规划
 
-> 本文档定义博客系统的所有路由。路由实现应遵循 RESTful 风格。
+> 本文档定义博客系统的所有路由。语言前缀贯穿所有公开页面，API 和仪表盘路由不受影响。
 
-### 11.1 公开路由（无需认证）
+### 11.1 核心设计原则
+
+1. **语言前缀**：所有公开页面使用 `/{lang}/` 前缀，`lang` 取值为 `zh`（中文）或 `en`（英文）
+2. **默认重定向**：访问 `/` 自动重定向到用户偏好的语言版本
+3. **API 不受影响**：`/api/*` 路由无语言前缀
+4. **仪表盘不受影响**：`/admin/*` 路由无语言前缀（仅博主访问）
+
+### 11.2 公开路由（带语言前缀）
 
 | 路径 | 页面 | 说明 |
 |------|------|------|
-| `/` | 主页 | 介绍性内容 + 近期文章 |
-| `/articles` | 文章列表页 | 所有已发布文章，支持分页和筛选 |
-| `/articles/[slug]` | 文章阅读页 | 单篇文章，slug 包含语言信息（如 `/articles/zh/hello-world`） |
-| `/wiki` | 词条列表页 | 知识库词条列表 |
-| `/wiki/[name]` | 词条阅读页 | 单个词条 |
-| `/about` | 关于页 | 博客介绍、联系信息 |
-| `/rss.xml` | RSS Feed | 文章订阅 |
-| `/sitemap.xml` | 站点地图 | SEO |
-| `/login` | 登录页 | 读者登录（后续） |
-| `/settings` | 读者设置页 | 偏好设置（后续） |
+| `/{lang}` | 主页 | 语言版本的主页 |
+| `/{lang}/articles` | 文章列表页 | 指定语言的已发布文章 |
+| `/{lang}/articles/[slug]` | 文章阅读页 | slug 不包含语言，由路径前缀区分 |
+| `/{lang}/wiki` | 词条列表页 | 指定语言的词条 |
+| `/{lang}/wiki/[name]` | 词条阅读页 | 词条名不包含语言 |
+| `/{lang}/about` | 关于页 | 语言版本的关于页面 |
+| `/{lang}/settings` | 读者设置页 | 偏好设置、认证等 |
 
-### 11.2 仪表盘路由（需要认证，仅博主）
+**示例**：
+- `/zh/articles/hello-world` - 中文版文章
+- `/en/articles/hello-world` - 英文版文章（相同 slug）
 
-| 路径 | 功能 | 说明 |
-|------|------|------|
-| `/admin` | 仪表盘首页 | 概览 + 快速入口 |
-| `/admin/articles` | 文章管理 | 列表、新建、编辑、删除 |
-| `/admin/articles/new` | 发布文章 | 上传 MD、预览、填写 changelog、发布 |
-| `/admin/articles/[id]/edit` | 编辑文章 | 编辑已发布文章（产生草稿） |
-| `/admin/wiki` | 词条管理 | 列表、新建、编辑、删除 |
-| `/admin/wiki/proposals` | 词条提议审批 | AI 词条提议 + 读者申请 |
-| `/admin/reviews` | 审查报告 | AI 审查历史记录 |
-| `/admin/notifications` | 通知中心 | 评论违规、词条申请等 |
-| `/admin/settings` | 设置 | 站点配置、Prompt 配置等 |
+### 11.3 无语言前缀的路由
 
-### 11.3 API 路由
+| 路径 | 说明 |
+|------|------|
+| `/` | 自动重定向到 `/{lang}` |
+| `/rss.xml` | RSS Feed（可按语言分离，MVP 先做默认语言） |
+| `/sitemap.xml` | 站点地图 |
+| `/api/*` | 所有 API 路由 |
+| `/admin/*` | 仪表盘路由（HTTP Basic Auth 保护） |
+
+### 11.4 仪表盘路由（博主专用）
+
+| 路径 | 功能 |
+|------|------|
+| `/admin` | 仪表盘首页 |
+| `/admin/articles` | 文章管理 |
+| `/admin/articles/new` | 发布文章 |
+| `/admin/articles/[id]/edit` | 编辑文章 |
+| `/admin/wiki` | 词条管理 |
+| `/admin/wiki/proposals` | 词条提议审批 |
+| `/admin/reviews` | 审查报告 |
+| `/admin/notifications` | 通知中心 |
+| `/admin/settings` | 站点设置 |
+
+### 11.5 API 路由
 
 #### 文章相关
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/articles/upload` | 上传 MD 文件到草稿 |
-| POST | `/api/articles/preview` | 预览渲染 |
-| POST | `/api/articles/publish` | 发布文章 |
-| GET | `/api/articles` | 文章列表（分页、标签筛选） |
-| GET | `/api/articles/[slug]` | 文章详情 |
-| PUT | `/api/articles/[slug]` | 更新文章（v2） |
-| DELETE | `/api/articles/[slug]` | 删除文章（v2） |
+| 方法 | 路径 | 说明 | 语言参数 |
+|------|------|------|----------|
+| POST | `/api/articles/upload` | 上传 MD 文件到草稿 | 从 frontmatter 读 |
+| POST | `/api/articles/preview` | 预览渲染 | 无需 |
+| POST | `/api/articles/publish` | 发布文章 | 从 frontmatter 读 |
+| GET | `/api/articles` | 文章列表 | `?lang=zh` 必填 |
+| GET | `/api/articles/[slug]` | 文章详情 | `?lang=zh` 必填 |
+| PUT | `/api/articles/[slug]` | 更新文章（v2） | `?lang=zh` |
+| DELETE | `/api/articles/[slug]` | 删除文章（v2） | `?lang=zh` |
 
 #### 词条相关
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/wiki` | 词条列表 |
-| GET | `/api/wiki/[name]` | 词条详情 |
-| POST | `/api/wiki` | 创建词条 |
-| PUT | `/api/wiki/[name]` | 更新词条 |
-| DELETE | `/api/wiki/[name]` | 删除词条 |
-| POST | `/api/wiki/proposals` | 提交词条申请（读者） |
-| POST | `/api/wiki/proposals/[id]/approve` | 审批词条提议（AI 生成） |
+| 方法 | 路径 | 说明 | 语言参数 |
+|------|------|------|----------|
+| GET | `/api/wiki` | 词条列表 | `?lang=zh` 必填 |
+| GET | `/api/wiki/[name]` | 词条详情 | `?lang=zh` 必填 |
+| POST | `/api/wiki` | 创建词条 | 从请求体读 |
+| PUT | `/api/wiki/[name]` | 更新词条 | `?lang=zh` |
+| DELETE | `/api/wiki/[name]` | 删除词条 | `?lang=zh` |
+| POST | `/api/wiki/proposals` | 提交词条申请 | 无需 |
+| POST | `/api/wiki/proposals/[id]/approve` | 审批提议 | 无需 |
 
 #### AI 相关
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/ai/review` | 提交审查任务（返回 taskId） |
+| POST | `/api/ai/review` | 提交审查任务 |
 | POST | `/api/ai/translate` | 提交翻译任务 |
 | POST | `/api/ai/generate` | 提交词条生成任务 |
 | GET | `/api/ai/status/[taskId]` | 查询任务状态 |
-| POST | `/api/chat` | 读者对话（调用 DeepSeek） |
+| POST | `/api/chat` | 读者对话 |
 
 #### 评论相关
 
@@ -690,68 +708,97 @@ SITE_URL="https://..."
 | POST | `/api/comments` | 发表评论 |
 | PUT | `/api/comments/[id]/hide` | 隐藏/显示评论（博主） |
 
-#### 其他
+### 11.6 中间件实现
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 健康检查 |
-| POST | `/api/auth/...` | 认证相关（v2） |
-
-### 11.4 认证策略（MVP）
-
-**MVP 阶段采用简单方案**：
-- 仪表盘路由（`/admin/*`）使用 **HTTP Basic Auth** 保护
-- 通过 Next.js 中间件（`middleware.ts`）实现
-- 密码存储在环境变量 `ADMIN_PASSWORD` 中
-
-**实现示例**：
+语言重定向和校验通过 `middleware.ts` 实现：
 
 ```typescript
 // middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const SUPPORTED_LANGUAGES = ['zh', 'en']
+const DEFAULT_LANGUAGE = 'zh'
+
 export function middleware(request: NextRequest) {
-  // 只保护 /admin 路由
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader) {
-      return new NextResponse('Unauthorized', {
-        status: 401,
-        headers: { 'WWW-Authenticate': 'Basic realm="Admin Area"' },
-      })
-    }
-    
-    const base64 = authHeader.split(' ')[1]
-    const [user, pass] = Buffer.from(base64, 'base64').toString().split(':')
-    
-    if (user !== 'admin' || pass !== process.env.ADMIN_PASSWORD) {
-      return new NextResponse('Unauthorized', { status: 401 })
-    }
+  const { pathname } = request.nextUrl
+  
+  // API、仪表盘、静态资源不处理
+  if (pathname.startsWith('/api') || 
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/favicon.ico') ||
+      pathname === '/rss.xml' ||
+      pathname === '/sitemap.xml') {
+    return NextResponse.next()
   }
   
-  return NextResponse.next()
+  // 检查是否已有语言前缀
+  const firstSegment = pathname.split('/')[1]
+  if (SUPPORTED_LANGUAGES.includes(firstSegment)) {
+    return NextResponse.next()
+  }
+  
+  // 获取用户偏好的语言
+  let preferredLang = request.cookies.get('preferred_lang')?.value
+  if (!preferredLang) {
+    const acceptLang = request.headers.get('accept-language') || ''
+    preferredLang = acceptLang.startsWith('zh') ? 'zh' : 'en'
+  }
+  if (!SUPPORTED_LANGUAGES.includes(preferredLang)) {
+    preferredLang = DEFAULT_LANGUAGE
+  }
+  
+  // 重定向
+  const newUrl = new URL(`/${preferredLang}${pathname}`, request.url)
+  return NextResponse.redirect(newUrl)
 }
 
 export const config = {
-  matcher: '/admin/:path*',
+  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
 }
 ```
 
-**后续迭代**：引入 NextAuth.js，支持 OAuth 和更完善的用户管理。
+### 11.7 语言切换逻辑
 
-### 11.5 前端页面实现顺序
+- 切换按钮位于导航栏右上角
+- 点击后：
+  1. 保存 `preferred_lang` 到 cookie（有效期 1 年）
+  2. 将当前路径中的语言部分替换为目标语言
+  3. 跳转到新路径
+- 如果目标语言版本的内容不存在，显示 404 页面
 
-| 顺序 | 页面 | 依赖 API | 说明 |
-|------|------|----------|------|
-| 1 | `/admin/articles/new` | upload, preview, publish | 发布流程 |
-| 2 | `/articles` | GET /api/articles | 文章列表 |
-| 3 | `/articles/[slug]` | GET /api/articles/[slug] | 文章阅读 |
-| 4 | `/admin/articles` | GET /api/articles, DELETE | 文章管理 |
-| 5 | `/wiki` | GET /api/wiki | 词条列表 |
-| 6 | `/wiki/[name]` | GET /api/wiki/[name] | 词条阅读 |
-| 7 | 其他仪表盘页面 | 相应 API | 后续阶段 |
+**示例**：用户在 `/zh/articles/hello-world` 点击切换到英文
+→ 跳转到 `/en/articles/hello-world`
+
+### 11.8 前端页面实现顺序（调整后）
+
+| 顺序 | 页面 | 说明 |
+|------|------|------|
+| 1 | `/admin/articles/new` | 发布页（无语言依赖） |
+| 2 | `/{lang}/articles` | 文章列表页（需要 lang 参数） |
+| 3 | `/{lang}/articles/[slug]` | 文章阅读页（需要 lang 参数） |
+| 4 | `/admin/articles` | 文章管理页 |
+| 5 | `/{lang}/wiki` | 词条列表页（后续阶段） |
+| 6 | `/{lang}/wiki/[name]` | 词条阅读页（后续阶段） |
+
+### 11.9 对已实现 API 的影响
+
+阶段2.2 已实现的 API 需要小幅调整：
+
+| API | 当前状态 | 需要的调整 |
+|-----|----------|------------|
+| `GET /api/articles` | 无语言参数 | 增加 `lang` 必填查询参数 |
+| `GET /api/articles/[slug]` | 无语言参数 | 增加 `lang` 必填查询参数 |
+| `POST /api/articles/publish` | 从 frontmatter 读取 `lang` | ✅ 无需调整 |
+| 文件路径 | `content/articles/{lang}/{slug}.md` | ✅ 已实现 |
+
+**调整示例**：
+```typescript
+// 调用时
+fetch(`/api/articles?lang=${lang}&page=1`)
+fetch(`/api/articles/${slug}?lang=${lang}`)
+```
 
 ---
 
