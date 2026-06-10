@@ -4,7 +4,12 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-09
+**最后更新**：2026-06-10
+
+### v0.2.1 2026-06-10
+
+- 第 4.1 节：Article 模型新增 `contentType` 字段、`viewCount` 字段、`likes` 字段
+- 第 4.1 节：新增 `ContentFormat` enum（markdown / notesaw），用于选择渲染管线
 
 ### v0.2.0 2026-06-09
 
@@ -180,6 +185,7 @@ miniese-blog/
 | slug | String | URL 标识，与语言组合唯一 |
 | title | String | 标题 |
 | language | Enum (zh, en) | 语言 |
+| contentType | Enum (markdown, notesaw) | 内容格式，决定渲染管线（v0.2.1 新增） |
 | contentPath | String | MD 文件路径 |
 | summary | Text? | AI 生成的摘要 |
 | tags | String[] | 标签数组 |
@@ -189,8 +195,8 @@ miniese-blog/
 | updatedAt | DateTime | 更新时间 |
 | changelog | Text? | 最近的变更摘要 |
 | author | String | 作者（默认"博主"） |
-| viewCount | Int | 阅读量，默认 0（v0.3.0 新增） |
-| likes | Int | 点赞数，默认 0（v0.3.0 新增） |
+| viewCount | Int | 阅读量，默认 0（v0.2.1 新增） |
+| likes | Int | 点赞数，默认 0（v0.2.1 新增） |
 
 #### WikiEntry（词条）
 

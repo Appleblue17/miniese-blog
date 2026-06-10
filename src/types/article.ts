@@ -3,6 +3,7 @@ export interface ArticleMeta {
   slug: string;
   title: string;
   language: "zh" | "en";
+  contentType: "markdown" | "notesaw";
   contentPath: string;
   summary?: string;
   tags: string[];
@@ -12,4 +13,6 @@ export interface ArticleMeta {
   updatedAt: string;
   changelog?: string;
   author: string;
+  viewCount: number;
+  likes: number;
 }
