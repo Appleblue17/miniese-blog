@@ -189,6 +189,8 @@ miniese-blog/
 | updatedAt | DateTime | 更新时间 |
 | changelog | Text? | 最近的变更摘要 |
 | author | String | 作者（默认"博主"） |
+| viewCount | Int | 阅读量，默认 0（v0.3.0 新增） |
+| likes | Int | 点赞数，默认 0（v0.3.0 新增） |
 
 #### WikiEntry（词条）
 
