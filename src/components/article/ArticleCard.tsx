@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Clock, Eye, Heart, User } from "lucide-react";
+import { Calendar, Clock, Eye, Heart, User, Tag } from "lucide-react";
 
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +96,8 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
 
           {/* Tags */}
           {article.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Tag className="size-3 text-muted-foreground shrink-0" />
               {article.tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="text-[10px]">
                   {tag}

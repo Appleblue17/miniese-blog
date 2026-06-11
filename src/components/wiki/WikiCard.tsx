@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Sparkles, ShieldCheck, Clock, Tag } from "lucide-react";
 
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,8 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
 
           {/* Tags */}
           {entry.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Tag className="size-3 text-muted-foreground shrink-0" />
               {entry.tags.map((tag) => (
                 <Badge key={tag} variant="outline" className="text-[10px]">
                   {tag}
@@ -68,16 +69,19 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
           {/* Metadata: status badges */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {entry.status === "creating" && (
-              <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                <Sparkles className="size-2.5" />
                 生成中
               </span>
             )}
             {entry.status === "reviewed" ? (
-              <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-700 dark:bg-green-900 dark:text-green-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
+                <ShieldCheck className="size-2.5" />
                 已审查
               </span>
             ) : entry.status === "unreviewed" ? (
-              <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                <Clock className="size-2.5" />
                 待审查
               </span>
             ) : null}

@@ -3,17 +3,19 @@
  *
  * Shows all published articles with their linked drafts below.
  * New drafts (no linked article) are shown as placeholder article rows.
- * Each row shows modified time, line count, and character count.
+ * Supports pagination with consistent styling to AdminWikiList.
  */
 
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import { ArticleRowActions } from "@/components/admin/ArticleRowActions";
 
 export const metadata: Metadata = {
   title: "文章管理 | Miniese's Blog",
 };
+
+const PAGE_SIZE = 15;
 
 interface ArticleItem {
   id: string;
@@ -46,21 +48,41 @@ interface DraftItem {
   lineCount: number;
 }
 
-async function fetchData() {
+interface AdminArticlesResponse {
+  articles: ArticleItem[];
+  drafts: DraftItem[];
+  newDrafts: DraftItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+async function fetchData(
+  page: number,
+): Promise<AdminArticlesResponse> {
   try {
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/admin/articles`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return { articles: [], drafts: [], newDrafts: [] };
+    const res = await fetch(
+      `${baseUrl}/api/admin/articles?page=${page}&limit=${PAGE_SIZE}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return { articles: [], drafts: [], newDrafts: [], total: 0, page: 1, totalPages: 0 };
     return res.json();
   } catch {
-    return { articles: [], drafts: [], newDrafts: [] };
+    return { articles: [], drafts: [], newDrafts: [], total: 0, page: 1, totalPages: 0 };
   }
 }
 
-export default async function AdminArticlesPage() {
-  const { articles, drafts, newDrafts } = await fetchData();
+export default async function AdminArticlesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const currentPage = Math.max(1, parseInt(params.page || "1", 10));
+
+  const { articles, drafts, newDrafts, total } = await fetchData(currentPage);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)) || 1;
 
   const hasContent = articles.length > 0 || newDrafts.length > 0;
 
@@ -70,7 +92,7 @@ export default async function AdminArticlesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">文章管理</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {articles.length} 篇已发布
+            {total} 篇已发布
             {newDrafts.length > 0 && ` · ${newDrafts.length} 篇新草稿`}
           </p>
         </div>
@@ -98,6 +120,61 @@ export default async function AdminArticlesPage() {
             newDrafts={newDrafts}
           />
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <nav className="flex items-center justify-center gap-1 mt-6" aria-label="分页">
+          <Link
+            href={currentPage > 1 ? `/admin/articles?page=${currentPage - 1}` : "#"}
+            className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm ${
+              currentPage <= 1
+                ? "text-muted-foreground/40 pointer-events-none"
+                : "text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            <ChevronLeft className="size-4" />
+          </Link>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => {
+              // Show first, last, and pages around current
+              if (p === 1 || p === totalPages) return true;
+              if (Math.abs(p - currentPage) <= 1) return true;
+              return false;
+            })
+            .map((p, idx, arr) => {
+              // Add ellipsis
+              const prev = arr[idx - 1];
+              const needsEllipsis = prev !== undefined && p - prev > 1;
+              return (
+                <span key={p} className="inline-flex items-center gap-1">
+                  {needsEllipsis && (
+                    <span className="px-2 text-sm text-muted-foreground/60">...</span>
+                  )}
+                  <Link
+                    href={`/admin/articles?page=${p}`}
+                    className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium ${
+                      p === currentPage
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {p}
+                  </Link>
+                </span>
+              );
+            })}
+          <Link
+            href={currentPage < totalPages ? `/admin/articles?page=${currentPage + 1}` : "#"}
+            className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm ${
+              currentPage >= totalPages
+                ? "text-muted-foreground/40 pointer-events-none"
+                : "text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            <ChevronRight className="size-4" />
+          </Link>
+        </nav>
       )}
     </div>
   );

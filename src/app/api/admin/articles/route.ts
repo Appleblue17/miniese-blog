@@ -1,13 +1,13 @@
 /**
  * @file GET /api/admin/articles
  *
- * Returns all published articles with their linked drafts.
- * Used by the admin dashboard article list.
+ * Returns paginated published articles with their linked drafts.
+ * Query params: page (default 1), limit (default 15)
  *
- * Response: { articles: [...], drafts: [...], newDrafts: [...] }
+ * Response: { articles: [...], drafts: [...], newDrafts: [...], total, page, totalPages }
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
@@ -24,23 +24,40 @@ async function getFileStats(contentPath: string) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get all published articles
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "15", 10)),
+    );
+
+    // Get total count of published articles
+    const total = await prisma.article.count({
+      where: { status: "published" },
+    });
+
+    // Get paginated published articles
     const publishedArticles = await prisma.article.findMany({
       where: { status: "published" },
       orderBy: { publishedAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    // Get all draft/review articles, then split into linked vs new
+    // Get ALL drafts (not paginated — they're linked to the current page's articles)
     const allDrafts = await prisma.article.findMany({
       where: { status: { in: ["draft", "review"] } },
     });
 
-    const drafts = allDrafts.filter((d) => d.draftOfId !== null);
+    const linkedArticleIds = publishedArticles.map((a) => a.id);
+    const drafts = allDrafts.filter(
+      (d) => d.draftOfId !== null && linkedArticleIds.includes(d.draftOfId),
+    );
     const newDrafts = allDrafts.filter((d) => d.draftOfId === null);
 
-    // Gather file stats for all articles
+    // Gather file stats
     const articlesWithStats = await Promise.all(
       publishedArticles.map(async (a) => {
         const stats = await getFileStats(a.contentPath);
@@ -100,6 +117,9 @@ export async function GET() {
       articles: articlesWithStats,
       drafts: draftsWithStats,
       newDrafts: newDraftsWithStats,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error("Admin articles list error:", error);
