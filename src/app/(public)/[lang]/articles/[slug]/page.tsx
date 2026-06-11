@@ -79,7 +79,7 @@ export default async function ArticlePage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8">
       <ArticleReader
         title={data.article.title}
         author={data.article.author}
@@ -91,6 +91,7 @@ export default async function ArticlePage({ params }: Props) {
         viewCount={0}
         likes={0}
         lang={lang}
+        changelog={data.article.changelog}
       />
     </div>
   );
