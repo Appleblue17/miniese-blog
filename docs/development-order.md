@@ -90,105 +90,150 @@
 
 ### 模块 3.1：词条后端 API
 
-| 任务 | 验收标准 |
-|------|----------|
-| 词条文件区块解析器 + frontmatter | `lib/wiki/parser.ts` 能解析 DEF/HUMAN/AI/REF 区块，`lib/articles/frontmatter.ts` 处理 frontmatter |
-| 创建词条 API | `POST /api/wiki`，只接收 `name` + `language`，状态为 `proposed` |
-| 审批通过 API | `POST /api/wiki/[name]/approve`，`proposed` → `creating`（阶段 3 模拟为直接可用） |
-| 词条列表 API | `GET /api/wiki?lang=zh`，默认返回 `unreviewed` + `reviewed`，管理员可用 `?status=` 参数 |
-| 词条详情 API | `GET /api/wiki/[name]?lang=zh`，返回 frontmatter + 各区块内容 |
-| 更新词条 API | `PUT /api/wiki/[name]?lang=zh`，仅 `unreviewed`/`reviewed` 可编辑 |
-| 审查通过 API | `POST /api/wiki/[name]/review`，`unreviewed` → `reviewed` |
-| 删除词条 API | `DELETE /api/wiki/[name]?lang=zh`，删除文件和数据库记录 |
+| 任务 | 方法 | 路径 | 说明 |
+|------|------|------|------|
+| 创建词条 | POST | `/api/wiki` | 接收元信息 + 内容，保存 MD 文件，写入数据库 |
+| 获取词条列表 | GET | `/api/wiki?lang=zh` | 支持分页、按语言筛选 |
+| 获取词条详情 | GET | `/api/wiki/[name]?lang=zh` | 返回词条数据和渲染后的 HTML |
+| 更新词条 | PUT | `/api/wiki/[name]?lang=zh` | 更新内容，重新渲染 |
+| 删除词条 | DELETE | `/api/wiki/[name]?lang=zh` | 删除文件和数据库记录 |
 
-**数据库模型**：
+**文件存储**：
+- 路径：`content/wiki/{lang}/{name}.md`
+- 文件包含 frontmatter 存储元数据（主名称、别名、定义型内容、标签、可见性等）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | String (UUID) | 主键 |
-| name | String | 主名称 |
-| aliases | String[] | 别名列表 |
-| language | Enum (zh, en) | 语言 |
-| definition | Text | 定义型内容 |
-| contentPath | String | 文件路径 |
-| tags | String[] | 标签 |
-| accessGroup | String[] | 权限组 |
-| status | Enum (proposed, creating, unreviewed, reviewed) | 生命周期状态 |
-| createdAt | DateTime | |
-| updatedAt | DateTime | |
+**API 验收**：
+- [ ] 创建后文件存在于正确路径
+- [ ] 数据库记录正确
+- [ ] 列表按名称排序
+- [ ] 详情返回完整内容
 
-- `@@unique([name, language])`：唯一约束
-
-**文件格式**：
-
-```markdown
----
-name: DFS
-aliases: [深度优先搜索]
-language: zh
-tags: [算法]
-status: reviewed
-accessGroup: []
 ---
 
-<!-- DEF_START -->...<!-- DEF_END -->
-<!-- HUMAN_START -->...<!-- HUMAN_END -->
-<!-- AI_START -->...<!-- AI_END -->
-<!-- REF_START -->...<!-- REF_END -->
-```
+### 模块 3.2：词条链接检测
 
-区块顺序：`DEF` → `HUMAN` → `AI` → `REF`
-反向链接动态生成，不写入文件。
+位置：`src/lib/markdown/linkDetector.ts`
 
-**交付物**：8 个 API 端点 + 单元测试 + 解析器 + 集成测试
+| 任务 | 说明 |
+|------|------|
+| 获取词条数据 | 从数据库读取当前语言的所有词条（名称 + 别名列表） |
+| 匹配文本 | 在文章 MD 内容中匹配词条名称或别名（全词匹配，避免匹配到子串） |
+| 替换链接 | 将匹配的文本替换为 `<a href="/{lang}/wiki/{name}" data-wiki-name="{name}">` |
+| 集成到渲染流程 | 在 `renderMarkdown` 调用前执行链接检测 |
+
+**注意事项**：
+- 只替换独立词条，不替换代码块、公式内的文本
+- 别名替换时保持原文大小写，链接中 name 使用主名称
+- 同个词条在文章中多次出现都要替换
+
+**验收**：
+- [ ] 单元测试覆盖匹配逻辑
+- [ ] 文章渲染后词条变为可点击链接
+
+---
+
+### 模块 3.3：词条 hover 预览
+
+位置：`src/components/wiki/WikiPreview.tsx`
+
+| 任务 | 说明 |
+|------|------|
+| 监听悬停 | 监听页面内 `[data-wiki-name]` 链接的 `mouseenter` 事件 |
+| 获取数据 | 调用 `/api/wiki/[name]?lang=current` 获取定义型内容（或预加载） |
+| 弹出卡片 | 300ms 延迟后显示卡片，包含定义型内容 + "查看完整词条" 按钮 |
+| 卡片定位 | 跟随鼠标或显示在链接附近 |
+| 移动端 | tap and hold 触发（简化实现，先不做完美） |
+
+**验收**：
+- [ ] 悬停词条链接后显示卡片
+- [ ] 点击按钮跳转到词条页
+- [ ] 离开后卡片消失
 
 ---
 
 ### 模块 3.4：词条前端页面
 
-| 任务 | 验收标准 |
+#### 列表页 `/{lang}/wiki`
+
+| 内容 | 说明 |
+|------|------|
+| 页面标题 | "知识库" |
+| 词条卡片 | 显示词条名称、别名、简短定义（定义型内容截断） |
+| 搜索/筛选 | 按名称搜索（MVP 可先不做） |
+| 分页 | 与文章列表类似 |
+
+#### 阅读页 `/{lang}/wiki/[name]`
+
+按 PRD 第 4.3.4 节，阶段3 实现以下部分：
+
+| 区域 | 实现状态 |
 |------|----------|
-| 词条列表页 | `/{lang}/wiki`，展示 `reviewed` 词条，支持分页 |
-| 词条阅读页 | `/{lang}/wiki/[name]`，展示词条内容 |
+| 标题区 | ✅ 主名称 + 别名列表（标签形式） |
+| 定义型内容区 | ✅ 显示定义型内容，标注"AI生成"（如有） |
+| 博主笔记 | ✅ 显示人类撰写内容，无额外标注 |
+| AI 补充 | 🔘 预留占位，显示"待添加" |
+| 文章引用区 | 🔘 预留占位 |
+| 反向链接区 | 🔘 预留占位 |
 
-**阅读页布局**（阶段3 实现）：
-- 标题区：主名称 + 别名列表
-- 定义型内容区（DEF 区块）
-- 博主笔记区（HUMAN 区块）
-- AI 补充区：预留占位
-- 文章引用区：预留占位
-- 反向链接区：预留占位
-
-**交付物**：2 个页面 + 基础样式
+**注**：博主笔记是手动创建/编辑时填写的内容，与定义型内容分开存储（都在同一个 MD 文件中，通过 frontmatter 或标记区分）。
 
 ---
 
 ### 模块 3.5：仪表盘词条管理
 
-| 任务 | 验收标准 |
-|------|----------|
-| 词条列表页 | `/admin/wiki`，按状态分组展示词条（proposed/creating/unreviewed/reviewed） |
-| 创建词条 | 只输入主名称 + 语言 → 提交申请（proposed）→ 自动审批通过 → creating |
-| 编辑词条 | 可编辑 `unreviewed`/`reviewed` 状态的词条（所有字段 + 四个区块） |
-| 审批词条 | `unreviewed` → `reviewed`（审查通过按钮） |
+位置：`/admin/wiki`
+
+| 功能 | 说明 |
+|------|------|
+| 词条列表 | 显示所有词条（名称、语言、是否 AI 生成、是否已审查） |
+| 创建词条 | 表单填写：主名称、别名（可多个）、语言、定义型内容、博主笔记、标签、可见性 |
+| 编辑词条 | 同上，加载已有数据 |
 | 删除词条 | 确认后删除 |
 
-**交付物**：仪表盘管理界面
+**表单字段**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| 主名称 | text | ✅ | 英文为主，中文也可 |
+| 别名 | text[] | 可选 | 多个别名用逗号或回车分隔 |
+| 语言 | select | ✅ | zh / en |
+| 定义型内容 | textarea | ✅ | 简短定义，用于 hover 预览 |
+| 博主笔记 | textarea | 可选 | 人类撰写内容，支持 Markdown |
+| 标签 | text[] | 可选 | |
+| 可见性 | select | 可选 | 公开 / 校内 |
+
+**文件格式**：词条 MD 文件使用 frontmatter 存储元数据，博主笔记作为正文内容。
+
+```markdown
+---
+name: "TypeScript"
+aliases: ["TS", "类型脚本"]
+language: "zh"
+definition: "TypeScript 是 JavaScript 的静态类型超集"
+tags: ["编程语言"]
+accessGroup: []
+isAIGenerated: false
+isReviewed: true
+---
+
+# 博主笔记
+
+这里是手动撰写的详细内容...
+```
 
 ---
 
 ### 开发顺序（阶段3 内部）
 
-```
 3.1 词条后端 API（状态机 + 文件存储 + frontmatter）
     ↓
 3.4 词条前端页面（只显示 reviewed 词条）
     ↓
 3.5 仪表盘词条管理（按状态分组管理）
     ↓
-[后续阶段] 3.2 词条链接检测（依赖 AI 填充完成的词条定义）
+3.2 词条链接检测（依赖 AI 填充完成的词条定义）
     ↓
-[后续阶段] 3.3 词条 hover 预览（依赖 3.2 的 data 属性）
+3.3 词条 hover 预览（依赖 3.2 的 data 属性）
 
 ---
 
