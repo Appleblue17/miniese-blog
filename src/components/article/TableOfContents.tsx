@@ -84,10 +84,13 @@ export function TableOfContents({ html }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
   const [headings, setHeadings] = useState<TocItem[]>([]);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const activeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const isScrollingRef = useRef(false);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headingElsRef = useRef<HTMLElement[]>([]);
 
+  // Parse headings and inject IDs
   useEffect(() => {
     const parsed = parseHeadings(html);
     setHeadings(parsed);
@@ -111,42 +114,58 @@ export function TableOfContents({ html }: TableOfContentsProps) {
       }
     });
 
-    // Set up intersection observer
-    const headingEls = parsed
+    // Collect heading elements for scroll-based active tracking
+    headingElsRef.current = parsed
       .map((h) => document.getElementById(h.id))
       .filter(Boolean) as HTMLElement[];
+  }, [html]);
 
+  // Scroll-based active heading tracking
+  useEffect(() => {
+    const headingEls = headingElsRef.current;
     if (headingEls.length === 0) return;
 
-    observerRef.current?.disconnect();
+    function updateActiveHeading() {
+      if (isScrollingRef.current) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find the top-most intersecting heading (last entry with isIntersecting)
-        let topId = "";
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            // If this entry is higher up (lower top), it's the top-most
-            const rect = entry.boundingClientRect;
-            if (!topId || rect.top < (document.getElementById(topId)?.getBoundingClientRect().top ?? Infinity)) {
-              topId = entry.target.id;
-            }
-          }
+      const scrollTop = window.scrollY;
+      const offset = 100; // navbar offset
+
+      // Find the last heading that is scrolled past (above or at current scroll position)
+      let current: HTMLElement | null = null;
+      for (const el of headingEls) {
+        if (el.offsetTop - offset <= scrollTop + 1) {
+          current = el;
+        } else {
+          break;
         }
-        if (topId) {
-          setActiveId(topId);
-        }
-      },
-      { rootMargin: "-80px 0px -65% 0px", threshold: 0 },
-    );
+      }
 
-    headingEls.forEach((el) => observer.observe(el));
-    observerRef.current = observer;
+      if (current && current.id !== activeId) {
+        setActiveId(current.id);
+      }
+    }
 
+    // Throttled scroll handler
+    let ticking = false;
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          updateActiveHeading();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }
+
+    // Run once on mount
+    updateActiveHeading();
+
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
     };
-  }, [html]);
+  }, [activeId]);
 
   // Auto-scroll TOC to keep active button visible
   useEffect(() => {
@@ -168,13 +187,43 @@ export function TableOfContents({ html }: TableOfContentsProps) {
   const handleClick = useCallback(
     (id: string) => {
       const el = document.getElementById(id);
-      if (el) {
-        // Use offset to account for sticky navbar
-        const offset = 80;
-        const top = el.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top, behavior: "smooth" });
-        setIsOpen(false);
+      if (!el) return;
+
+      setIsOpen(false);
+
+      const offset = 80;
+      const targetY = el.getBoundingClientRect().top + window.scrollY - offset;
+      const startY = window.scrollY;
+      const distance = targetY - startY;
+      const duration = Math.min(Math.abs(distance) * 0.3, 400);
+      const startTime = performance.now();
+
+      isScrollingRef.current = true;
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+
+      function step(currentTime: number) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease =
+          progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+        window.scrollTo(0, startY + distance * ease);
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          // Immediately update active heading to the target after scroll
+          setActiveId(id);
+          // Release lock after a brief delay
+          scrollTimerRef.current = setTimeout(() => {
+            isScrollingRef.current = false;
+          }, 80);
+        }
       }
+
+      requestAnimationFrame(step);
     },
     [],
   );

@@ -108,3 +108,22 @@
   - Next.js 构建在 `allowImportingTsExtensions` 未启用时报 `.ts` 后缀导入错误，将所有 `import ... from "./foo.ts"` 改为无后缀
   - `notesaw-assets/` 目录（旧 Notesaw 资源）已移除，不需 gitignore
   - Notesaw 文章缺失 source file（原 `notesaw-assets/` 随目录删除），重新发布新 Notesaw 测试文章，清理旧数据库记录
+
+### 任务 阶段2.3：前端文章页面 — 右侧目录导航 + 文末区域
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 新增 `src/components/article/TableOfContents.tsx`：从 HTML 提取 h1/h2/h3，生成锚点 ID 并注入 DOM
+  - 支持 HTML 实体解码（`&amp;` → `&`）、防重复 ID 生成（计数器）
+  - 桌面端 sticky sidebar（xl:block），移动端底部浮动按钮 + bottom sheet 弹出层
+  - IntersectionObserver 跟踪当前可见章节 → **后改为 scroll 事件（requestAnimationFrame throttle）+ offsetTop 计算**，更稳定
+  - 点击跳转使用 `requestAnimationFrame` 自定义 easeInOutQuad 缓动（~300ms/1000px，上限 400ms），比浏览器默认 `behavior:"smooth"` 更快
+  - 滚动锁定机制（`isScrollingRef`）防止跳转动画中途被 scroll/observer 干扰而"跳回去"
+  - 跳转结束后立即 `setActiveId(id)` 更新目录高亮，再延迟 80ms 释放锁定
+  - 目录项自动滚动到 active 项保持可见
+  - 层级视觉区分：h1 粗体 → h2 中等 → h3 小字浅色缩进
+  - 修改 `ArticleReader.tsx`：改为 `"use client"`，flex 布局（内容区 + TOC sidebar），新增文末区域（版权 CC BY-NC 4.0、Changelog、评论区占位），`max-w-3xl` → `max-w-5xl`
+  - 修改 `page.tsx`：传递 `changelog` prop
+- **测试结果**：`next build` 通过
+- **遇到的问题**：
+  - IntersectionObserver 在快速滚动时可能错过事件，导致目录高亮滞后 → 改用 scroll 事件 + offsetTop 计算，即时稳定
