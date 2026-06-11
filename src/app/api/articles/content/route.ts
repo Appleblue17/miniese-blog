@@ -6,7 +6,8 @@
  *
  * Query params: id - Article ID
  *
- * Response: { content: string }
+ * Response (normal): { content: string, fileName: string }
+ * Response (download): raw file with Content-Disposition: attachment
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const isDownload = searchParams.get("download") === "1";
 
     if (!id) {
       return NextResponse.json(
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     const article = await prisma.article.findUnique({
       where: { id },
-      select: { contentPath: true, status: true },
+      select: { contentPath: true, title: true },
     });
 
     if (!article) {
@@ -46,7 +48,20 @@ export async function GET(request: NextRequest) {
       content = "";
     }
 
-    return NextResponse.json({ content });
+    const fileName = article.contentPath.split("/").pop() || `${article.title}.md`;
+
+    // Download mode: return file as attachment
+    if (isDownload) {
+      return new NextResponse(content, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+        },
+      });
+    }
+
+    return NextResponse.json({ content, fileName });
   } catch (error) {
     console.error("Get article content error:", error);
     return NextResponse.json(

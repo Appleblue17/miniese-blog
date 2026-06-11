@@ -14,10 +14,10 @@ export interface AiTaskMeta {
 
 export interface ReviewReport {
   sections: {
-    type: "factual" | "typo" | "structure" | "other";
+    type: "factual" | "typo" | "clarity" | "other";
     title: string;
     items: {
-      severity: "error" | "warning" | "suggestion";
+      severity: "error" | "warning" | "suggestion" | "ok";
       lineStart: number;
       lineEnd: number;
       snippet: string;

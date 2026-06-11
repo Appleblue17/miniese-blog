@@ -73,6 +73,7 @@ model Article {
 
   wikiLinks   ArticleWikiLink[]
   comments    Comment[]
+  aiTasks     AiTask[]
 
   @@unique([slug, language])
 }
@@ -117,6 +118,9 @@ model AiTask {
   error       String?
   createdAt   DateTime      @default(now())
   completedAt DateTime?
+
+  articleId String?
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
 }
 
 model Comment {

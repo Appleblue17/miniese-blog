@@ -31,17 +31,24 @@ export interface JobData {
  * @param type - The type of AI task (review, translate, generate, scan).
  * @param payload - Task parameters (e.g. `{ articleId }`).
  * @returns The `taskId` (database record ID) for status polling.
+ *
+ * The payload must include `articleId` so the task can be linked
+ * to its article. If present, it is also stored in AiTask.articleId
+ * for direct relational queries.
  */
 export async function addJob(
   type: AiTaskType,
   payload: Record<string, unknown>,
 ): Promise<string> {
+  const articleId = typeof payload.articleId === "string" ? payload.articleId : undefined;
+
   // 1. Create database record
   const task = await prisma.aiTask.create({
     data: {
       type,
       status: "pending",
       input: payload as JsonInput,
+      ...(articleId ? { articleId } : {}),
     },
   });
 

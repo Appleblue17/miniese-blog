@@ -6,6 +6,13 @@
 
 **最后更新**：2026-06-11
 
+### v1.3.0 2026-06-11
+
+- 阶段 5.2：AI 审查功能完整实现
+- 修复：`queue.test.ts` 外键约束（测试中创建真实 Article 记录）
+- 修复：Detail 页遗留的旧渲染代码改为客户端 `<ReviewChunkList>` 组件
+- 修复：severity 筛选从多选 checkbox 改为四级分级模式
+
 ### v1.2.0 2026-06-11
 
 - 阶段 3.5：知识库管理界面新增状态切换栏（全部/申请中/生成中/待审查/已审查）+ 分页导航
@@ -255,49 +262,120 @@ isReviewed: true
 
 ## 阶段5：AI 任务集成
 
-**目标**：实现具体的 AI 功能。
+**目标**：实现 AI 审查、翻译、词条生成功能，接入队列系统。
+
+**依赖**：阶段4 队列基础设施已完成。
+
+---
 
 ### 模块 5.1：DeepSeek API 封装
 
-| 任务 | 验收标准 |
-|------|----------|
-| 封装 `callDeepSeek` 函数 | 支持 prompt 输入，返回字符串，带重试逻辑 |
-| 提示词管理 | `lib/ai/prompts/` 目录下有各功能模板 |
+| 任务 | 说明 |
+|------|------|
+| API 客户端 | `lib/ai/client.ts`，封装 `callDeepSeek(prompt, options)` |
+| 重试机制 | 失败自动重试 3 次（指数退避） |
+| Token 记录 | 每次调用记录消耗 token 数 |
+| 响应解析 | 支持 JSON 模式，自动处理非标准响应 |
 
-**交付物**：`lib/ai/client.ts` + 单元测试（Mock）
+**完成状态**: ✅
+
+---
 
 ### 模块 5.2：AI 审查功能
 
-| 任务 | 验收标准 |
-|------|----------|
-| 提交审查 API | `POST /api/ai/review` 创建队列任务，返回 taskId |
-| 审查任务处理函数 | Worker 中实现，调用 DeepSeek，生成结构化报告 |
-| 审查报告展示页面（仪表盘） | 展示报告的各板块、问题条目、行号+原文摘录 |
-| 发布流程集成 | 发布前可选择提交审查，审查完成后显示红点提示 |
+| 任务 | 说明 |
+|------|------|
+| 内容拆分器 | `lib/ai/chunker.ts`，按标题层级/段落拆分文章，支持大小边界控制（MIN_CHUNK_SIZE=1000, TARGET_CHUNK_SIZE=5000, MAX_CHUNK_SIZE=8000） |
+| 审查 Prompt | 设计结构化输出格式（JSON），severity 字段放最后，包含 "ok" 等级 |
+| Worker 处理 | `processReview` 调用 DeepSeek API，串行处理每个 chunk，fire-and-forget 更新进度到 DB |
+| 报告存档 | 存入 `AiTask.output`，支持历史查询 |
+| 段落进度 | Worker 写入 `output.progress`（totalChunks + processedChunks），前端轮询展示进度条 |
+| 审查历史 API | `GET /api/admin/reviews`（分页）、`GET /api/admin/reviews/[id]` |
+| 仪表盘列表页 | `/admin/reviews` — 分页列表，显示文章标题、状态、时间、问题数 |
+| 仪表盘详情页 | `/admin/reviews/[id]` — Summary 卡片 + `<ReviewChunkList>` 客户端组件 |
+| PublishForm 集成 | 文章管理页"AI 审查"按钮 → 轮询 → 完成后跳转到详情页 |
 
-**交付物**：完整审查功能 + E2E 测试
+**审查 Prompt 要点**：
+- 输入：文章块内容（Markdown）
+- 注意事项：Notesaw 自定义语法（`---`、`:::`、`> >`）不需要审查；可能是长文章的片段，整体结构评价不在范围内
+- 输出：按 `factual`、`typo`、`clarity`（替换旧的 `structure`）、`other` 四类分组
+- 每个 item 字段顺序：`lineStart → lineEnd → snippet → issue → suggestion → severity`（severity 放最后，AI 做完分析再判定）
+- severity 可选值：`"error"` / `"warning"` / `"suggestion"` / `"ok"`（ok 表示检查后确认没问题）
+
+**ReviewChunkList 组件特性**：
+- 每个段落默认折叠，点击 header 展开/收起
+- Header 显示各 severity 的计数色块（红/黄/蓝/绿圆点 + 数字）
+- 右上角四级筛选菜单：>= 错误 / >= 警告 / >= 建议 / 全部
+- 展开后按 section 类型分组，item 内按 severity 降序排列
+- 筛选后无匹配项时 filter bar 始终可见，下方显示空状态提示
+
+**完成状态**: ✅
+
+---
 
 ### 模块 5.3：AI 翻译功能
 
-| 任务 | 验收标准 |
-|------|----------|
-| 提交翻译 API | `POST /api/ai/translate` |
-| 增量翻译逻辑 | 对比原文变更段落，只翻译修改部分 |
-| 译文保存 | 生成独立的 MD 文件，标注"AI翻译" |
-| 翻译状态管理 | 仪表盘文章列表显示翻译版本状态 |
+| 任务 | 说明 |
+|------|------|
+| 段落变更检测 | 复用审查的段落对比逻辑 |
+| 翻译 Prompt | 保持 Markdown 结构，只翻译文本内容 |
+| Worker 处理 | `processTranslate` 增量翻译，生成译文文件 |
+| 手动触发 API | `POST /api/ai/translate` |
+| 仪表盘入口 | 文章管理页增加"翻译"按钮 |
 
-**交付物**：翻译功能 + 集成测试
+**增量翻译策略**：
+- 对比原文新旧版本，找出变更段落
+- 只翻译变更段落，其他从已有译文复用
+- 首次翻译时全量翻译
 
-### 模块 5.4：AI 词条发现与生成
+---
 
-| 任务 | 验收标准 |
-|------|----------|
-| 发布时扫描新概念 | 返回词条提议列表 |
-| 词条提议审批 API | `POST /api/ai/proposals/approve` |
-| 词条生成任务 | Worker 中生成中英文词条（定义型+教程型） |
-| 仪表盘词条提议板块 | 展示提议，支持同意/驳回/修改 |
+### 模块 5.4：AI 词条生成功能
 
-**交付物**：词条发现+生成完整流程
+| 任务 | 说明 |
+|------|------|
+| 概念扫描器 | `lib/ai/conceptScanner.ts`，从文章中提取候选词条 |
+| 词条提议生成 | 发布文章时自动扫描，存入 `WikiProposal` 表 |
+| 仪表盘审批页 | 展示提议列表，支持同意/驳回/修改 |
+| Worker 生成 | 审批后调用 `processGenerate` 创建中英文词条 |
+| 词条内容生成 Prompt | 输出定义型内容 + 别名列表 + 详细解释 |
+
+**词条提议表**（新增 `WikiProposal`）：
+
+| 字段 | 说明 |
+|------|------|
+| id | 主键 |
+| name | 候选词条名 |
+| sourceArticleId | 来源文章 |
+| sourceContext | 来源上下文（摘录） |
+| status | pending / approved / rejected |
+| createdAt | |
+
+---
+
+### 开发顺序（阶段5 内部）
+
+```
+5.1 DeepSeek API 封装
+    ↓
+5.2 AI 审查功能（核心，工作量最大）
+    ↓
+5.4 AI 词条生成功能（与审查共享扫描逻辑）
+    ↓
+5.3 AI 翻译功能（相对独立）
+```
+
+---
+
+### 验收标准
+
+- [x] 能对文章进行 AI 审查，返回结构化报告
+- [x] 长文章自动按标题/段落拆分处理
+- [x] 审查报告可存档、可追溯历史版本
+- [x] 仪表盘可查看审查历史详情（块导航 + 问题列表）
+- [ ] 能对文章进行增量翻译，生成译文
+- [ ] 发布文章时自动扫描词条提议
+- [ ] 仪表盘可审批词条提议，AI 自动生成词条
 
 ---
 

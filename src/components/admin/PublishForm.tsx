@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Send,
   AlertCircle,
@@ -107,6 +107,79 @@ export function PublishForm({
   const [error, setError] = useState<string | null>(null);
   const [published, setPublished] = useState<{ slug: string; url: string } | null>(null);
 
+  // AI Review state
+  const [reviewTaskId, setReviewTaskId] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<{
+    totalIssues: number;
+    errors: number;
+    warnings: number;
+    suggestions: number;
+  } | null>(null);
+  const [reviewProgress, setReviewProgress] = useState<{
+    totalChunks: number;
+    processedChunks: number;
+  } | null>(null);
+  const [reviewPolling, setReviewPolling] = useState(false);
+  // When true, the review button is locked (already submitted or waiting)
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  // Confirm dialog for re-review
+  const [showReviewConfirm, setShowReviewConfirm] = useState(false);
+
+  // Restore review state when loading an existing draft
+  useEffect(() => {
+    if (!draftId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/reviews?articleId=${encodeURIComponent(draftId)}&limit=1`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const tasks = data.tasks as Array<{
+          id: string;
+          status: string;
+          output: Record<string, unknown> | null;
+        }>;
+        if (tasks.length === 0) return;
+
+        // Pick the most recent review task for this draft
+        const latest = tasks[0];
+        setReviewTaskId(latest.id);
+        setReviewStatus(latest.status);
+
+        if (latest.status === "completed" && latest.output) {
+          const summary = (latest.output as Record<string, unknown>).summary as {
+            totalIssues: number;
+            errors: number;
+            warnings: number;
+            suggestions: number;
+          } | undefined;
+          if (summary) {
+            setReviewSummary(summary);
+          }
+        }
+      } catch {
+        // Silently ignore — the review section will show "no review" state
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [draftId]);
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      const interval = (window as unknown as Record<string, unknown>).__reviewPollInterval as number | undefined;
+      if (interval) {
+        clearInterval(interval);
+        delete (window as unknown as Record<string, unknown>).__reviewPollInterval;
+      }
+    };
+  }, []);
+
   // Preview
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -153,6 +226,13 @@ export function PublishForm({
     setError(null);
     setPublished(null);
     setDraftId(null);
+    // Reset review state — re-uploading a file should allow re-trigger
+    setReviewTaskId(null);
+    setReviewStatus(null);
+    setReviewSummary(null);
+    setReviewProgress(null);
+    setReviewSubmitted(false);
+    setShowReviewConfirm(false);
   }, []);
 
   const handleRefreshPreview = useCallback(async () => {
@@ -224,34 +304,114 @@ export function PublishForm({
       return;
     }
 
+    // Prevent double submission
+    if (reviewSubmitted) return;
+
+    // First save as draft if not yet saved
     setSavingDraft(true);
     setError(null);
+    setReviewTaskId(null);
+    setReviewStatus(null);
+    setReviewSummary(null);
+
     try {
-      const res = await fetch("/api/articles/draft", {
+      let currentDraftId = draftId;
+
+      if (!currentDraftId) {
+        const draftRes = await fetch("/api/articles/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName,
+            fileContent,
+            meta: getMetaPayload(),
+            draftOfId: publishedId || null,
+          }),
+        });
+        const draftData = await draftRes.json();
+        if (!draftRes.ok) {
+          setError(draftData.error || "保存草稿失败");
+          return;
+        }
+        currentDraftId = draftData.draft.id;
+        setDraftId(currentDraftId);
+      }
+
+      // Mark as submitted — prevent re-trigger until file re-upload
+      setReviewSubmitted(true);
+
+      // Trigger AI review
+      const reviewRes = await fetch("/api/ai/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName,
-          fileContent,
-          meta: getMetaPayload(),
-          draftOfId: publishedId || null,
-        }),
+        body: JSON.stringify({ articleId: currentDraftId }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "保存草稿失败");
+      const reviewData = await reviewRes.json();
+      if (!reviewRes.ok) {
+        setReviewSubmitted(false);
+        setError(reviewData.error || "触发审查失败");
         return;
       }
-      setDraftId(data.draft.id);
 
-      // TODO: Trigger AI review job
-      setError("AI 审查功能将在后续版本中实现。草稿已保存。");
+      const taskId = reviewData.taskId;
+      setReviewTaskId(taskId);
+      setReviewStatus("pending");
+
+      // Start polling for results
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/ai/status/${taskId}`);
+          if (!statusRes.ok) {
+            clearInterval(pollInterval);
+            return;
+          }
+          const statusData = await statusRes.json();
+          const newStatus = statusData.status as string;
+          setReviewStatus(newStatus);
+
+          // Show chunk progress during processing
+          if (newStatus === "processing") {
+            const output = (statusData.output ?? {}) as Record<string, unknown>;
+            const progress = output.progress as {
+              totalChunks: number;
+              processedChunks: number;
+            } | undefined;
+            if (progress) {
+              setReviewProgress(progress);
+            }
+          }
+
+          if (newStatus === "completed") {
+            clearInterval(pollInterval);
+            const output = (statusData.output ?? {}) as Record<string, unknown>;
+            const summary = output.summary as {
+              totalIssues: number;
+              errors: number;
+              warnings: number;
+              suggestions: number;
+            } | undefined;
+            if (summary) {
+              setReviewSummary(summary);
+            }
+            // Clear progress once complete
+            setReviewProgress(null);
+          } else if (newStatus === "failed") {
+            clearInterval(pollInterval);
+            setError(`审查失败: ${statusData.error || "未知错误"}`);
+          }
+        } catch {
+          // Ignore polling errors, continue retrying
+        }
+      }, 2000);
+
+      // Store interval reference for cleanup
+      (window as unknown as Record<string, unknown>).__reviewPollInterval = pollInterval;
     } catch {
       setError("提交审查请求失败");
     } finally {
       setSavingDraft(false);
     }
-  }, [fileName, fileContent, meta, publishedId, getMetaPayload]);
+  }, [fileName, fileContent, meta, publishedId, draftId, getMetaPayload]);
 
   const handleGoToConfirm = useCallback(async () => {
     if (!fileContent) return;
@@ -579,12 +739,18 @@ export function PublishForm({
 
               <Button
                 variant="secondary"
-                onClick={handleSubmitReview}
-                disabled={savingDraft}
+                onClick={() => {
+                  if (reviewSubmitted) {
+                    setShowReviewConfirm(true);
+                  } else {
+                    handleSubmitReview();
+                  }
+                }}
+                disabled={savingDraft || (reviewSubmitted && reviewStatus === "processing")}
                 className="sm:order-2"
               >
                 <Sparkles className="size-4" />
-                交给助手审查
+                {reviewSubmitted ? "已提交审查" : "交给助手审查"}
               </Button>
 
               <Button
@@ -671,12 +837,88 @@ export function PublishForm({
           {renderMetaEditor()}
         </Card>
 
-        {/* AI Review Status Placeholder */}
+        {/* AI Review Status */}
         <Card className="p-6">
-          <h3 className="text-sm font-medium mb-2">AI 审查状态</h3>
-          <p className="text-sm text-muted-foreground">
-            AI 审查功能将在后续版本中实现。
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium">AI 审查</h3>
+            {reviewTaskId && (
+              <a
+                href={`/admin/reviews/${reviewTaskId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                查看详情 &rarr;
+              </a>
+            )}
+          </div>
+
+          {!reviewTaskId && !reviewStatus && (
+            <p className="text-sm text-muted-foreground">
+              点击「交给助手审查」按钮发起 AI 审查。
+            </p>
+          )}
+
+          {reviewTaskId && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                {reviewStatus === "pending" && (
+                  <>
+                    <div className="size-3 rounded-full bg-slate-400 animate-pulse" />
+                    <span className="text-sm text-muted-foreground">等待处理...</span>
+                  </>
+                )}
+                {reviewStatus === "processing" && (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin text-blue-500" />
+                    <span className="text-sm text-blue-600 dark:text-blue-400">AI 正在审查...</span>
+                    {reviewProgress && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({reviewProgress.processedChunks}/{reviewProgress.totalChunks} 段落)
+                      </span>
+                    )}
+                    {/* Progress bar */}
+                    {reviewProgress && reviewProgress.totalChunks > 0 && (
+                      <div className="w-full mt-1.5">
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                            style={{
+                              width: `${(reviewProgress.processedChunks / reviewProgress.totalChunks) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          已处理 {reviewProgress.processedChunks}/{reviewProgress.totalChunks} 个段落
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+                {reviewStatus === "completed" && (
+                  <>
+                    <Check className="size-3.5 text-green-500" />
+                    <span className="text-sm text-green-600 dark:text-green-400">审查完成</span>
+                  </>
+                )}
+                {reviewStatus === "failed" && (
+                  <>
+                    <AlertCircle className="size-3.5 text-red-500" />
+                    <span className="text-sm text-red-600 dark:text-red-400">审查失败</span>
+                  </>
+                )}
+              </div>
+
+              {reviewSummary && (
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                  <span className="text-red-600 dark:text-red-400">{reviewSummary.errors} 错误</span>
+                  <span className="text-yellow-600 dark:text-yellow-400">{reviewSummary.warnings} 警告</span>
+                  <span className="text-blue-600 dark:text-blue-400">{reviewSummary.suggestions} 建议</span>
+                  <span>共 {reviewSummary.totalIssues} 个问题</span>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Preview */}
@@ -708,6 +950,33 @@ export function PublishForm({
           )}
         </Card>
 
+        {/* Re-review confirm dialog */}
+        {showReviewConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowReviewConfirm(false)}>
+            <div className="mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-2">重新提交审查？</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                这篇文章已经提交过 AI 审查，确定要再次提交吗？
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowReviewConfirm(false)}>
+                  取消
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowReviewConfirm(false);
+                    handleSubmitReview();
+                  }}
+                >
+                  <Sparkles className="size-4" />
+                  确认重新审查
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button
@@ -725,12 +994,18 @@ export function PublishForm({
           </Button>
           <Button
             variant="secondary"
-            onClick={handleSubmitReview}
-            disabled={savingDraft}
+            onClick={() => {
+              if (reviewSubmitted) {
+                setShowReviewConfirm(true);
+              } else {
+                handleSubmitReview();
+              }
+            }}
+            disabled={savingDraft || (reviewSubmitted && reviewStatus === "processing")}
             className="sm:order-2"
           >
             <Sparkles className="size-4" />
-            交给助手审查
+            {reviewSubmitted ? "已提交审查" : "交给助手审查"}
           </Button>
           <Button
             onClick={handleGoToConfirm}

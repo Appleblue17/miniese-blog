@@ -79,14 +79,40 @@ describe("功能分组", () => {
 ### 清理方法
 
 ```bash
-# 1. 清空数据库表（仅清空主业务表，AiTask 保留给队列使用）
-npx prisma db execute --stdin <<< "DELETE FROM \"Article\"; DELETE FROM \"WikiEntry\";"
+# 1. 清空数据库表
+npx prisma db execute --stdin <<< "DELETE FROM \"Article\"; DELETE FROM \"WikiEntry\"; DELETE FROM \"AiTask\";"
 
 # 2. 删除文件系统中的 Markdown 源文件
 find content/articles -name "*.md" -delete
+find content/wiki -name "*.md" -delete
 
 # 3. 清空 Redis 队列（如有残留任务导致 Worker 出错）
 docker compose exec redis redis-cli EVAL "return redis.call('DEL', unpack(redis.call('KEYS', ARGV[1])))" 0 "bull:*"
+```
+
+### 仅清空 AI 审查记录
+
+如果只想清空审查记录（保留文章和草稿），不删除文章本身：
+
+```bash
+# 清空所有 AiTask 记录（审查/翻译/生成等）
+npx prisma db execute --stdin <<< "DELETE FROM \"AiTask\";"
+
+# 同时清空 Redis 中的残留任务
+docker compose exec redis redis-cli EVAL \
+  "return redis.call('DEL', unpack(redis.call('KEYS', ARGV[1])))" 0 "bull:*"
+```
+
+这会将系统重置到"没有任何审查历史"的状态，PublishForm 中的 AI 审查面板会显示"点击审查按钮发起审查"的初始状态。
+
+### 仅重置单篇文章的审查状态
+
+```bash
+# 查看文章 ID
+npx prisma db execute --stdin <<< "SELECT id, title FROM \"Article\" WHERE status = 'draft';"
+
+# 删除该文章关联的所有 AiTask 记录
+npx prisma db execute --stdin <<< "DELETE FROM \"AiTask\" WHERE \"articleId\" = '<ARTICLE_ID>';"
 ```
 
 ### 原理解释
@@ -152,12 +178,12 @@ npm run worker
 
 | 类型 | 说明 | 路由端点 |
 |------|------|---------|
-| `review` | AI 文章审查 | `POST /api/ai/review` |
-| `translate` | AI 翻译 | `POST /api/ai/translate` |
-| `generate` | AI 词条生成 | `POST /api/ai/generate` |
-| `scan` | AI 文章扫描 | `POST /api/ai/scan` |
+| `review` | AI 文章审查 | `POST /api/ai/review` | ✅ 已完成 |
+| `translate` | AI 翻译 | `POST /api/ai/translate` | 🔘 待实现 |
+| `generate` | AI 词条生成 | `POST /api/ai/generate` | 🔘 待实现 |
+| `scan` | AI 文章扫描 | `POST /api/ai/scan` | 🔘 待实现 |
 
-> **当前状态**：阶段 4 仅完成了队列基础设施，所有 handler 为模拟（2s 延迟 + 返回固定结果）。实际的 AI 调用将在后续阶段实现。
+> **当前状态**：`review` 类型已完整实现（基于 DeepSeek API，分段处理+进度更新）。其余类型为模拟 handler（2s 延迟 + 返回固定结果），将在后续阶段实现。
 
 ### API 使用示例
 
@@ -209,3 +235,73 @@ docker compose exec redis redis-cli EVAL \
 2. **Redis 必须可用**，否则队列操作会抛出错误
 3. **测试会产生残留数据**，运行集成测试后建议清理 Redis（见上方清理命令）
 4. 当前 Job 重试策略：最多 3 次，指数退避（初始 2s）
+
+---
+
+## AI 审查系统
+
+> 阶段 5.2 实现的 AI 文章审查功能，基于 DeepSeek API。
+
+### 工作流程
+
+```
+PublishForm → POST /api/ai/review → addJob() → Bull Queue → Worker
+                                                         ↓
+              前端轮询 GET /api/ai/status/[taskId] ← 进度更新
+                                                         ↓
+              审查完成 → 跳转详情页 /admin/reviews/[id]
+```
+
+审查是**异步**的：
+1. **PublishForm** 中点击"发起 AI 审查" → 提交任务 → 返回 `taskId`
+2. 前端开始**轮询** `/api/ai/status/[taskId]`（每 3 秒）
+3. Worker 处理时写 `output.progress`（如 `{ totalChunks: 3, processedChunks: 1 }`）
+4. 前端显示进度条 + "已处理 X/Y 个段落"
+5. 完成后自动跳转到审查详情页
+
+### 审查详情页
+
+**列表页** `/admin/reviews`：分页显示所有审查任务，包含文章标题、状态（等待中/处理中/已完成/失败）、时间、问题数。
+
+**详情页** `/admin/reviews/[reviewId]`：
+- Header：状态徽章 + 创建/完成时间 + 下载源文件按钮
+- 错误/处理中状态：失败原因或进度条
+- Summary 卡片：问题总数 / 错误 / 警告 / 建议
+- ReviewChunkList 组件：段落可折叠、四级 severity 筛选、section 分组、severity 色块计数
+- 底部：原始 JSON 展开查看
+
+### 审查 Prompt
+
+审查输出分为四个 section：
+
+| section | 说明 |
+|---------|------|
+| `factual` | 事实性错误 |
+| `typo` | 拼写与语法 |
+| `clarity` | 表达歧义与通顺性 |
+| `other` | 其他建议 |
+
+每个 item 的 severity 可选值：
+
+| severity | 含义 |
+|----------|------|
+| `error` | 明确错误，必须修改 |
+| `warning` | 可能有问题，建议关注 |
+| `suggestion` | 非必要优化建议 |
+| `ok` | 经检查后确认没问题 |
+
+### 手动触发审查
+
+```bash
+# 获取文章 ID
+npx prisma db execute --stdin <<< "SELECT id, title FROM \"Article\" WHERE status = 'draft' LIMIT 5;"
+
+# 提交审查
+curl -X POST http://localhost:3000/api/ai/review \
+  -H "Content-Type: application/json" \
+  -d '{"articleId": "<ARTICLE_ID>"}'
+# 响应: {"taskId": "uuid-string"}
+
+# 轮询状态
+curl http://localhost:3000/api/ai/status/<TASK_ID>
+```

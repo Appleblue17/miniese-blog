@@ -25,6 +25,7 @@ export async function GET(
         error: true,
         createdAt: true,
         completedAt: true,
+        articleId: true,
       },
     });
 

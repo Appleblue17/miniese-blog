@@ -17,8 +17,28 @@ import { isDatabaseAvailable } from "./setup";
 const isDbAvailable = await isDatabaseAvailable();
 
 const createdTaskIds: string[] = [];
+const createdArticleIds: string[] = [];
 
 const describeDb = isDbAvailable ? describe : describe.skip;
+
+/**
+ * Creates a minimal Article record in the DB so AiTask foreign key works.
+ * Returns the article ID.
+ */
+async function createTestArticle(slug: string): Promise<string> {
+  const { prisma } = await import("./db-client");
+  const article = await prisma.article.create({
+    data: {
+      slug,
+      title: `Test Article ${slug}`,
+      language: "zh",
+      status: "draft",
+      contentPath: `content/articles/drafts/${slug}.md`,
+    },
+  });
+  createdArticleIds.push(article.id);
+  return article.id;
+}
 
 describeDb("Queue infrastructure", () => {
   afterAll(async () => {
@@ -26,6 +46,12 @@ describeDb("Queue infrastructure", () => {
       const { prisma } = await import("./db-client");
       await prisma.aiTask.deleteMany({
         where: { id: { in: createdTaskIds } },
+      });
+    }
+    if (createdArticleIds.length > 0) {
+      const { prisma } = await import("./db-client");
+      await prisma.article.deleteMany({
+        where: { id: { in: createdArticleIds } },
       });
     }
   });
@@ -36,8 +62,9 @@ describeDb("Queue infrastructure", () => {
 
   it("creates a review task via producer", async () => {
     const { addJob } = await import("@/lib/queue/producer");
+    const articleId = await createTestArticle("producer-review");
 
-    const taskId = await addJob("review", { articleId: "test-article-1" });
+    const taskId = await addJob("review", { articleId });
     createdTaskIds.push(taskId);
 
     expect(taskId).toBeDefined();
@@ -48,7 +75,7 @@ describeDb("Queue infrastructure", () => {
     expect(task).toBeDefined();
     expect(task!.type).toBe("review");
     expect(task!.status).toBe("pending");
-    expect(task!.input).toEqual({ articleId: "test-article-1" });
+    expect(task!.input).toEqual({ articleId });
   });
 
   it("creates all supported task types", async () => {
@@ -72,8 +99,9 @@ describeDb("Queue infrastructure", () => {
 
   it("returns pending state for unprocessed task", async () => {
     const { addJob } = await import("@/lib/queue/producer");
+    const articleId = await createTestArticle("status-pending");
 
-    const taskId = await addJob("review", { articleId: "status-test" });
+    const taskId = await addJob("review", { articleId });
     createdTaskIds.push(taskId);
 
     const { GET } = await import("@/app/api/ai/status/[taskId]/route");
@@ -87,7 +115,7 @@ describeDb("Queue infrastructure", () => {
     expect(response.status).toBe(200);
     expect(data.id).toBe(taskId);
     expect(data.status).toBe("pending");
-    expect(data.input).toEqual({ articleId: "status-test" });
+    expect(data.input).toEqual({ articleId });
   });
 
   it("returns 404 for non-existent task", async () => {
