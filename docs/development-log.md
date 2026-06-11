@@ -127,3 +127,26 @@
 - **测试结果**：`next build` 通过
 - **遇到的问题**：
   - IntersectionObserver 在快速滚动时可能错过事件，导致目录高亮滞后 → 改用 scroll 事件 + offsetTop 计算，即时稳定
+
+### 任务 阶段2.3：文章管理页面 — 删除与编辑按钮
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 新增 `POST /api/articles/delete`：删除文章/草稿记录 + 关联文件，级联删除关联草稿、wikiLinks、comments
+  - 新增 `POST /api/articles/create-draft`：从已发布文章复制文件创建草稿记录
+  - 新增 `src/components/admin/ArticleRowActions.tsx`：客户端组件，处理所有交互
+  - 新增 `src/components/admin/StatusBadge.tsx`：可复用状态标签
+  - 删除确认模态框区分"文章"/"草稿"
+  - 有草稿的已发布文章不再显示多余提示
+  - 时间格式改为 24 小时制（hourCycle: "h23"）
+- **测试结果**：`next build` 通过
+
+### 任务 阶段2.3：全站语言切换 + Dark/Light 切换完善
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - Navbar sidebar 底部添加语言切换按钮（Globe 图标 + EN/中 标识），点击在 zh ↔ en 之间切换
+  - 切换时设置 `preferred_lang` cookie（有效期 1 年）并刷新页面
+  - 中间件（`proxy.ts`）已支持根据 cookie 重定向语言（之前已实现）
+  - Dark/Light 切换（ThemeToggle 组件）已在 Navbar 底部存在，本次未改动
+- **测试结果**：`next build` 通过

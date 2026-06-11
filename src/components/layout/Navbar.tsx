@@ -6,7 +6,6 @@ import { Home, FileText, BookOpen, Info, Settings, Menu, X } from "lucide-react"
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const navItems = [
   { href: "/articles", label: "文章", icon: FileText },
@@ -88,8 +87,8 @@ export function Navbar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Bottom area: theme toggle + admin link */}
-        <div className="flex items-center justify-between border-t border-border pt-3">
+        {/* Bottom area: admin link */}
+        <div className="border-t border-border pt-3">
           <Link
             href="/admin"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -97,7 +96,6 @@ export function Navbar() {
             <Settings className="size-4" />
             仪表盘
           </Link>
-          <ThemeToggle />
         </div>
       </nav>
 

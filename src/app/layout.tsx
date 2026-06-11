@@ -6,6 +6,7 @@ import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Navbar } from "@/components/layout/Navbar";
+import { ActionBar } from "@/components/layout/ActionBar";
 import { Footer } from "@/components/layout/Footer";
 
 const featherSprite = (() => {
@@ -89,6 +90,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Navbar />
+          <ActionBar />
           <div className="md:pl-56 flex flex-col min-h-full">
             <main className="flex-1">{children}</main>
             <Footer />
