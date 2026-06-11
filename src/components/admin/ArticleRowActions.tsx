@@ -80,6 +80,7 @@ function formatDateTime(dateStr: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 }
 
@@ -114,11 +115,13 @@ function ArticleMetaRow({
 
 function DeleteModal({
   title,
+  itemType,
   onConfirm,
   onCancel,
   loading,
 }: {
   title: string;
+  itemType: "文章" | "草稿";
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -132,9 +135,9 @@ function DeleteModal({
             <AlertTriangle className="size-5 text-destructive" />
           </div>
           <div className="flex-1">
-            <h3 className="text-base font-semibold">确认删除</h3>
+            <h3 className="text-base font-semibold">确认删除{itemType}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              确定要删除 <strong className="text-foreground">{title}</strong> 吗？
+              确定要删除{itemType} <strong className="text-foreground">{title}</strong> 吗？<br />
               {loading ? "" : "此操作不可撤销。"}
             </p>
           </div>
@@ -269,9 +272,7 @@ function PublishedArticleRow({
               )}
               <span className="hidden sm:inline">编辑</span>
             </button>
-          ) : (
-            <span className="text-xs text-muted-foreground px-1">草稿中</span>
-          )}
+          ) : null}
 
           {/* View link */}
           <Link
@@ -298,6 +299,7 @@ function PublishedArticleRow({
       {showDelete && (
         <DeleteModal
           title={article.title}
+          itemType="文章"
           onConfirm={handleDelete}
           onCancel={() => { setShowDelete(false); setError(null); }}
           loading={deleting}
@@ -382,6 +384,7 @@ function DeleteDraftButton({ draft }: { draft: DraftItem }) {
       {showDelete && (
         <DeleteModal
           title={draft.title}
+          itemType="草稿"
           onConfirm={handleDelete}
           onCancel={() => { setShowDelete(false); setError(null); }}
           loading={deleting}
@@ -475,6 +478,7 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
       {showDelete && (
         <DeleteModal
           title={draft.title}
+          itemType="草稿"
           onConfirm={handleDelete}
           onCancel={() => { setShowDelete(false); setError(null); }}
           loading={deleting}
