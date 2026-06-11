@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { cleanDraftsDir, createTestDraft, removeTestDraft, isDatabaseAvailable } from "./setup";
-import { toNextRequest, skipIfNoDb } from "./helpers";
+import { toNextRequest } from "./helpers";
 
 let isDbAvailable = false;
 let cleanupFns: (() => Promise<void>)[] = [];

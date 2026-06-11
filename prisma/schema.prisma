@@ -33,6 +33,13 @@ enum AiTaskType {
   scan
 }
 
+enum WikiStatus {
+  proposed
+  creating
+  unreviewed
+  reviewed
+}
+
 enum AiTaskStatus {
   pending
   processing
@@ -71,21 +78,22 @@ model Article {
 }
 
 model WikiEntry {
-  id            String          @id @default(uuid())
-  name          String
-  aliases       String[]
-  language      ArticleLanguage
-  contentType   ContentFormat   @default(markdown)
-  definition    String
-  contentPath   String
-  tags          String[]
-  accessGroup   String[]
-  isAIGenerated Boolean         @default(false)
-  isReviewed    Boolean         @default(false)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id          String          @id @default(uuid())
+  name        String
+  aliases     String[]
+  language    ArticleLanguage
+  contentType ContentFormat   @default(markdown)
+  definition  String
+  contentPath String
+  tags        String[]
+  accessGroup String[]
+  status      WikiStatus      @default(proposed)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   articleLinks  ArticleWikiLink[]
+
+  @@unique([name, language])
 }
 
 model ArticleWikiLink {

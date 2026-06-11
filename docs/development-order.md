@@ -4,11 +4,20 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-09
+**最后更新**：2026-06-11
 
-### [版本] [修改时间]
+### v1.2.0 2026-06-11
 
-[分点列出修改内容概要]
+- 阶段 3.5：知识库管理界面新增状态切换栏（全部/申请中/生成中/待审查/已审查）+ 分页导航
+- 阶段 3.5：新增手动"完成"按钮（creating → unreviewed），对应新端点 `POST /api/wiki/[name]/complete`
+- 阶段 3.4：词条列表默认展示 `unreviewed` + `reviewed` 状态（AI 填充完成后即可上线，无需等待人工审查）
+
+### v1.1.0 2026-06-11
+
+- 阶段 3：全面重写知识库设计——新增词条状态机（proposed/creating/unreviewed/reviewed）、文件存储增加 frontmatter
+- 模块 3.1：API 设计改为基于状态——POST 只接收 name+language，新增审批/审查端点
+- 模块 3.5：仪表盘改为按状态分组展示
+- 模块 3.2/3.3：推迟到后续阶段（依赖 AI 填充完成的词条）
 
 ---
 
@@ -69,44 +78,117 @@
 
 ## 阶段3：知识库（基础版）
 
-**目标**：手动词条、文章自动链接、hover 预览。
+**目标**：词条基础框架——状态机、文件存储、API、前端页面、仪表盘管理。
 
-### 模块 3.1：词条 CRUD
+**不依赖 AI，不依赖队列**。
 
-| 任务 | 验收标准 |
-|------|----------|
-| 创建/编辑词条 API | `POST /api/wiki`，保存 MD 文件 |
-| 词条列表 API | `GET /api/wiki` |
-| 词条详情 API | `GET /api/wiki/{name}` |
+> **设计说明**：词条有完整的生命周期（proposed → creating → unreviewed → reviewed）。
+> 阶段 3 实现状态机的前半段（proposed/unreviewed/reviewed 的 CRUD），`creating` 状态的 AI 填充留到后续阶段。
+> 手动新建词条 = 申请（proposed）→ 立即审批通过 → creating → 手动标记完成 → unreviewed → 审查通过 → reviewed。
 
-**交付物**：3 个 API 端点
+---
 
-### 模块 3.2：词条链接检测
+### 模块 3.1：词条后端 API
 
 | 任务 | 验收标准 |
 |------|----------|
-| 渲染文章时检测词条 | 将匹配的词条名称替换为 `<a>` 链接 |
-| 词条数据注入 | 链接包含 `data-wiki-id`，供 hover 使用 |
+| 词条文件区块解析器 + frontmatter | `lib/wiki/parser.ts` 能解析 DEF/HUMAN/AI/REF 区块，`lib/articles/frontmatter.ts` 处理 frontmatter |
+| 创建词条 API | `POST /api/wiki`，只接收 `name` + `language`，状态为 `proposed` |
+| 审批通过 API | `POST /api/wiki/[name]/approve`，`proposed` → `creating`（阶段 3 模拟为直接可用） |
+| 词条列表 API | `GET /api/wiki?lang=zh`，默认返回 `unreviewed` + `reviewed`，管理员可用 `?status=` 参数 |
+| 词条详情 API | `GET /api/wiki/[name]?lang=zh`，返回 frontmatter + 各区块内容 |
+| 更新词条 API | `PUT /api/wiki/[name]?lang=zh`，仅 `unreviewed`/`reviewed` 可编辑 |
+| 审查通过 API | `POST /api/wiki/[name]/review`，`unreviewed` → `reviewed` |
+| 删除词条 API | `DELETE /api/wiki/[name]?lang=zh`，删除文件和数据库记录 |
 
-**交付物**：`lib/markdown/linkDetector.ts` + 单元测试
+**数据库模型**：
 
-### 模块 3.3：词条 hover 预览
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | String (UUID) | 主键 |
+| name | String | 主名称 |
+| aliases | String[] | 别名列表 |
+| language | Enum (zh, en) | 语言 |
+| definition | Text | 定义型内容 |
+| contentPath | String | 文件路径 |
+| tags | String[] | 标签 |
+| accessGroup | String[] | 权限组 |
+| status | Enum (proposed, creating, unreviewed, reviewed) | 生命周期状态 |
+| createdAt | DateTime | |
+| updatedAt | DateTime | |
+
+- `@@unique([name, language])`：唯一约束
+
+**文件格式**：
+
+```markdown
+---
+name: DFS
+aliases: [深度优先搜索]
+language: zh
+tags: [算法]
+status: reviewed
+accessGroup: []
+---
+
+<!-- DEF_START -->...<!-- DEF_END -->
+<!-- HUMAN_START -->...<!-- HUMAN_END -->
+<!-- AI_START -->...<!-- AI_END -->
+<!-- REF_START -->...<!-- REF_END -->
+```
+
+区块顺序：`DEF` → `HUMAN` → `AI` → `REF`
+反向链接动态生成，不写入文件。
+
+**交付物**：8 个 API 端点 + 单元测试 + 解析器 + 集成测试
+
+---
+
+### 模块 3.4：词条前端页面
 
 | 任务 | 验收标准 |
 |------|----------|
-| hover 弹出卡片 | 鼠标悬停 300ms 后显示卡片，包含定义型内容和跳转链接 |
-| 移动端适配 | tap and hold 触发（可简化） |
+| 词条列表页 | `/{lang}/wiki`，展示 `reviewed` 词条，支持分页 |
+| 词条阅读页 | `/{lang}/wiki/[name]`，展示词条内容 |
 
-**交付物**：前端组件 + 基础样式
+**阅读页布局**（阶段3 实现）：
+- 标题区：主名称 + 别名列表
+- 定义型内容区（DEF 区块）
+- 博主笔记区（HUMAN 区块）
+- AI 补充区：预留占位
+- 文章引用区：预留占位
+- 反向链接区：预留占位
 
-### 模块 3.4：前端词条页面
+**交付物**：2 个页面 + 基础样式
+
+---
+
+### 模块 3.5：仪表盘词条管理
 
 | 任务 | 验收标准 |
 |------|----------|
-| 词条列表页 | `/wiki` 展示所有词条 |
-| 词条阅读页 | `/wiki/{name}` 展示词条完整内容（先做简单版：标题+正文） |
+| 词条列表页 | `/admin/wiki`，按状态分组展示词条（proposed/creating/unreviewed/reviewed） |
+| 创建词条 | 只输入主名称 + 语言 → 提交申请（proposed）→ 自动审批通过 → creating |
+| 编辑词条 | 可编辑 `unreviewed`/`reviewed` 状态的词条（所有字段 + 四个区块） |
+| 审批词条 | `unreviewed` → `reviewed`（审查通过按钮） |
+| 删除词条 | 确认后删除 |
 
-**交付物**：2 个页面
+**交付物**：仪表盘管理界面
+
+---
+
+### 开发顺序（阶段3 内部）
+
+```
+3.1 词条后端 API（状态机 + 文件存储 + frontmatter）
+    ↓
+3.4 词条前端页面（只显示 reviewed 词条）
+    ↓
+3.5 仪表盘词条管理（按状态分组管理）
+    ↓
+[后续阶段] 3.2 词条链接检测（依赖 AI 填充完成的词条定义）
+    ↓
+[后续阶段] 3.3 词条 hover 预览（依赖 3.2 的 data 属性）
 
 ---
 
