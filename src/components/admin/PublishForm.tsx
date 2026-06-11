@@ -551,7 +551,7 @@ export function PublishForm({
               </div>
 
               {showPreview && previewHtml ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border p-4">
+                <div className="markdown-body rounded-lg border p-4">
                   <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
                 </div>
               ) : (
@@ -698,7 +698,7 @@ export function PublishForm({
           </div>
 
           {showPreview && previewHtml ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border p-4">
+            <div className="markdown-body rounded-lg border p-4">
               <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
             </div>
           ) : (
