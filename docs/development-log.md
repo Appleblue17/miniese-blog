@@ -150,3 +150,45 @@
   - 中间件（`proxy.ts`）已支持根据 cookie 重定向语言（之前已实现）
   - Dark/Light 切换（ThemeToggle 组件）已在 Navbar 底部存在，本次未改动
 - **测试结果**：`next build` 通过
+
+### 任务 阶段3.2+3.3：Wiki 链接检测 + 悬停预览组件
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 实现 `src/lib/markdown/linkDetector.ts`：从文章 Markdown 内容检测 wiki 术语并按匹配位置插入 `<a>` 标签
+  - 修复 3 个 term 匹配 bug（URL 编码、CJK 后边界检测、全角标点处理），添加 `isAsciiWordChar()` 辅助函数
+  - `renderer.ts`：添加 `allowDangerousHtml: true` 使 `<a>` 标签通过 rehypeStringify
+  - `publish/route.ts`：在渲染前调用 `detectWikiLinks`，DB 中 `renderedContent` 包含 wiki 链接
+  - 新增 `POST /api/articles/render`：手动重新渲染（含 wiki 链接检测和注入）
+  - 实现 `src/components/wiki/WikiPreview.tsx`：客户端组件，300ms hover 延迟、全局缓存（5min TTL）、事件委托、移动端无视、固定定位 + scroll/resize 重定位
+  - 集成到 `ArticleReader.tsx`（`<WikiPreview lang={lang} />`）
+- **测试结果**：164/164 全部通过（12 个测试文件）
+  - `linkDetector.test.ts`：23/23
+  - `WikiPreview.test.tsx`：7/7（jsdom + @testing-library/react）
+  - `articles-render.test.ts`：4/4（集成测试）
+  - 其余 130 个测试保持回归通过
+- **遇到的问题**：
+  - linkDetector 最初使用 `encodeURIComponent` 导致链接 URL 中空格编码，改为使用原始名称
+  - rehypeStringify 默认转义 HTML 实体导致 `<a>` 标签被转义为文本，需设置 `allowDangerousHtml: true`
+  - WikiPreview.test.tsx 使用 `@testing-library/react` 和 `jsdom`，需安装依赖并配置 vitest 以支持 `.tsx` 文件
+  - vitest 默认 `fileParallelism: true` 导致测试间全局状态（`globalCache`）污染，设置为 `false`
+
+### 任务 阶段3.2+3.3：Wiki 链接修复 + 刷新按钮
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 修复**：wiki 阅读页 `/zh/wiki/文档` 返回 404。
+    - 根因：Next.js 16 Turbopack 模式下 `params.name` 在页面组件中是 URL 编码的（`%E6%96%87%E6%A1%A3`），而 `slugifyName("%E6%96%87%E6%A1%A3")` 去除非 ASCII 字符后变成 `e69687e6a1a3`，查询不到数据库记录
+    - 修复：在 `fetchEntry` 和页面组件入口添加 `decodeParam()` 函数对参数解码
+  - **新增功能**：文章管理页已发布文章行右侧添加"刷新词条链接"按钮
+    - `POST /api/articles/render` 新增 `preserveUpdatedAt` 参数，保持修改时间不变
+    - 在 `ArticleRowActions.tsx` 中集成刷新按钮调用
+  - 最终验证：165/165 测试全部通过，`npx next build` 编译成功
+- **测试结果**：165/165 全部通过
+  - `linkDetector.test.ts`：23/23 ✅
+  - `WikiPreview.test.tsx`：7/7 ✅
+  - `articles-render.test.ts`：4/4 ✅
+  - 其余 131 个测试保持回归通过 ✅
+- **遇到的问题**：
+  - URL 编码问题：Next.js 16 Turbopack 的 `params.name` 在不同 API（page vs generateMetadata）中行为不一致
+  - `slugifyName` 对非 ASCII 字符的处理导致 URL 编码后查询失败

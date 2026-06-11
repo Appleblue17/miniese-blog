@@ -10,14 +10,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    fileParallelism: false,
     env: {
       DATABASE_URL: process.env.DATABASE_URL || "postgresql://dev:devpass@localhost:5432/miniese",
     },
-    include: ["src/**/*.test.ts", "tests/integration/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/integration/**/*.test.ts"],
     coverage: {
       provider: "v8",
       include: ["src/lib/markdown/**/*.ts", "src/lib/articles/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
       thresholds: {
         branches: 80,
         functions: 80,

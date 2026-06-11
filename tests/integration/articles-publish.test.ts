@@ -8,6 +8,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { cleanDraftsDir, createTestDraft, removeTestDraft, isDatabaseAvailable } from "./setup";
 import { toNextRequest } from "./helpers";
+import { buildWikiFileWithMeta } from "@/lib/wiki/parser";
+import { mkdir, writeFile, unlink } from "fs/promises";
+import path from "path";
 
 let isDbAvailable = false;
 let cleanupFns: (() => Promise<void>)[] = [];
@@ -26,6 +29,10 @@ beforeEach(async () => {
     }).catch(() => {});
     await prisma.article.deleteMany({
       where: { slug: "duplicate-test" },
+    }).catch(() => {});
+    // Clean up wiki entries created for link detection tests
+    await prisma.wikiEntry.deleteMany({
+      where: { name: { in: ["DFS", "BFS", "量子计算"] } },
     }).catch(() => {});
   }
 });
@@ -257,6 +264,111 @@ Body 2`,
       await prisma.article
         .delete({ where: { id: firstId } })
         .catch(() => {});
+    });
+  });
+
+  it("includes wiki links in renderedContent when article contains wiki terms", async () => {
+    const { prisma } = await import("./db-client");
+
+    // Seed a wiki entry
+    const wikiFileContent = buildWikiFileWithMeta(
+      {
+        name: "DFS",
+        language: "zh",
+        aliases: ["深度优先搜索"],
+        tags: ["算法"],
+        status: "reviewed",
+        accessGroup: [],
+      },
+      {
+        definition: "深度优先搜索是一种遍历算法。",
+        human: "",
+        ai: "",
+        ref: "",
+      },
+    );
+
+    // Write wiki file
+    const wikiDir = path.join(process.cwd(), "content", "wiki", "zh");
+    await mkdir(wikiDir, { recursive: true });
+    await writeFile(path.join(wikiDir, "dfs.md"), wikiFileContent, "utf-8");
+
+    // Create DB record
+    await prisma.wikiEntry.create({
+      data: {
+        name: "DFS",
+        aliases: ["深度优先搜索"],
+        language: "zh",
+        definition: "深度优先搜索是一种遍历算法。",
+        contentPath: "content/wiki/zh/dfs.md",
+        tags: ["算法"],
+        accessGroup: [],
+        status: "reviewed",
+      },
+    });
+
+    // Publish an article mentioning DFS
+    const fileContent = `---
+title: "Test Wiki Links"
+language: zh
+tags: [test]
+slug: test-wiki-links
+---
+
+# Graph Algorithms
+
+DFS 是一种重要的图算法。深度优先搜索常用于遍历。`;
+
+    const { POST } = await import("@/app/api/articles/publish/route");
+
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/articles/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: "zh",
+          meta: {
+            title: "Test Wiki Links",
+            language: "zh",
+            fileType: "markdown",
+            tags: ["test"],
+            author: "博主",
+            summary: "",
+          },
+          fileContent,
+        }),
+      }),
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(200);
+
+    // Verify rendered content contains wiki links
+    const article = await prisma.article.findUnique({
+      where: { slug_language: { slug: "test-wiki-links", language: "zh" } },
+    });
+
+    expect(article).not.toBeNull();
+    expect(article!.renderedContent).toContain(
+      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>',
+    );
+    expect(article!.renderedContent).toContain(
+      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">深度优先搜索</a>',
+    );
+
+    // Cleanup
+    cleanupFns.push(async () => {
+      await unlink(
+        path.join(process.cwd(), "content", "articles", "zh", "test-wiki-links.md"),
+      ).catch(() => {});
+      await prisma.article.deleteMany({
+        where: { slug: { startsWith: "test-wiki" } },
+      }).catch(() => {});
+      await unlink(path.join(wikiDir, "dfs.md")).catch(() => {});
+      await prisma.wikiEntry.deleteMany({
+        where: { name: "DFS" },
+      }).catch(() => {});
     });
   });
 });

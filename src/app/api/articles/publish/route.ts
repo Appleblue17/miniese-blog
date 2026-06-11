@@ -24,6 +24,7 @@ import { readFile, mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown/renderer";
+import { detectWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter, buildFrontmatter, generateSlug } from "@/lib/articles/frontmatter";
 import type { ArticleMeta, ArticleFrontmatter } from "@/lib/articles/frontmatter";
 import type { ContentType } from "@/lib/markdown/renderer";
@@ -135,14 +136,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Render HTML ---
+    // --- Render HTML with wiki link detection ---
     // Parse body from finalContent for rendering
     const { content: mdBody } = parseFrontmatter(finalContent);
     const pipeline: ContentType =
       frontmatter.contentType === "notesaw" || frontmatter.fileType === "notesaw"
         ? "notesaw"
         : "markdown";
-    const html = await renderMarkdown(mdBody, pipeline);
+
+    // First detect wiki links in the Markdown content, then render
+    // This allows the renderer to produce proper <a> tags in the HTML output
+    const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
+    const html = await renderMarkdown(linkedContent, pipeline);
 
     // --- Write file to published directory ---
 

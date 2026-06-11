@@ -77,7 +77,7 @@ async function renderStandardMarkdown(content: string): Promise<string> {
     .use(remarkMath)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeKatex)
-    .use(rehypeStringify)
+    .use(rehypeStringify, { allowDangerousHtml: true })
     .process(content);
 
   return String(result);
@@ -99,7 +99,7 @@ async function renderNotesaw(content: string): Promise<string> {
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeKatex)
     .use(noteTransformPlugin)
-    .use(rehypeStringify)
+    .use(rehypeStringify, { allowDangerousHtml: true })
     .process(content);
 
   return String(result);

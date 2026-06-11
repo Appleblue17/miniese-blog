@@ -9,6 +9,7 @@ import { Calendar, Clock, Eye, Heart, User, Tag, GitCommit, MessageSquare, Copyr
 
 import { Badge } from "@/components/ui/badge";
 import { TableOfContents } from "@/components/article/TableOfContents";
+import { WikiPreview } from "@/components/wiki/WikiPreview";
 
 interface ArticleReaderProps {
   title: string;
@@ -61,6 +62,8 @@ export function ArticleReader({
 }: ArticleReaderProps) {
   return (
     <div className="relative flex gap-8">
+      <WikiPreview lang={lang} />
+
       {/* Main content */}
       <div className="min-w-0 flex-1">
         <article className="flex flex-col gap-8">

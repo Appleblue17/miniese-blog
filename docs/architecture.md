@@ -6,7 +6,11 @@
 
 **最后更新**：2026-06-11
 
-### v0.6.0 2026-06-11
+### v0.7.0 2026-06-11
+
+- 第 11.9 节：补充已实现 API——POST /api/articles/render（手动重新渲染，含 preserveUpdatedAt 参数）
+- 第 7.8 节：词条链接检测补充 URL 编码处理说明
+- 第 3 节：目录结构补充 `src/app/api/articles/render/`、`src/components/wiki/WikiPreview.tsx`
 
 - 第 4.1 节：WikiEntry 模型重新设计——新增 status 字段，移除 isAIGenerated/isReviewed，新增 `@@unique([name, language])`
 - 第 7.7 节：词条文件存储格式新增 frontmatter 元数据说明
@@ -166,6 +170,7 @@ miniese-blog/
 │   │   │   │   ├── upload/     # POST 上传
 │   │   │   │   ├── preview/    # POST 预览
 │   │   │   │   ├── publish/    # POST 发布
+│   │   │   │   ├── render/     # POST 手动重新渲染（含 wiki 链接检测，支持 preserveUpdatedAt）
 │   │   │   │   ├── draft/      # POST 保存草稿
 │   │   │   │   ├── content/    # GET 获取文件内容
 │   │   │   │   ├── delete/     # POST 删除文章/草稿
@@ -610,9 +615,11 @@ AI 生成内容。
 ### 7.8 词条链接检测
 
 - 渲染前扫描 MD 内容，匹配 WikiEntry 的主名称和别名
-- 将匹配的文本替换为 `<a href="/wiki/{slug}">` 标签
+- 将匹配的文本替换为 `<a href="/wiki/{name}">` 标签（使用原始名称，非 URL 编码）
 - hover 数据（definition 字段）通过 `data-wiki` 属性存储，前端 JS 处理预览弹出
 - 链接检测应在渲染**之前**执行，替换文本后再送入渲染管线
+
+**URL 编码说明**：`params.name` 在 Next.js 16 Turbopack 模式下页面组件中是 URL 编码的（如 `%E6%96%87%E6%A1%A3`），但在 `generateMetadata` 中是解码后的。Wiki 页面 `page.tsx` 中的 `fetchEntry` 和页面入口需要调用 `decodeParam()` 对参数解码后再查询数据库，否则 `slugifyName` 处理编码后的字符串会导致查询失败。
 
 ### 7.8 CSS 与图标资源管理
 
@@ -914,7 +921,7 @@ export const config = {
 
 ### 11.9 已实现 API 清单
 
-阶段 2.2 和 2.3 已完成的所有 API：
+阶段 2.2、2.3 和 3.2 已完成的所有 API：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -925,6 +932,7 @@ export const config = {
 | POST | `/api/articles/preview` | 渲染 MD/Notesaw 内容为 HTML |
 | POST | `/api/articles/draft` | 保存/更新草稿（UI 元信息存入 frontmatter） |
 | POST | `/api/articles/publish` | 发布草稿（写入 DB + 渲染缓存） |
+| POST | `/api/articles/render` | 手动重新渲染文章（含 wiki 链接检测，可选 `preserveUpdatedAt` 参数保持修改时间不变） |
 | POST | `/api/articles/delete` | 删除文章/草稿（删除记录 + 文件） |
 | POST | `/api/articles/create-draft` | 从已发布文章创建草稿（复制文件） |
 | GET | `/api/admin/articles` | 管理员文章列表（已发布+草稿+新草稿） |

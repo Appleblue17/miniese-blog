@@ -18,6 +18,7 @@ import {
   Loader2,
   AlertTriangle,
   X,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "./StatusBadge";
@@ -187,6 +188,7 @@ function PublishedArticleRow({
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
+  const [refreshingLinks, setRefreshingLinks] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleDelete = useCallback(async () => {
@@ -234,6 +236,33 @@ function PublishedArticleRow({
       setCreatingDraft(false);
     }
   }, [article.id, router]);
+
+  const handleRefreshLinks = useCallback(async () => {
+    setRefreshingLinks(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/articles/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId: article.id,
+          lang: article.language,
+          preserveUpdatedAt: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "刷新链接失败");
+        setRefreshingLinks(false);
+        return;
+      }
+      setRefreshingLinks(false);
+      router.refresh();
+    } catch {
+      setError("刷新链接请求失败");
+      setRefreshingLinks(false);
+    }
+  }, [article.id, article.language, router]);
 
   return (
     <>
@@ -283,6 +312,17 @@ function PublishedArticleRow({
           >
             <Eye className="size-3.5" />
           </Link>
+
+          {/* Refresh wiki links button */}
+          <button
+            type="button"
+            onClick={handleRefreshLinks}
+            disabled={refreshingLinks}
+            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            title="刷新词条链接"
+          >
+            <RefreshCw className={`size-3.5 ${refreshingLinks ? "animate-spin" : ""}`} />
+          </button>
 
           {/* Delete button */}
           <button

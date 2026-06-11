@@ -11,79 +11,107 @@
  */
 
 import { notFound } from "next/navigation";
+import { readFile } from "fs/promises";
+import path from "path";
 import type { Metadata } from "next";
 import { WikiReader } from "@/components/wiki/WikiReader";
-import type { WikiStatus } from "@/types/wiki";
+import { prisma } from "@/lib/db";
+import { parseWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
+import type { WikiStatus, WikiEntryDetail } from "@/types/wiki";
+
+/**
+ * URLs may pass route params as percent-encoded strings (e.g. %E6%96%87%E6%A1%A3).
+ * This helper decodes them so we can match against the database.
+ */
+function decodeParam(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 interface Props {
   params: Promise<{ lang: string; name: string }>;
 }
 
-interface WikiApiResponse {
-  entry: {
-    id: string;
-    name: string;
-    aliases: string[];
-    language: string;
-    definition: string;
-    tags: string[];
-    accessGroup: string[];
-    status: WikiStatus;
-    createdAt: string;
-    updatedAt: string;
-    blocks: {
-      definition: string;
-      human: string;
-      ai: string;
-      ref: string;
-    };
+async function fetchEntry(
+  lang: string,
+  rawName: string,
+): Promise<WikiEntryDetail | null> {
+  const name = decodeParam(rawName);
+  const slug = slugifyName(name);
+
+  if (!slug) {
+    return null;
+  }
+
+  const entry = await prisma.wikiEntry.findFirst({
+    where: {
+      OR: [
+        { name, language: lang as "zh" | "en" },
+        { name: slug, language: lang as "zh" | "en" },
+      ],
+    },
+  });
+
+  if (!entry) {
+    return null;
+  }
+
+  // Read and parse wiki file for blocks
+  const filePath = path.join(process.cwd(), entry.contentPath);
+  const content = await readFile(filePath, "utf-8");
+  const parsed = parseWikiFileWithMeta(content);
+  const blocks = parsed?.blocks || { definition: "", human: "", ai: "", ref: "" };
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    aliases: entry.aliases,
+    language: entry.language as "zh" | "en",
+    definition: entry.definition,
+    contentPath: entry.contentPath,
+    tags: entry.tags,
+    accessGroup: entry.accessGroup,
+    status: entry.status as WikiStatus,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+    blocks,
   };
 }
 
-async function fetchEntry(
-  lang: string,
-  name: string,
-): Promise<WikiApiResponse | null> {
-  try {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const url = `${baseUrl}/api/wiki/${encodeURIComponent(name)}?lang=${lang}`;
-    const res = await fetch(url, { cache: "no-store" });
-
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { lang, name } = await params;
+  const { lang, name: rawName } = await params;
+  const name = decodeParam(rawName);
 
-  const data = await fetchEntry(lang, name);
-  if (!data) return { title: "Not Found" };
+  const entry = await fetchEntry(lang, name);
+  if (!entry) return { title: "Not Found" };
 
   return {
-    title: `${data.entry.name} | Miniese's Blog`,
-    description: data.entry.definition || undefined,
+    title: `${entry.name} | Miniese's Blog`,
+    description: entry.definition || undefined,
   };
 }
 
 export default async function WikiEntryPage({ params }: Props) {
-  const { lang, name } = await params;
+  const resolved = await params;
+  const { lang, name: rawName } = resolved;
+  const name = decodeParam(rawName);
 
   // Validate language
   if (lang !== "zh" && lang !== "en") {
     notFound();
   }
 
-  const data = await fetchEntry(lang, name);
-  if (!data) {
+  const entry = await fetchEntry(lang, name);
+  if (!entry) {
     notFound();
   }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <WikiReader entry={data.entry} lang={lang} />
+      <WikiReader entry={entry} lang={lang} />
     </div>
   );
 }
