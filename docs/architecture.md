@@ -4,7 +4,15 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-10
+**最后更新**：2026-06-11
+
+### v0.5.0 2026-06-11
+
+- 第 11.7 节：语言切换逻辑更新——从侧边栏移至右上角 ActionBar
+- 第 11.9 节：补充已实现 API——DELETE /api/articles/delete、POST /api/articles/create-draft
+- 第 11.4 节：仪表盘路由确认——新增删除/编辑按钮交互
+- 第 3 节：目录结构——补充 ActionBar.tsx、TableOfContents.tsx、ArticleRowActions.tsx、StatusBadge.tsx
+- 第 4.1 节：Article 模型补充 renderedContent 字段说明
 
 ### v0.4.0 2026-06-10
 
@@ -145,19 +153,29 @@ miniese-blog/
 │   │   │   └── admin/
 │   │   ├── api/                # API Routes
 │   │   │   ├── articles/
+│   │   │   │   ├── [slug]/     # GET 文章详情
+│   │   │   │   ├── route.ts    # GET 文章列表
+│   │   │   │   ├── upload/     # POST 上传
+│   │   │   │   ├── preview/    # POST 预览
+│   │   │   │   ├── publish/    # POST 发布
+│   │   │   │   ├── draft/      # POST 保存草稿
+│   │   │   │   ├── content/    # GET 获取文件内容
+│   │   │   │   ├── delete/     # POST 删除文章/草稿
+│   │   │   │   └── create-draft/ # POST 从已发布文章创建草稿
 │   │   │   ├── wiki/
 │   │   │   ├── ai/
-│   │   │   │   ├── review/     # 提交审查任务
-│   │   │   │   ├── translate/  # 提交翻译任务
-│   │   │   │   ├── generate/   # 提交词条生成任务
-│   │   │   │   └── status/     # 查询任务状态
-│   │   │   └── webhook/        # 预留
+│   │   │   │   ├── review/
+│   │   │   │   ├── translate/
+│   │   │   │   ├── generate/
+│   │   │   │   └── status/
+│   │   │   └── webhook/
 │   │   └── layout.tsx
 │   ├── components/             # React 组件
 │   │   ├── ui/                 # shadcn/ui 组件
-│   │   ├── layout/             # 导航栏、页脚等
-│   │   ├── article/            # 文章相关组件
-│   │   ├── wiki/               # 词条相关组件
+│   │   ├── layout/             # 导航栏、页脚、ActionBar 等
+│   │   ├── article/            # 文章相关组件（TableOfContents、ArticleReader、ArticleCard）
+│   │   ├── admin/              # 管理面板组件（PublishForm、ArticleRowActions、StatusBadge）
+│   │   ├── theme/              # 主题组件（ThemeProvider、ThemeToggle）
 │   │   └── ai/                 # AI 对话窗口等
 │   ├── lib/
 │   │   ├── db.ts               # Prisma 客户端（全局单例）
@@ -211,6 +229,7 @@ miniese-blog/
 | viewCount | Int | 阅读量，默认 0（v0.2.1 新增） |
 | likes | Int | 点赞数，默认 0（v0.2.1 新增） |
 | draftOfId | String? | 草稿关联的已发布文章 ID（v0.3.0 新增） |
+| renderedContent | Text? | 发布时渲染的 HTML 缓存（v0.4.0 新增） |
 
 ##### 自关联说明
 
@@ -800,11 +819,12 @@ export const config = {
 
 ### 11.7 语言切换逻辑
 
-- 切换按钮位于导航栏右上角
+- 切换按钮位于页面右上角的 ActionBar 固定悬浮框中（胶囊样式，毛玻璃背景）
 - 点击后：
-  1. 保存 `preferred_lang` 到 cookie（有效期 1 年）
+  1. 保存 `preferred_lang` 到 cookie（有效期 1 年，`SameSite=Lax`）
   2. 将当前路径中的语言部分替换为目标语言
-  3. 跳转到新路径
+  3. 跳转到新路径（`window.location.href`）
+- 管理员页面（`/admin`）自动隐藏 ActionBar
 - 如果目标语言版本的内容不存在，显示 404 页面
 
 **示例**：用户在 `/zh/articles/hello-world` 点击切换到英文
@@ -821,23 +841,22 @@ export const config = {
 | 5 | `/{lang}/wiki` | 词条列表页（后续阶段） |
 | 6 | `/{lang}/wiki/[name]` | 词条阅读页（后续阶段） |
 
-### 11.9 对已实现 API 的影响
+### 11.9 已实现 API 清单
 
-阶段2.2 已实现的 API 需要小幅调整：
+阶段 2.2 和 2.3 已完成的所有 API：
 
-| API | 当前状态 | 需要的调整 |
-|-----|----------|------------|
-| `GET /api/articles` | 无语言参数 | 增加 `lang` 必填查询参数 |
-| `GET /api/articles/[slug]` | 无语言参数 | 增加 `lang` 必填查询参数 |
-| `POST /api/articles/publish` | 从 frontmatter 读取 `lang` | ✅ 无需调整 |
-| 文件路径 | `content/articles/{lang}/{slug}.md` | ✅ 已实现 |
-
-**调整示例**：
-```typescript
-// 调用时
-fetch(`/api/articles?lang=${lang}&page=1`)
-fetch(`/api/articles/${slug}?lang=${lang}`)
-```
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/articles` | 文章列表（分页，`?lang=` 必填，支持 `?tag=` 筛选） |
+| GET | `/api/articles/[slug]` | 文章详情（`?lang=` 必填） |
+| GET | `/api/articles/content` | 获取文章文件内容（`?id=` 指定文章 ID） |
+| POST | `/api/articles/upload` | 上传 MD 文件到草稿目录 |
+| POST | `/api/articles/preview` | 渲染 MD/Notesaw 内容为 HTML |
+| POST | `/api/articles/draft` | 保存/更新草稿（UI 元信息存入 frontmatter） |
+| POST | `/api/articles/publish` | 发布草稿（写入 DB + 渲染缓存） |
+| POST | `/api/articles/delete` | 删除文章/草稿（删除记录 + 文件） |
+| POST | `/api/articles/create-draft` | 从已发布文章创建草稿（复制文件） |
+| GET | `/api/admin/articles` | 管理员文章列表（已发布+草稿+新草稿） |
 
 ---
 
