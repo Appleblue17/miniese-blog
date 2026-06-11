@@ -22,8 +22,8 @@ import remarkRehype from "remark-rehype";
 import rehypeKatex from "rehype-katex";
 import rehypeStringify from "rehype-stringify";
 
-import noteParsePlugin, { noteBoxParsePlugin } from "../../../packages/notesaw/parser.ts";
-import { noteTransformPlugin } from "../../../packages/notesaw/transformer.ts";
+import noteParsePlugin, { noteBoxParsePlugin } from "../../../packages/notesaw/parser";
+import { noteTransformPlugin } from "../../../packages/notesaw/transformer";
 
 /**
  * Supported content types for rendering.

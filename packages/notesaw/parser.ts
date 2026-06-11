@@ -3,9 +3,9 @@ import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
-import type { NoteNode } from "./index.ts";
+import type { NoteNode } from "./index";
 import { CONTINUE, visit } from "unist-util-visit";
-import prettyPrint from "./utils/prettyprint.ts";
+import prettyPrint from "./utils/prettyprint";
 
 const abbrMap: Record<string, string> = {
   thm: "theorem",
@@ -409,7 +409,6 @@ function parseNote(text: string): NoteNode {
         },
         data: {
           hName: "div",
-          hProperties: { class: "markdown-body" },
         },
       },
       current: 0,

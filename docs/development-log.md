@@ -1,28 +1,7 @@
 # 开发日志
 
-## [2026-06-10]
-
-### 任务 阶段3a：发布流程步骤一——上传页
-- **开始时间**：00:00
-- **结束时间**：01:30
-- **状态**：✅ 完成
-- **变更摘要**：
-  - 实现 `PublishForm.tsx`：上传 + 元信息 + 预览 + 存草稿/发布多步骤表单，包含 tag chip 输入
-  - 实现 `POST /api/articles/upload`：支持文件上传和直接 `fileContent` 两种方式，返回解析的 frontmatter
-  - 修复 tag 解析：从手写 regex 改为 `gray-matter` 解析 frontmatter，`buildFrontmatter` 输出内联 YAML 数组
-  - 仪表盘草稿页优化：草稿显示在文章下方、空草稿占位行、增加修改时间/行数/字符数
-  - 草稿文件命名统一为 slug（`draft/route.ts` 和 `publish/route.ts`）
-  - 新文章发布后草稿关联：`publish/route.ts` 接收 `draftId`，发布后设置 `draftOfId`
-  - `ArticleMeta` 新增 slug 保留逻辑：`buildFrontmatter` 从原始 frontmatter 保留 slug 字段
-- **测试结果**：84/84 全部通过（新增 publish 测试回归修复）
-- **遇到的问题**：
-  - `buildFrontmatter` 中 slug 在 `MANAGED_FIELDS` 但不在 `ArticleMeta` 中导致 slug 丢失
-  - 测试 `returns 409 when slug+language combination already exists` 因前次运行的 DB 残留记录失败
-  - 修复：在 `buildFrontmatter` 中用 `parsedFrontmatter` 变量保留原始 frontmatter 的 slug
-
 ### 任务 阶段1：基础环境搭建
-- **开始时间**：22:30
-- **结束时间**：23:20
+- **时间**：2026-06-09
 - **状态**：✅ 完成
 - **变更摘要**：
   - 1.1 初始化 Next.js 16.2.7 + TypeScript 5 + Tailwind CSS 4 项目
@@ -38,8 +17,7 @@
   - Prisma 6 使用了新的 `prisma.config.ts` 配置方式，已适配
 
 ### 任务 阶段2.1：Markdown 渲染器集成
-- **开始时间**：00:10
-- **结束时间**：00:30
+- **时间**：2026-06-09
 - **状态**：✅ 完成
 - **变更摘要**：
   - 移动 Notesaw 核心源码到 `packages/notesaw/` 并精简 transformer（移除 VS Code 专用代码）
@@ -55,8 +33,7 @@
   - Notesaw 的 `parser.ts` 中 `import type` 路径需从 `./index.d.ts` 改为 `./index.ts`
 
 ### 任务 阶段2.2：文章基础 CRUD
-- **开始时间**：01:00
-- **结束时间**：01:15
+- **时间**：2026-06-10
 - **状态**：✅ 完成
 - **变更摘要**：
   - 安装 gray-matter（frontmatter 解析）和 supertest（集成测试）依赖
@@ -78,8 +55,7 @@
   - Next.js `NextRequest` 与标准 `Request` 类型不完全兼容，需使用 `as unknown as NextRequest` 转换
 
 ### 任务 阶段2.2：集成测试修复 & 全部通过
-- **开始时间**：01:20
-- **结束时间**：01:30
+- **时间**：2026-06-10
 - **状态**：✅ 完成
 - **变更摘要**：
   - Docker 启动成功（切换 registry 镜像源），PostgreSQL 16 + Redis 7 正常运行
@@ -96,3 +72,39 @@
   - publish 集成测试：5/5
   - list 集成测试：7/7
   - detail 集成测试：4/4
+
+### 任务 阶段2.3：发布流程步骤一——上传页
+- **时间**：2026-06-10
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 实现 `PublishForm.tsx`：上传 + 元信息 + 预览 + 存草稿/发布多步骤表单，包含 tag chip 输入
+  - 实现 `POST /api/articles/upload`：支持文件上传和直接 `fileContent` 两种方式，返回解析的 frontmatter
+  - 修复 tag 解析：从手写 regex 改为 `gray-matter` 解析 frontmatter，`buildFrontmatter` 输出内联 YAML 数组
+  - 仪表盘草稿页优化：草稿显示在文章下方、空草稿占位行、增加修改时间/行数/字符数
+  - 草稿文件命名统一为 slug（`draft/route.ts` 和 `publish/route.ts`）
+  - 新文章发布后草稿关联：`publish/route.ts` 接收 `draftId`，发布后设置 `draftOfId`
+  - `ArticleMeta` 新增 slug 保留逻辑：`buildFrontmatter` 从原始 frontmatter 保留 slug 字段
+- **测试结果**：84/84 全部通过（新增 publish 测试回归修复）
+- **遇到的问题**：
+  - `buildFrontmatter` 中 slug 在 `MANAGED_FIELDS` 但不在 `ArticleMeta` 中导致 slug 丢失
+  - 测试 `returns 409 when slug+language combination already exists` 因前次运行的 DB 残留记录失败
+  - 修复：在 `buildFrontmatter` 中用 `parsedFrontmatter` 变量保留原始 frontmatter 的 slug
+
+### 任务 阶段2.3：前端文章页面 — 样式与渲染修复
+- **时间**：2026-06-11
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 修复 `/{lang}/articles` 列表页 API 错误处理和标题本地化（`ArticleList.tsx`）
+  - 修复 proxy 中间件静态资源 404：将 `/styles/` 和 `/icon/` 路径加入排除列表（`src/proxy.ts`）
+  - 添加 KaTeX、Notesaw（note.css）和 GitHub Markdown（github-markdown.css）三种样式文件到 `public/styles/`
+  - 添加 Feather SVG sprite 到 `public/icon/`（Notesaw 图标支持），在 layout 中通过 `fs.readFileSync` 内联注入
+  - layout 中添加 `github-markdown.css` 的 `<link>` 标签
+  - layout 中注入 `data-theme` 属性到 `<html>`（SSR 默认 `"light"`），FOUC-prevention script 同步设置 `data-theme="dark"`/`"light"`，实现 github-markdown.css 的 dark/light 主题切换
+  - `ArticleReader.tsx`：文章内容容器从 Tailwind `prose` 类改为 `markdown-body` 类，由 github-markdown.css 统一控制排版样式
+  - `packages/notesaw/parser.ts`：root 节点移除 `hProperties: { class: "markdown-body" }`，避免 Notesaw 文章渲染时 HTML 嵌套两层 `markdown-body`
+  - 修复 packages/notesaw 和 src 中多处 `.ts` 后缀导入问题（`allowImportingTsExtensions` 未启用）
+- **测试结果**：84/84 全部通过，`next build` 成功
+- **遇到的问题**：
+  - Next.js 构建在 `allowImportingTsExtensions` 未启用时报 `.ts` 后缀导入错误，将所有 `import ... from "./foo.ts"` 改为无后缀
+  - `notesaw-assets/` 目录（旧 Notesaw 资源）已移除，不需 gitignore
+  - Notesaw 文章缺失 source file（原 `notesaw-assets/` 随目录删除），重新发布新 Notesaw 测试文章，清理旧数据库记录

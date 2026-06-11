@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { readFileSync } from "fs";
+import path from "path";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+
+const featherSprite = (() => {
+  try {
+    return readFileSync(
+      path.join(process.cwd(), "public", "icon", "feather-sprite.svg"),
+      "utf-8",
+    );
+  } catch {
+    return "";
+  }
+})();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,20 +44,33 @@ export default function RootLayout({
     <html
       lang="zh"
       suppressHydrationWarning
+      data-theme="light"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        {/* Prevent FOUC: set dark class before React hydrates */}
+        {/* KaTeX styles for math rendering */}
+        <link rel="stylesheet" href="/styles/katex.min.css" />
+
+        {/* Notesaw block styles */}
+        <link rel="stylesheet" href="/styles/note.css" />
+
+        {/* GitHub Markdown theme styles */}
+        <link rel="stylesheet" href="/styles/github-markdown.css" />
+
+        {/* Prevent FOUC: set dark class and data-theme before React hydrates */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
                   var theme = localStorage.getItem('theme');
-                  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  var isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) {
                     document.documentElement.classList.add('dark');
+                    document.documentElement.setAttribute('data-theme', 'dark');
                   } else {
                     document.documentElement.classList.remove('dark');
+                    document.documentElement.setAttribute('data-theme', 'light');
                   }
                 } catch(e) {}
               })();
@@ -53,6 +79,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-background text-foreground">
+        {/* Feather SVG sprite for Notesaw icons (hidden, referenced by <use href="#icon-name"/>) */}
+        <div style={{ display: "none" }} dangerouslySetInnerHTML={{ __html: featherSprite }} />
+
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

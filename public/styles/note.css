@@ -1,0 +1,118 @@
+:root {
+  --tag-height: 18px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .markdown-body,
+  [data-theme="dark"] {
+    /* dark */
+    color-scheme: dark;
+    --box-border-color: #ffffff;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .markdown-body,
+  [data-theme="light"] {
+    /* light */
+    color-scheme: light;
+    --box-border-color: #181818;
+  }
+}
+
+.markdown-body {
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 2rem 2rem;
+}
+
+/* block title*/
+.block-container,
+.inline-block-container {
+  border-left: 2px solid transparent;
+  padding: 0.2rem 0 0.2rem 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.inline-block-container {
+  padding-left: 0.5rem;
+}
+
+.block-container > .block-title > div p {
+  margin: 0;
+}
+
+.block-container > .block-title > .block-label {
+  margin-right: 0.8rem;
+  font-size: 1rem;
+}
+
+.block-container > .block-title > .block-title-content {
+  font-size: 1rem;
+}
+
+.block-container > .block-title,
+.inline-block-container {
+  display: flex;
+  align-items: flex-start;
+}
+
+.block-container > .block-title > .block-icon,
+.inline-block-container > .block-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  stroke-width: 2;
+  margin-right: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+/* block body */
+.block-container > .block-body {
+  margin-top: 1rem;
+}
+
+/* inline block */
+.inline-block-container > .block-label {
+  margin-right: 0.6rem;
+}
+
+.inline-block-container > .inline-block-content p {
+  margin: 0;
+  padding: 0;
+}
+
+/* box */
+
+.box {
+  position: relative;
+  display: inline-block;
+  padding: 0 8px;
+  margin: 0px 4px 6px;
+}
+
+.box::before {
+  content: "";
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 8px;
+  height: 80%;
+  display: block;
+  border-left: 1.5px solid var(--box-border-color);
+  border-top: 1.5px solid var(--box-border-color);
+}
+
+.box::after {
+  content: "";
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 8px;
+  height: 80%;
+  display: block;
+  border-right: 1.5px solid var(--box-border-color);
+  border-bottom: 1.5px solid var(--box-border-color);
+}

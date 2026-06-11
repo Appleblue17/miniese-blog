@@ -1,4 +1,4 @@
-import type { NoteNode } from "../index.ts";
+import type { NoteNode } from "../index";
 
 const lastChildIndent = "└───",
   childIndent = "├───",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderMarkdown } from "./renderer.ts";
+import { renderMarkdown } from "./renderer";
 
 // ============================================================================
 // Standard Markdown tests

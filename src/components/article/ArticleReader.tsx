@@ -117,13 +117,7 @@ export function ArticleReader({
 
       {/* Rendered content */}
       <div
-        className="prose prose-neutral dark:prose-invert max-w-none
-          prose-headings:font-semibold prose-headings:tracking-tight
-          prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-          prose-img:rounded-lg prose-code:rounded-md prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-sm
-          prose-pre:rounded-xl prose-pre:border prose-pre:border-border
-          prose-blockquote:border-l-primary prose-blockquote:not-italic
-          prose-hr:border-border"
+        className="markdown-body"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>

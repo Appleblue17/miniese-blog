@@ -54,6 +54,8 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
+    pathname.startsWith("/styles") ||
+    pathname.startsWith("/icon") ||
     pathname === "/favicon.ico" ||
     pathname === "/rss.xml" ||
     pathname === "/sitemap.xml"

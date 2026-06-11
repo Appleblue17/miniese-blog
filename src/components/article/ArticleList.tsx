@@ -42,12 +42,22 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
     if (tag) params.set("tag", tag);
 
     fetch(`/api/articles?${params}`)
-      .then((res) => res.json())
-      .then((json: ApiResponse) => {
-        setData(json);
-        setLoading(false);
+      .then((res) => {
+        if (!res.ok) {
+          setData({ articles: [], total: 0, page: 1, totalPages: 0 });
+          setLoading(false);
+          return null;
+        }
+        return res.json();
+      })
+      .then((json: ApiResponse | null) => {
+        if (json) {
+          setData(json);
+          setLoading(false);
+        }
       })
       .catch(() => {
+        setData({ articles: [], total: 0, page: 1, totalPages: 0 });
         setLoading(false);
       });
   }, [lang, page, tag]);
@@ -62,7 +72,7 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Articles</h1>
+        <h1 className="text-2xl font-bold">{lang === "zh" ? "文章" : "Articles"}</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {data && !loading
             ? `共 ${data.total} 篇文章`
