@@ -208,6 +208,7 @@ function replaceLines(
  * @param existingTranslations - Previously translated chunks (original content → translated text)
  * @param sourceLang - Source language name (e.g., "Chinese", "English")
  * @param targetLang - Target language name (e.g., "English", "Chinese")
+ * @param onProgress - Optional callback for progress reporting (processed, total)
  * @returns The translation result
  */
 export async function incrementalTranslate(
@@ -216,6 +217,7 @@ export async function incrementalTranslate(
   existingTranslations: TranslationMap,
   sourceLang: string,
   targetLang: string,
+  onProgress?: ProgressCallback,
 ): Promise<TranslateResult> {
   // Strip frontmatter
   const newFrontmatter = extractFrontmatterBlock(newSourceContent);
@@ -309,94 +311,108 @@ export async function incrementalTranslate(
     }
   }
 
-  // 3b. Process each DiffBlock
+  // 3b. Pre-compute total sub-chunks for progress reporting
+  const allSubChunks: Array<{ startLine: number; endLine: number; content: string }> = [];
   for (const block of diffBlocks) {
-    // Split the diff block by heading boundaries
     const subChunks = splitRange(newLines, block.startLine, block.endLine);
-
-    for (const subChunk of subChunks) {
-      const originalContent = subChunk.content;
-
-      // Check existing translations by content
-      if (newTranslations[originalContent] !== undefined) {
-        // Already translated (either from existingTranslations or previous sub-chunk)
-        const translated = newTranslations[originalContent];
-        outputLines = replaceLines(
-          outputLines,
-          subChunk.startLine,
-          subChunk.endLine,
-          translated,
-        );
-        reusedCount++;
-        continue;
-      }
-
-      // Build context window
-      const ctx = buildContext(
-        { startLine: subChunk.startLine, endLine: subChunk.endLine },
-        newLines,
-      );
-
-      // Extract context text and target text
-      const contextParts: string[] = [];
-      const targetParts: string[] = [];
-
-      for (let lineNum = ctx.startLine; lineNum <= ctx.endLine; lineNum++) {
-        const line = newLines[lineNum - 1];
-        if (lineNum >= subChunk.startLine && lineNum <= subChunk.endLine) {
-          targetParts.push(line);
-        } else {
-          contextParts.push(line);
-        }
-      }
-
-      const contextText = contextParts.join("\n");
-      const targetText = targetParts.join("\n");
-
-      // Build prompt and call AI
-      const prompt = buildChunkPrompt(
-        sourceLang,
-        targetLang,
-        contextText,
-        targetText,
-      );
-
-      const result = await callDeepSeek({
-        prompt,
-        responseFormat: "text",
-        temperature: 0.3,
-      });
-
-      totalTokensUsed += result.usage.total_tokens;
-
-      const translated = parseTranslatedChunk(result.content);
-
-      if (translated) {
-        newTranslations[originalContent] = translated;
-        translatedCount++;
-
-        // Replace lines in output
-        outputLines = replaceLines(
-          outputLines,
-          subChunk.startLine,
-          subChunk.endLine,
-          translated,
-        );
-      } else {
-        // Fallback: use original content
-        console.warn(
-          `[Translator2] Sub-chunk at line ${subChunk.startLine} returned empty translation, using original.`,
-        );
-        newTranslations[originalContent] = originalContent;
-        translatedCount++;
-      }
-
-      // Record for detail page
-      translatedGroups.push({
-        targetLines: [subChunk.startLine, subChunk.endLine],
-        contextLines: [ctx.startLine, ctx.endLine],
-      });
+    for (const sc of subChunks) {
+      allSubChunks.push(sc);
     }
+  }
+
+  const totalSubChunks = allSubChunks.length;
+  let processedSubChunks = 0;
+
+  // Report initial progress
+  onProgress?.(0, totalSubChunks);
+
+  // 3c. Process each sub-chunk
+  for (const subChunk of allSubChunks) {
+    const originalContent = subChunk.content;
+
+    // Check existing translations by content
+    if (newTranslations[originalContent] !== undefined) {
+      // Already translated (either from existingTranslations or previous sub-chunk)
+      const translated = newTranslations[originalContent];
+      outputLines = replaceLines(
+        outputLines,
+        subChunk.startLine,
+        subChunk.endLine,
+        translated,
+      );
+      reusedCount++;
+      continue;
+    }
+
+    // Build context window
+    const ctx = buildContext(
+      { startLine: subChunk.startLine, endLine: subChunk.endLine },
+      newLines,
+    );
+
+    // Extract context text and target text
+    const contextParts: string[] = [];
+    const targetParts: string[] = [];
+
+    for (let lineNum = ctx.startLine; lineNum <= ctx.endLine; lineNum++) {
+      const line = newLines[lineNum - 1];
+      if (lineNum >= subChunk.startLine && lineNum <= subChunk.endLine) {
+        targetParts.push(line);
+      } else {
+        contextParts.push(line);
+      }
+    }
+
+    const contextText = contextParts.join("\n");
+    const targetText = targetParts.join("\n");
+
+    // Build prompt and call AI
+    const prompt = buildChunkPrompt(
+      sourceLang,
+      targetLang,
+      contextText,
+      targetText,
+    );
+
+    const result = await callDeepSeek({
+      prompt,
+      responseFormat: "text",
+      temperature: 0.3,
+    });
+
+    totalTokensUsed += result.usage.total_tokens;
+
+    const translated = parseTranslatedChunk(result.content);
+
+    if (translated) {
+      newTranslations[originalContent] = translated;
+      translatedCount++;
+
+      // Replace lines in output
+      outputLines = replaceLines(
+        outputLines,
+        subChunk.startLine,
+        subChunk.endLine,
+        translated,
+      );
+    } else {
+      // Fallback: use original content
+      console.warn(
+        `[Translator2] Sub-chunk at line ${subChunk.startLine} returned empty translation, using original.`,
+      );
+      newTranslations[originalContent] = originalContent;
+      translatedCount++;
+    }
+
+    // Record for detail page
+    translatedGroups.push({
+      targetLines: [subChunk.startLine, subChunk.endLine],
+      contextLines: [ctx.startLine, ctx.endLine],
+    });
+
+    // Report progress after each sub-chunk
+    processedSubChunks++;
+    onProgress?.(processedSubChunks, totalSubChunks);
   }
 
   // ---- Step 4: Assemble final content ----

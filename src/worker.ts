@@ -317,13 +317,38 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   const sourceLangName = sourceLang === "zh" ? "Chinese" : "English";
   const targetLangName = targetLang === "en" ? "English" : "Chinese";
 
-  // 6. Perform incremental translation (or full translation if forced)
+  // 6. Store initial progress so detail page can show 0/total immediately
+  const { taskId: translateTaskId } = job.data as { taskId: string };
+
+  await prisma.aiTask.update({
+    where: { id: translateTaskId },
+    data: {
+      output: {
+        progress: { totalChunks: 0, processedChunks: 0 },
+      } as JsonInput,
+    },
+  });
+
+  // 7. Perform incremental translation with progress callback
   const result = await incrementalTranslate(
     oldSourceContent,
     currentSourceContent,
     existingTranslationMap,
     sourceLangName,
     targetLangName,
+    // Report progress after each sub-chunk (fire-and-forget, don't block)
+    (processed, total) => {
+      prisma.aiTask.update({
+        where: { id: translateTaskId },
+        data: {
+          output: {
+            progress: { totalChunks: total, processedChunks: processed },
+          } as JsonInput,
+        },
+      }).catch((err) => {
+        console.warn(`[Worker] Failed to update translate progress: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    },
   );
 
   console.log(

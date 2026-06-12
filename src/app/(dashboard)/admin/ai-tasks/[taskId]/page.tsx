@@ -398,15 +398,48 @@ export default async function TaskDetailPage({
               <p className="font-medium text-sm text-blue-800 dark:text-blue-200">
                 任务正在{task.status === "pending" ? "等待" : "处理"}中
               </p>
-              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                等待 Worker 处理，请稍后刷新页面查看最新结果。
-              </p>
-              <Link
-                href={`/admin/ai-tasks/${taskId}`}
-                className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-500 mt-2 inline-block"
-              >
-                刷新页面
-              </Link>
+              {task.status === "processing" && isTranslate && (() => {
+                const rawOutput = output as unknown as Record<string, unknown>;
+                const progress = rawOutput.progress as { totalChunks?: number; processedChunks?: number } | undefined;
+                if (progress && typeof progress.totalChunks === "number" && progress.totalChunks > 0 && typeof progress.processedChunks === "number") {
+                  const pct = Math.round((progress.processedChunks / progress.totalChunks) * 100);
+                  return (
+                    <>
+                      <div className="mt-2">
+                        <div className="h-1.5 w-full rounded-full bg-blue-200 dark:bg-blue-800 overflow-hidden max-w-xs">
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          已翻译 {progress.processedChunks}/{progress.totalChunks} 个段落
+                        </p>
+                      </div>
+                      <Link
+                        href={`/admin/ai-tasks/${taskId}`}
+                        className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-500 mt-2 inline-block"
+                      >
+                        刷新页面
+                      </Link>
+                    </>
+                  );
+                }
+                return <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">正在分析段落内容...</p>;
+              })()}
+              {(!isTranslate || task.status === "pending") && (
+                <>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                    等待 Worker 处理，请稍后刷新页面查看最新结果。
+                  </p>
+                  <Link
+                    href={`/admin/ai-tasks/${taskId}`}
+                    className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-500 mt-2 inline-block"
+                  >
+                    刷新页面
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
