@@ -399,8 +399,8 @@ export default async function TaskDetailPage({
                 任务正在{task.status === "pending" ? "等待" : "处理"}中
               </p>
               {task.status === "processing" && isTranslate && (() => {
-                const rawOutput = output as unknown as Record<string, unknown>;
-                const progress = rawOutput.progress as { totalChunks?: number; processedChunks?: number } | undefined;
+                const rawOutput = output as unknown as Record<string, unknown> | null;
+                const progress = rawOutput?.progress as { totalChunks?: number; processedChunks?: number } | undefined;
                 if (progress && typeof progress.totalChunks === "number" && progress.totalChunks > 0 && typeof progress.processedChunks === "number") {
                   const pct = Math.round((progress.processedChunks / progress.totalChunks) * 100);
                   return (

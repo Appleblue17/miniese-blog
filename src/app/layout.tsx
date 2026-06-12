@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { readFileSync } from "fs";
 import path from "path";
+import Script from "next/script";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -57,9 +58,12 @@ export default function RootLayout({
 
         {/* GitHub Markdown theme styles */}
         <link rel="stylesheet" href="/styles/github-markdown.css" />
-
+      </head>
+      <body className="min-h-full bg-background text-foreground">
         {/* Prevent FOUC: set dark class and data-theme before React hydrates */}
-        <script
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -78,8 +82,7 @@ export default function RootLayout({
             `,
           }}
         />
-      </head>
-      <body className="min-h-full bg-background text-foreground">
+
         {/* Feather SVG sprite for Notesaw icons (hidden, referenced by <use href="#icon-name"/>) */}
         <div style={{ display: "none" }} dangerouslySetInnerHTML={{ __html: featherSprite }} />
 
