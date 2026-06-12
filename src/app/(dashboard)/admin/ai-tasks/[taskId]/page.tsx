@@ -185,15 +185,37 @@ export default async function TaskDetailPage({
 }) {
   const { taskId } = await params;
 
-  // Fetch task via status API
+  // Fetch task directly from DB (Server Component, no fetch caching)
   let task: TaskDetail | null = null;
   try {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/ai/status/${taskId}`, {
-      cache: "no-store",
+    const dbTask = await prisma.aiTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        input: true,
+        output: true,
+        error: true,
+        createdAt: true,
+        completedAt: true,
+        articleId: true,
+      },
     });
-    if (res.ok) {
-      task = await res.json();
+
+    if (dbTask) {
+      task = {
+        id: dbTask.id,
+        type: dbTask.type,
+        status: dbTask.status,
+        input: (dbTask.input ?? {}) as Record<string, unknown>,
+        output: dbTask.output as ReviewOutput | TranslateOutput | GenerateOutput | null,
+        error: dbTask.error,
+        createdAt: dbTask.createdAt.toISOString(),
+        completedAt: dbTask.completedAt?.toISOString() ?? null,
+        articleId: dbTask.articleId,
+        articleTitle: null,
+      };
     }
   } catch {
     task = null;
