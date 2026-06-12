@@ -25,6 +25,7 @@ function serializeEntry(entry: {
   definition: string;
   contentPath: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: string;
   createdAt: Date;
@@ -38,6 +39,7 @@ function serializeEntry(entry: {
     definition: entry.definition,
     contentPath: entry.contentPath,
     tags: entry.tags,
+    type: entry.type,
     accessGroup: entry.accessGroup,
     status: entry.status as WikiStatus,
     createdAt: entry.createdAt.toISOString(),

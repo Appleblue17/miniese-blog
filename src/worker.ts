@@ -13,10 +13,9 @@ import fs from "fs/promises";
 import Queue from "bull";
 import { prisma } from "./lib/db";
 import { callDeepSeek } from "./lib/ai/client";
-import { parseGenerateResponse } from "./lib/ai/parsers";
 import { incrementalTranslate, type TranslationMap } from "./lib/ai/translator2";
 import { incrementalReview } from "./lib/ai/reviewer";
-import { buildGenerateSystemPrompt, buildGenerateUserPrompt } from "./lib/ai/prompts/generate";
+import { generateWikiEntry } from "./lib/ai/generator";
 import { renderMarkdown } from "./lib/markdown/renderer";
 import { detectWikiLinks } from "./lib/markdown/linkDetector";
 import { parseFrontmatter } from "./lib/articles/frontmatter";
@@ -531,201 +530,219 @@ async function loadExistingTranslations(
 /**
  * Processes an AI term generation job.
  *
+ * Given a discoveryId, calls DeepSeek to generate a complete wiki entry
+ * (definition + content) for the term, then updates the WikiEntry file
+ * and DB record with the generated content, transitioning from "creating"
+ * to "unreviewed".
+ *
  * Flow:
- * 1. Read article content from file system
- * 2. Fetch existing wiki terms for the article's language (to avoid duplicates)
- * 3. Build prompt and call DeepSeek API
- * 4. Parse the response to extract candidate terms
- * 5. Create wiki entries (status: proposed) in DB and file system
- * 6. Return summary of generated terms
+ * 1. Look up the WikiDiscovery record by discoveryId
+ * 2. Look up the associated WikiEntry(creating) record
+ * 3. Call generateWikiEntry() with term + definition hint
+ * 4. On success: update WikiEntry file with generated content, transition to unreviewed
+ * 5. On success: update WikiDiscovery status to "generated", store wikiEntryId
+ * 6. On failure: update WikiDiscovery status to "failed", store failedReason
  *
  * Payload required fields:
- * - `articleId`: ID of the article to analyze
+ * - `discoveryId`: ID of the WikiDiscovery record to generate content for
  */
 async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   const payload = (job.data.payload ?? {}) as Record<string, unknown>;
-  const { articleId } = payload;
+  const { discoveryId } = payload;
 
-  const articleIdStr = String(articleId ?? "");
+  const discoveryIdStr = String(discoveryId ?? "");
 
-  console.log(`[Worker] Processing term generation for article ${articleIdStr}`);
+  console.log(`[Worker] Processing term generation for discovery ${discoveryIdStr}`);
 
-  if (!articleIdStr) {
-    throw new Error("Missing required payload field: articleId");
+  if (!discoveryIdStr) {
+    throw new Error("Missing required payload field: discoveryId");
   }
 
-  // 1. Read article content from DB + file system
-  const article = await prisma.article.findUnique({
-    where: { id: articleIdStr },
-    select: { contentPath: true, slug: true, title: true, language: true },
+  // 1. Look up the discovery record
+  const discovery = await prisma.wikiDiscovery.findUnique({
+    where: { id: discoveryIdStr },
+    select: {
+      id: true,
+      term: true,
+      definition: true,
+      articleSlug: true,
+      articleLang: true,
+      status: true,
+      wikiEntryId: true,
+    },
   });
 
-  if (!article) {
-    throw new Error(`Article not found: ${articleIdStr}`);
+  if (!discovery) {
+    throw new Error(`Discovery record not found: ${discoveryIdStr}`);
   }
 
-  const filePath = path.join(process.cwd(), article.contentPath);
-  let content: string;
-  try {
-    content = await fs.readFile(filePath, "utf-8");
-  } catch (err) {
+  if (discovery.status !== "approved") {
     throw new Error(
-      `Could not read article file: ${article.contentPath} (${err instanceof Error ? err.message : String(err)})`,
+      `Discovery record "${discoveryIdStr}" has status "${discovery.status}", expected "approved".`,
     );
   }
 
-  // 2. Fetch existing wiki terms for this language (to avoid duplicates)
-  const existingEntries = await prisma.wikiEntry.findMany({
-    where: { language: article.language },
-    select: { name: true },
-  });
-  const existingTermNames = existingEntries.map((e) => e.name);
-
-  // 3. Build prompt and call DeepSeek
-  // Note: callDeepSeek doesn't support separate systemPrompt, so we prepend
-  // the system instructions to the user prompt
-  const systemPrompt = buildGenerateSystemPrompt();
-  const userPrompt = buildGenerateUserPrompt(
-    content,
-    article.title,
-    existingTermNames,
-  );
-
-  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-
-  console.log(
-    `[Worker] Calling DeepSeek for term generation (article: "${article.title}")`,
-  );
-
-  const response = await callDeepSeek({
-    prompt: combinedPrompt,
-    responseFormat: "json",
-    temperature: 0.3,
-    maxTokens: 4096,
-  });
-
-  // 4. Parse the response
-  const generateResult = parseGenerateResponse(response.content);
-
-  if (!generateResult) {
-    console.warn(
-      `[Worker] Term generation returned unparseable response for article ${articleIdStr}`,
+  // 2. Look up the associated WikiEntry(creating)
+  if (!discovery.wikiEntryId) {
+    throw new Error(
+      `Discovery record "${discoveryIdStr}" has no associated WikiEntry.`,
     );
+  }
+
+  const entry = await prisma.wikiEntry.findUnique({
+    where: { id: discovery.wikiEntryId },
+    select: {
+      id: true,
+      name: true,
+      contentPath: true,
+      status: true,
+    },
+  });
+
+  if (!entry) {
+    throw new Error(
+      `WikiEntry "${discovery.wikiEntryId}" not found for discovery "${discoveryIdStr}".`,
+    );
+  }
+
+  if (entry.status !== "creating") {
+    throw new Error(
+      `WikiEntry "${entry.id}" has status "${entry.status}", expected "creating".`,
+    );
+  }
+
+  // 3. Call generateWikiEntry() with term + definition hint + optional context
+  const context = discovery.articleSlug || undefined;
+  const result = await generateWikiEntry(
+    discovery.term,
+    discovery.definition,
+    context,
+  );
+
+  if (!result.success || !result.entry) {
+    const reason = result.reason || "unknown";
+    console.warn(
+      `[Worker] Generation failed for term "${discovery.term}": ${reason}`,
+    );
+
+    // Update discovery to failed
+    await prisma.wikiDiscovery.update({
+      where: { id: discoveryIdStr },
+      data: {
+        status: "failed",
+        failedReason: reason,
+      },
+    });
+
     return {
-      articleId: articleIdStr,
-      generatedAt: new Date().toISOString(),
-      termsCount: 0,
-      terms: [],
-      message: "AI returned unparseable response.",
+      discoveryId: discoveryIdStr,
+      term: discovery.term,
+      success: false,
+      reason,
+      message: `AI was unable to generate content for "${discovery.term}": ${reason}.`,
     };
   }
 
+  const gen = result.entry;
   console.log(
-    `[Worker] AI suggested ${generateResult.terms.length} candidate terms`,
+    `[Worker] Successfully generated content for term: "${discovery.term}"`,
   );
 
-  // 5. Create wiki entries (status: proposed) in DB and file system
-  const createdTerms: Array<{
-    name: string;
-    definition: string;
-    tags: string[];
-    aliases: string[];
-    id: string;
-  }> = [];
-
-  for (const term of generateResult.terms) {
-    try {
-      // Check for duplicate one more time (race condition guard)
-      const existing = await prisma.wikiEntry.findUnique({
-        where: {
-          name_language: {
-            name: term.name,
-            language: article.language,
-          },
-        },
-      });
-
-      if (existing) {
-        console.log(
-          `[Worker] Term "${term.name}" already exists, skipping`,
-        );
-        continue;
-      }
-
-      // Build content file path
-      const slug = term.name
-        .replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "")
-        .toLowerCase() || term.name.toLowerCase();
-
-      const fileName = `${slug}.md`;
-      const contentPath = `content/wiki/${article.language}/${fileName}`;
-      const fullDir = path.join(process.cwd(), `content/wiki/${article.language}`);
-      const fullPath = path.join(fullDir, fileName);
-
-      // Write wiki file with basic frontmatter
-      const fileContent = [
-        "---",
-        `name: "${term.name}"`,
-        `language: ${article.language}`,
-        `status: proposed`,
-        `aliases: [${term.aliases.map((a) => `"${a}"`).join(", ")}]`,
-        `tags: [${term.tags.map((t) => `"${t}"`).join(", ")}]`,
-        "---",
-        "",
-        term.definition,
-      ].join("\n");
-
-      await fs.mkdir(fullDir, { recursive: true });
-      await fs.writeFile(fullPath, fileContent, "utf-8");
-
-      // Create DB record
-      const entry = await prisma.wikiEntry.create({
-        data: {
-          name: term.name,
-          language: article.language,
-          definition: term.definition,
-          contentPath,
-          tags: term.tags,
-          aliases: term.aliases,
-          status: "creating",
-          accessGroup: [],
-        },
-      });
-
-      createdTerms.push({
-        name: entry.name,
-        definition: entry.definition,
-        tags: entry.tags,
-        aliases: entry.aliases,
-        id: entry.id,
-      });
-
-      console.log(
-        `[Worker] Created proposed wiki entry: "${term.name}"`,
-      );
-    } catch (err) {
-      console.warn(
-        `[Worker] Failed to create wiki entry "${term.name}": ${err instanceof Error ? err.message : String(err)}`,
-      );
-      // Continue with next term
-    }
+  // 4. Read existing WikiEntry file and update with generated content
+  const filePath = path.join(process.cwd(), entry.contentPath);
+  let existingContent: string;
+  try {
+    existingContent = await fs.readFile(filePath, "utf-8");
+  } catch (err) {
+    console.warn(
+      `[Worker] Could not read wiki entry file for "${entry.name}", will create new: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    existingContent = "";
   }
 
-  console.log(
-    `[Worker] Term generation complete: ${createdTerms.length}/${generateResult.terms.length} terms created`,
-  );
+  // Build new file content using buildWikiFileWithMeta
+  const { buildWikiFileWithMeta, parseWikiFileWithMeta, slugifyName } = await import("./lib/wiki/parser");
 
-  // 6. Return summary
+  let updatedFileContent: string;
+
+  if (existingContent.trim()) {
+    // Update existing file — preserve any human-written content, add AI content
+    const parsed = parseWikiFileWithMeta(existingContent);
+    updatedFileContent = buildWikiFileWithMeta(
+      {
+        name: entry.name,
+        aliases: gen.aliases,
+        language: discovery.articleLang as "zh" | "en",
+        tags: gen.tags,
+        status: "unreviewed",
+        accessGroup: parsed.frontmatter.accessGroup || [],
+      },
+      {
+        // Write the AI-generated definition to the definition block
+        definition: gen.definition,
+        // Preserve any existing human notes
+        human: parsed.blocks.human,
+        // Write AI-generated content to the AI block
+        ai: gen.content,
+        // Preserve any existing references
+        ref: parsed.blocks.ref,
+      },
+    );
+  } else {
+    // New file (should not happen since approve creates it, but handle gracefully)
+    const slug = slugifyName(entry.name);
+    updatedFileContent = buildWikiFileWithMeta(
+      {
+        name: entry.name,
+        aliases: gen.aliases,
+        language: discovery.articleLang as "zh" | "en",
+        tags: gen.tags,
+        status: "unreviewed",
+        accessGroup: [],
+      },
+      {
+        definition: gen.definition,
+        human: "",
+        ai: gen.content,
+        ref: "",
+      },
+    );
+  }
+
+  // Write updated content to file
+  // Ensure directory exists
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, updatedFileContent, "utf-8");
+  console.log(`[Worker] Updated wiki entry file: ${entry.contentPath}`);
+
+  // 5. Update WikiEntry DB record — transition to unreviewed with generated data
+  await prisma.wikiEntry.update({
+    where: { id: entry.id },
+    data: {
+      status: "unreviewed",
+      definition: gen.definition,
+      aliases: gen.aliases,
+      tags: gen.tags,
+    },
+  });
+  console.log(`[Worker] WikiEntry "${entry.name}" transitioned to unreviewed`);
+
+  // 6. Update WikiDiscovery status to "generated" (link already set)
+  await prisma.wikiDiscovery.update({
+    where: { id: discoveryIdStr },
+    data: {
+      status: "generated",
+    },
+  });
+  console.log(`[Worker] Discovery "${discoveryIdStr}" marked as generated`);
+
+  // 7. Return success
   return {
-    articleId: articleIdStr,
-    generatedAt: new Date().toISOString(),
-    termsCount: createdTerms.length,
-    terms: createdTerms,
-    message: createdTerms.length > 0
-      ? `Successfully generated ${createdTerms.length} wiki term(s).`
-      : "No new terms were generated (all suggestions already exist or failed).",
+    discoveryId: discoveryIdStr,
+    term: discovery.term,
+    wikiEntryId: entry.id,
+    success: true,
+    message: `Successfully generated wiki entry for "${discovery.term}".`,
   };
 }
 
@@ -849,7 +866,7 @@ const HANDLERS: Record<
   review: processReview,
   translate: processTranslate,
   discover: processDiscover,
-  // generate: disabled for now
+  generate: processGenerate,
   // scan: disabled for now
 };
 

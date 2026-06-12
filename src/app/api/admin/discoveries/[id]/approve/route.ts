@@ -1,12 +1,16 @@
 /**
  * @file POST /api/admin/discoveries/[id]/approve
  *
- * Approves a single discovery record and auto-creates a WikiEntry(creating).
+ * Approves a single discovery record:
+ * 1. Creates the .md file on disk with placeholder frontmatter
+ * 2. Creates a WikiEntry with status "creating"
+ * 3. Updates discovery status to "approved" and links to wikiEntryId
+ * 4. Enqueues a generate job to fill in AI content asynchronously
  *
  * Flow:
- * 1. Update discovery status to "approved"
- * 2. Create a WikiEntry with status "creating"
- * 3. Create the .md file on disk with frontmatter
+ * - WikiEntry is created with status "creating"
+ * - Worker picks up the "generate" job, calls AI, writes content, transitions to "unreviewed"
+ * - Frontend polls or watches the discovery's wikiEntryId for status change
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +18,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { buildWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
+import { addJob } from "@/lib/queue/producer";
 import type { WikiBlocks } from "@/lib/wiki/parser";
 
 export async function POST(
@@ -81,6 +86,7 @@ export async function POST(
         language: record.articleLang,
         aliases: [],
         tags: [],
+        type: record.type,
         status: "creating",
         accessGroup: [],
       },
@@ -99,16 +105,6 @@ export async function POST(
     const filePath = path.join(process.cwd(), contentPath);
     await writeFile(filePath, fileContent, "utf-8");
 
-    // --- Update discovery status ---
-
-    const updated = await prisma.wikiDiscovery.update({
-      where: { id },
-      data: {
-        status: "approved",
-        approvedAt: new Date(),
-      },
-    });
-
     // --- Create WikiEntry with status "creating" ---
 
     const entry = await prisma.wikiEntry.create({
@@ -119,18 +115,48 @@ export async function POST(
         definition: record.definition || "",
         contentPath,
         tags: [],
+        type: record.type,
         accessGroup: [],
         status: "creating",
       },
     });
 
+    // --- Update discovery status to "approved" and link to wikiEntryId ---
+
+    await prisma.wikiDiscovery.update({
+      where: { id },
+      data: {
+        status: "approved",
+        approvedAt: new Date(),
+        wikiEntryId: entry.id,
+      },
+    });
+
+    // --- Enqueue generate job for the discovery ---
+
+    let taskId: string | null = null;
+    try {
+      taskId = await addJob("generate", {
+        discoveryId: id,
+      });
+      console.log(
+        `[Admin] Enqueued generate job (${taskId}) for discovery ${id}`,
+      );
+    } catch (err) {
+      // If queue enqueue fails, the WikiEntry is still created as "creating"
+      // Admin can manually trigger generation later
+      console.error(
+        `[Admin] Failed to enqueue generate job for discovery ${id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       discovery: {
-        id: updated.id,
-        term: updated.term,
-        status: updated.status,
-        approvedAt: updated.approvedAt?.toISOString() ?? null,
+        id,
+        term: record.term,
+        status: "approved",
+        approvedAt: new Date().toISOString(),
       },
       wikiEntry: {
         id: entry.id,
@@ -138,6 +164,7 @@ export async function POST(
         language: entry.language,
         status: entry.status,
       },
+      generateTaskId: taskId,
     });
   } catch (error) {
     console.error("Admin discovery approve error:", error);

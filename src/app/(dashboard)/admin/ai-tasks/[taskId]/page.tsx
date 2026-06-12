@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readFile } from "fs/promises";
 import path from "path";
-import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search, BookOpen } from "lucide-react";
+import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search, BookOpen, CheckCircle2, Edit } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import ReviewChunkList from "@/components/admin/ReviewChunkList";
@@ -71,14 +71,12 @@ interface TranslateOutput {
 }
 
 interface GenerateOutput {
-  termsCount: number;
-  terms: Array<{
-    name: string;
-    definition: string;
-    tags: string[];
-    aliases: string[];
-    id: string;
-  }>;
+  discoveryId: string;
+  term: string;
+  wikiEntryId: string;
+  success: boolean;
+  message: string;
+  reason?: string;
 }
 
 interface DiscoverOutput {
@@ -525,28 +523,47 @@ export default async function TaskDetailPage({
       {/* Term generation summary */}
       {generateOutput && task.status === "completed" && (
         <div className="mb-8">
-          <div className="rounded-lg border border-border bg-card p-4 text-center inline-block">
-            <p className="text-2xl font-bold">{generateOutput.termsCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">生成词条</p>
-          </div>
-          {generateOutput.terms.length > 0 && (
-            <div className="mt-4 flex flex-col gap-2">
-              {generateOutput.terms.map((term) => (
-                <div key={term.id} className="rounded-lg border border-border bg-card/50 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{term.name}</span>
-                    {term.tags.length > 0 && term.tags.map((tag) => (
-                      <span key={tag} className="text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">{term.definition}</p>
-                  {term.aliases.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">别名: {term.aliases.join(", ")}</p>
-                  )}
+          <div className="rounded-lg border border-border bg-card p-4 inline-flex items-center gap-3">
+            {generateOutput.success ? (
+              <>
+                <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-2">
+                  <CheckCircle2 className="size-5 text-green-500" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-lg font-semibold text-green-700 dark:text-green-400">生成成功</p>
+                  <p className="text-sm text-muted-foreground">{generateOutput.message}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-full bg-red-100 dark:bg-red-900/30 p-2">
+                  <AlertCircle className="size-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-red-700 dark:text-red-400">生成失败</p>
+                  <p className="text-sm text-muted-foreground">{generateOutput.message}</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Links */}
+          {generateOutput.success && (
+            <div className="mt-4 flex items-center gap-3">
+              <Link
+                href={`/admin/wiki/${generateOutput.wikiEntryId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                <Edit className="size-4" />
+                编辑词条
+              </Link>
+              <Link
+                href={`/admin/wiki?status=unreviewed`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                <BookOpen className="size-4" />
+                查看待审查词条
+              </Link>
             </div>
           )}
         </div>

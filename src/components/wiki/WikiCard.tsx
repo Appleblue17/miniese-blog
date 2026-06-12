@@ -12,6 +12,32 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { WikiEntryMeta } from "@/types/wiki";
 
+// --- Type badge helpers ---
+
+const TYPE_LABELS: Record<string, string> = {
+  acronym: "缩写",
+  concept: "概念",
+  theorem: "定理",
+  tech: "技术",
+  other: "其他",
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  acronym: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  concept: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  theorem: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  tech: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+  other: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+function getTypeLabel(type: string): string {
+  return TYPE_LABELS[type] || type;
+}
+
+function getTypeColor(type: string): string {
+  return TYPE_COLORS[type] || TYPE_COLORS.other;
+}
+
 export interface WikiCardProps {
   entry: WikiEntryMeta;
   lang: string;
@@ -28,6 +54,12 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
             <CardTitle className="flex-1 text-lg group-hover:text-primary transition-colors">
               {entry.name}
             </CardTitle>
+            {/* Type badge */}
+            {entry.type && (
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getTypeColor(entry.type)}`}>
+                {getTypeLabel(entry.type)}
+              </span>
+            )}
             <Badge
               variant="outline"
               className="shrink-0 mt-0.5 text-[10px] uppercase tracking-wider"

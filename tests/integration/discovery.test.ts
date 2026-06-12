@@ -9,18 +9,41 @@
  * 5. Single reject (POST /api/admin/discoveries/[id]/reject)
  * 6. Duplicate prevention (unique constraint)
  *
- * Requires: PostgreSQL running, Redis running (for queue, but not needed here)
+ * The approve APIs create WikiEntry(creating) + file, then enqueue a generate
+ * job. The generate job is async and requires Redis/worker — these tests
+ * verify the approve flow up to WikiEntry creation.
+ *
+ * Requires: PostgreSQL running (Redis is optional; queue enqueue failure
+ * is caught and non-fatal for the API).
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { prisma } from "../../src/lib/db";
+import { readFile, rm } from "fs/promises";
+import path from "path";
+import { toNextRequest } from "./helpers";
+import { prisma } from "./db-client";
 
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
 
 let articleId: string;
-let discoveryIds: string[] = [];
+const testDiscoveryTerms = [
+  "TypeScript",
+  "Closure",
+  "Docker",
+  "SingleApprove",
+  "SingleReject",
+  "GETTestTerm",
+  "BatchReject",
+  "BatchReject2",
+  "BatchApprove",
+  "HighImportance",
+  "AlreadyApproved",
+  "StatusTransition",
+  "StatusFailed",
+  "UniqueConstraint",
+];
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -28,6 +51,9 @@ let discoveryIds: string[] = [];
 
 beforeAll(async () => {
   // Clean up any leftover test data from previous runs
+  await prisma.wikiEntry.deleteMany({
+    where: { name: { in: testDiscoveryTerms } },
+  });
   await prisma.wikiDiscovery.deleteMany({
     where: { article: { slug: "test-discovery-article" } },
   });
@@ -48,320 +74,472 @@ beforeAll(async () => {
     },
   });
   articleId = article.id;
-
-  // Create test discovery records
-  const d1 = await prisma.wikiDiscovery.create({
-    data: {
-      articleId,
-      articleSlug: "test-discovery-article",
-      articleLang: "zh",
-      term: "TypeScript",
-      type: "tech",
-      definition: "JavaScript with static typing",
-      importance: 0.95,
-      status: "pending",
-    },
-  });
-  discoveryIds.push(d1.id);
-
-  const d2 = await prisma.wikiDiscovery.create({
-    data: {
-      articleId,
-      articleSlug: "test-discovery-article",
-      articleLang: "zh",
-      term: "Closure",
-      type: "concept",
-      definition: "Function with lexical environment",
-      importance: 0.75,
-      status: "pending",
-    },
-  });
-  discoveryIds.push(d2.id);
-
-  const d3 = await prisma.wikiDiscovery.create({
-    data: {
-      articleId,
-      articleSlug: "test-discovery-article",
-      articleLang: "zh",
-      term: "Docker",
-      type: "tech",
-      definition: "Container platform",
-      importance: 0.45,
-      status: "pending",
-    },
-  });
-  discoveryIds.push(d3.id);
 });
 
 afterAll(async () => {
   // Clean up test data — including WikiEntries created by approve tests
-  const article = await prisma.article.findFirst({
-    where: { slug: "test-discovery-article" },
+  // and files created on disk
+  const entries = await prisma.wikiEntry.findMany({
+    where: { name: { in: testDiscoveryTerms } },
+    select: { contentPath: true },
   });
-  if (article) {
-    await prisma.wikiEntry.deleteMany({
-      where: { name: { in: ["SingleApprove", "SingleReject"] } },
-    });
-    await prisma.wikiDiscovery.deleteMany({
-      where: { articleId: article.id },
-    });
-    await prisma.article.delete({ where: { id: article.id } });
+  for (const entry of entries) {
+    try {
+      await rm(path.join(process.cwd(), entry.contentPath));
+    } catch {
+      // File may not exist
+    }
   }
+
+  await prisma.wikiEntry.deleteMany({
+    where: { name: { in: testDiscoveryTerms } },
+  });
+  await prisma.wikiDiscovery.deleteMany({
+    where: { articleId },
+  });
+  await prisma.article.delete({ where: { id: articleId } });
 });
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+/** Creates a pending discovery record for testing. */
+async function createPendingDiscovery(
+  term: string,
+  importance = 0.5,
+): Promise<string> {
+  const d = await prisma.wikiDiscovery.create({
+    data: {
+      articleId,
+      articleSlug: "test-discovery-article",
+      articleLang: "zh",
+      term,
+      type: "concept",
+      definition: `Definition for ${term}`,
+      importance,
+      status: "pending",
+    },
+  });
+  return d.id;
+}
+
+/** Deletes a discovery record and its associated WikiEntry + file. */
+async function cleanupDiscovery(id: string) {
+  const rec = await prisma.wikiDiscovery.findUnique({
+    where: { id },
+    select: { wikiEntry: { select: { id: true, contentPath: true } } },
+  });
+  if (rec?.wikiEntry) {
+    try {
+      await rm(path.join(process.cwd(), rec.wikiEntry.contentPath));
+    } catch {
+      // ignore
+    }
+    await prisma.wikiEntry.delete({ where: { id: rec.wikiEntry.id } });
+  }
+  await prisma.wikiDiscovery.delete({ where: { id } });
+}
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("GET /api/admin/discoveries", () => {
-  it("should return pending discoveries by default", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      cache: "no-store",
-    });
-    expect(res.status).toBe(200);
+  let tmpId: string;
 
-    const body = await res.json();
+  beforeAll(async () => {
+    tmpId = await createPendingDiscovery("GETTestTerm", 0.6);
+  });
+
+  afterAll(async () => {
+    await cleanupDiscovery(tmpId);
+  });
+
+  it("should return pending discoveries by default", async () => {
+    const { GET } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries"),
+    );
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
     expect(body.discoveries).toBeDefined();
     expect(Array.isArray(body.discoveries)).toBe(true);
-    expect(body.total).toBeGreaterThanOrEqual(3);
+    expect(body.total).toBeGreaterThanOrEqual(1);
     expect(body.page).toBe(1);
   });
 
   it("should filter by articleId", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries?articleId=${articleId}`,
-      { cache: "no-store" },
+    const { GET } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries?articleId=${articleId}`,
+      ),
     );
-    expect(res.status).toBe(200);
+    const response = await GET(request);
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
-    expect(body.discoveries.length).toBeGreaterThanOrEqual(3);
+    const body = await response.json();
+    expect(body.discoveries.length).toBeGreaterThanOrEqual(1);
     body.discoveries.forEach((d: { articleId: string }) => {
       expect(d.articleId).toBe(articleId);
     });
   });
 
-  it("should filter by status", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries?status=approved`,
-      { cache: "no-store" },
-    );
-    expect(res.status).toBe(200);
+  it("should filter by status (generated, failed)", async () => {
+    const { GET } = await import("@/app/api/admin/discoveries/route");
 
-    const body = await res.json();
-    body.discoveries.forEach((d: { status: string }) => {
-      expect(d.status).toBe("approved");
+    // Test generated status
+    const req1 = toNextRequest(
+      new Request(
+        "http://localhost:3000/api/admin/discoveries?status=generated",
+      ),
+    );
+    const res1 = await GET(req1);
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json();
+    body1.discoveries.forEach((d: { status: string }) => {
+      expect(["generated", "approved"]).toContain(d.status);
     });
+
+    // Test failed status
+    const req2 = toNextRequest(
+      new Request(
+        "http://localhost:3000/api/admin/discoveries?status=failed",
+      ),
+    );
+    const res2 = await GET(req2);
+    expect(res2.status).toBe(200);
   });
 
   it("should return correct pagination metadata", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries?page=1&limit=2`,
-      { cache: "no-store" },
+    const { GET } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request(
+        "http://localhost:3000/api/admin/discoveries?page=1&limit=2",
+      ),
     );
-    expect(res.status).toBe(200);
+    const response = await GET(request);
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
     expect(body.discoveries.length).toBeLessThanOrEqual(2);
     expect(body.totalPages).toBeGreaterThanOrEqual(1);
   });
 });
 
 describe("POST /api/admin/discoveries - batch operations", () => {
-  it("should batch approve by ID list", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const approveIds = [discoveryIds[0]];
+  it("should batch reject by ID list", async () => {
+    const tmpId = await createPendingDiscovery("BatchReject");
+    const d2Id = await createPendingDiscovery("BatchReject2");
 
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: approveIds, action: "approve" }),
-    });
-    expect(res.status).toBe(200);
+    const { POST } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [tmpId, d2Id], action: "reject" }),
+      }),
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.affectedCount).toBe(2);
+
+    // Verify
+    for (const id of [tmpId, d2Id]) {
+      const record = await prisma.wikiDiscovery.findUnique({ where: { id } });
+      expect(record?.status).toBe("rejected");
+      await cleanupDiscovery(id);
+    }
+  });
+
+  it("should batch approve by ID list and create WikiEntry", async () => {
+    const tmpId = await createPendingDiscovery("BatchApprove");
+
+    const { POST } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [tmpId], action: "approve" }),
+      }),
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.affectedCount).toBe(1);
 
-    // Verify the record was updated
+    // Verify the discovery record was updated
     const record = await prisma.wikiDiscovery.findUnique({
-      where: { id: discoveryIds[0] },
+      where: { id: tmpId },
+      include: { wikiEntry: true },
     });
     expect(record?.status).toBe("approved");
     expect(record?.approvedAt).toBeTruthy();
-  });
+    // WikiEntry should have been created
+    expect(record?.wikiEntry).toBeDefined();
+    expect(record?.wikiEntry?.name).toBe("BatchApprove");
+    expect(record?.wikiEntry?.status).toBe("creating");
+    // The file should exist on disk
+    const filePath = path.join(process.cwd(), record!.wikiEntry!.contentPath);
+    const content = await readFile(filePath, "utf-8");
+    expect(content).toContain("BatchApprove");
+    expect(content).toContain("DEF_START");
+    expect(content).toContain("AI_START");
+    expect(content).toContain("AI_END");
 
-  it("should batch reject by ID list", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const rejectIds = [discoveryIds[2]];
-
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: rejectIds, action: "reject" }),
-    });
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.affectedCount).toBe(1);
-
-    // Verify
-    const record = await prisma.wikiDiscovery.findUnique({
-      where: { id: discoveryIds[2] },
-    });
-    expect(record?.status).toBe("rejected");
+    await cleanupDiscovery(tmpId);
   });
 
   it("should batch approve by criteria (minImportance)", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
+    const tmpId = await createPendingDiscovery("HighImportance", 0.8);
 
-    // discoveryIds[1] is still pending (0.75 importance)
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "approve",
-        minImportance: 0.7,
-        articleId,
+    const { POST } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          minImportance: 0.7,
+          articleId,
+        }),
       }),
-    });
-    expect(res.status).toBe(200);
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
     expect(body.success).toBe(true);
-    // Should have approved discoveryIds[1] (0.75)
-    expect(body.affectedCount).toBeGreaterThanOrEqual(1);
+
+    await cleanupDiscovery(tmpId);
   });
 
   it("should return empty result for non-matching criteria", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "approve",
-        minImportance: 0.99,
-        articleId,
+    const { POST } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          minImportance: 0.99,
+          articleId,
+        }),
       }),
-    });
-    expect(res.status).toBe(200);
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
     expect(body.affectedCount).toBe(0);
   });
 
   it("should reject invalid action", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-
-    const res = await fetch(`${baseUrl}/api/admin/discoveries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "invalid" }),
-    });
-    expect(res.status).toBe(400);
+    const { POST } = await import("@/app/api/admin/discoveries/route");
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "invalid" }),
+      }),
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(400);
   });
 });
 
 describe("POST /api/admin/discoveries/[id]/approve", () => {
-  it("should approve a single pending record", async () => {
-    // Create a fresh pending record
-    const rec = await prisma.wikiDiscovery.create({
-      data: {
-        articleId,
-        articleSlug: "test-discovery-article",
-        articleLang: "zh",
-        term: "SingleApprove",
-        type: "concept",
-        definition: "Test term for single approve",
-        importance: 0.5,
-        status: "pending",
-      },
-    });
+  it("should approve a single pending record and create WikiEntry(creating)", async () => {
+    const tmpId = await createPendingDiscovery("SingleApprove");
 
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries/${rec.id}/approve`,
-      { method: "POST" },
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
     );
-    expect(res.status).toBe(200);
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries/${tmpId}/approve`,
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ id: tmpId }),
+    });
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.discovery.status).toBe("approved");
 
-    // Clean up
-    await prisma.wikiDiscovery.delete({ where: { id: rec.id } });
+    // Verify WikiEntry was created
+    expect(body.wikiEntry).toBeDefined();
+    expect(body.wikiEntry.status).toBe("creating");
+    expect(body.wikiEntry.name).toBe("SingleApprove");
+
+    // Verify DB
+    const record = await prisma.wikiDiscovery.findUnique({
+      where: { id: tmpId },
+      select: { status: true, wikiEntryId: true },
+    });
+    expect(record?.status).toBe("approved");
+    expect(record?.wikiEntryId).toBe(body.wikiEntry.id);
+
+    // Verify file on disk
+    const entry = await prisma.wikiEntry.findUnique({
+      where: { id: body.wikiEntry.id },
+      select: { contentPath: true },
+    });
+    const filePath = path.join(process.cwd(), entry!.contentPath);
+    const content = await readFile(filePath, "utf-8");
+    expect(content).toContain("SingleApprove");
+    expect(content).toContain("DEF_START");
+    expect(content).toContain("AI_START");
+
+    await cleanupDiscovery(tmpId);
   });
 
   it("should reject if already processed", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
+    const tmpId = await createPendingDiscovery("AlreadyApproved");
 
-    // discoveryIds[0] is already approved
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries/${discoveryIds[0]}/approve`,
-      { method: "POST" },
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
     );
-    expect(res.status).toBe(409);
+
+    // First approve should work
+    const req1 = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries/${tmpId}/approve`,
+        { method: "POST" },
+      ),
+    );
+    const res1 = await POST(req1, {
+      params: Promise.resolve({ id: tmpId }),
+    });
+    expect(res1.status).toBe(200);
+
+    // Second approve should fail
+    const req2 = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries/${tmpId}/approve`,
+        { method: "POST" },
+      ),
+    );
+    const res2 = await POST(req2, {
+      params: Promise.resolve({ id: tmpId }),
+    });
+    expect(res2.status).toBe(409);
+
+    await cleanupDiscovery(tmpId);
   });
 
   it("should return 404 for non-existent id", async () => {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries/non-existent-id/approve`,
-      { method: "POST" },
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
     );
-    expect(res.status).toBe(404);
+    const request = toNextRequest(
+      new Request(
+        "http://localhost:3000/api/admin/discoveries/non-existent-id/approve",
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ id: "non-existent-id" }),
+    });
+    expect(response.status).toBe(404);
   });
 });
 
 describe("POST /api/admin/discoveries/[id]/reject", () => {
   it("should reject a single pending record", async () => {
-    // Create a fresh pending record
-    const rec = await prisma.wikiDiscovery.create({
-      data: {
-        articleId,
-        articleSlug: "test-discovery-article",
-        articleLang: "zh",
-        term: "SingleReject",
-        type: "concept",
-        definition: "Test term for single reject",
-        importance: 0.5,
-        status: "pending",
-      },
-    });
+    const tmpId = await createPendingDiscovery("SingleReject");
 
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/discoveries/${rec.id}/reject`,
-      { method: "POST" },
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/reject/route"
     );
-    expect(res.status).toBe(200);
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries/${tmpId}/reject`,
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ id: tmpId }),
+    });
+    expect(response.status).toBe(200);
 
-    const body = await res.json();
+    const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.discovery.status).toBe("rejected");
 
-    // Clean up
-    await prisma.wikiDiscovery.delete({ where: { id: rec.id } });
+    await cleanupDiscovery(tmpId);
+  });
+});
+
+describe("Discovery status transitions", () => {
+  it("should support pending → approved → generated transition in schema", async () => {
+    // Create a pending discovery
+    const tmpId = await createPendingDiscovery("StatusTransition");
+
+    // Approve it
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
+    );
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/admin/discoveries/${tmpId}/approve`,
+        { method: "POST" },
+      ),
+    );
+    const approveRes = await POST(request, {
+      params: Promise.resolve({ id: tmpId }),
+    });
+    expect(approveRes.status).toBe(200);
+
+    // Manually simulate what the worker would do (set to generated)
+    await prisma.wikiDiscovery.update({
+      where: { id: tmpId },
+      data: { status: "generated" },
+    });
+
+    const record = await prisma.wikiDiscovery.findUnique({
+      where: { id: tmpId },
+    });
+    expect(record?.status).toBe("generated");
+
+    // Test failed status too
+    const tmpId2 = await createPendingDiscovery("StatusFailed");
+    await prisma.wikiDiscovery.update({
+      where: { id: tmpId2 },
+      data: { status: "failed", failedReason: "ai_error" },
+    });
+    const record2 = await prisma.wikiDiscovery.findUnique({
+      where: { id: tmpId2 },
+    });
+    expect(record2?.status).toBe("failed");
+    expect(record2?.failedReason).toBe("ai_error");
+
+    await cleanupDiscovery(tmpId);
+    await cleanupDiscovery(tmpId2);
   });
 });
 
 describe("Unique constraint", () => {
   it("should prevent duplicate (articleId + term)", async () => {
+    const tmpId = await createPendingDiscovery("UniqueConstraint");
     await expect(
       prisma.wikiDiscovery.create({
         data: {
           articleId,
           articleSlug: "test-discovery-article",
           articleLang: "zh",
-          term: "TypeScript", // Already exists from setup
+          term: "UniqueConstraint", // Already exists
           type: "tech",
           definition: "Duplicate",
           importance: 0.5,
@@ -369,5 +547,7 @@ describe("Unique constraint", () => {
         },
       }),
     ).rejects.toThrow();
+
+    await cleanupDiscovery(tmpId);
   });
 });

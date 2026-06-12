@@ -38,6 +38,7 @@ enum WikiStatus {
   creating
   unreviewed
   reviewed
+  deleted
 }
 
 enum AiTaskStatus {
@@ -51,6 +52,8 @@ enum DiscoveryStatus {
   pending
   approved
   rejected
+  generated
+  failed
 }
 
 model Article {
@@ -102,12 +105,14 @@ model WikiEntry {
   definition  String
   contentPath String
   tags        String[]
+  type        String          @default("concept")
   accessGroup String[]
   status      WikiStatus      @default(creating)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   articleLinks  ArticleWikiLink[]
+  discoveries   WikiDiscovery[]
 
   @@unique([name, language])
 }
@@ -161,6 +166,11 @@ model WikiDiscovery {
   status        DiscoveryStatus @default(pending)
   createdAt     DateTime        @default(now())
   approvedAt    DateTime?
+
+  // AI generation result (Phase 5.5)
+  wikiEntryId   String?         // Link to WikiEntry when generated
+  wikiEntry     WikiEntry?      @relation(fields: [wikiEntryId], references: [id], onDelete: SetNull)
+  failedReason  String?         // Reason if generation failed
 
   article       Article?        @relation(fields: [articleId], references: [id], onDelete: SetNull)
 

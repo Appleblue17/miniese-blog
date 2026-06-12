@@ -1,71 +1,73 @@
 /**
- * @file AI term generation prompt templates.
+ * @file AI single term content generation prompt templates.
  *
- * These prompts instruct DeepSeek to analyze an article and discover potential
- * wiki entries — technical terms, concepts, tools, frameworks, or jargon that
- * would benefit from having a dedicated wiki entry.
+ * These prompts instruct DeepSeek to generate a complete wiki entry for
+ * a single term, given its name and a short hint/definition.
  *
- * The AI should:
- * 1. Scan the article content for candidate terms
- * 2. For each term, provide a concise definition (1–3 sentences)
- * 3. Suggest categories/tags for the term
- * 4. Suggest alternative names/aliases
- *
- * Output format: structured JSON.
+ * Output format: structured JSON with definition, content, aliases, tags, type.
  */
 
 /**
- * Builds the system prompt for term generation.
+ * Builds the system prompt for single term generation.
  *
  * @returns The system prompt string.
  */
 export function buildGenerateSystemPrompt(): string {
-  return `You are an expert technical writer and knowledge base curator. Your task is to analyze article content and identify terms that should have dedicated wiki entries.
+  return `You are a technical encyclopedia editor. Generate a complete wiki entry for the given term.
 
-Guidelines:
-- Focus on technical terms, concepts, tools, frameworks, libraries, algorithms, and jargon
-- Include domain-specific terminology that readers might not be familiar with
-- Suggest terms that are referenced multiple times or are central to the article's topic
-- For each term, provide a concise, accurate definition (1–3 sentences)
-- Suggest relevant tags for categorization
-- Suggest common aliases or alternative names
-- Prioritize quality over quantity — only suggest terms that genuinely warrant a wiki entry
-- Do NOT suggest common words, basic vocabulary, or terms already present in the article's title
+## Output format
+Return a strict JSON object:
 
-Output your response as a JSON object with this exact structure:
 {
-  "terms": [
-    {
-      "name": "TermName",
-      "definition": "Concise definition of the term.",
-      "tags": ["tag1", "tag2"],
-      "aliases": ["alias1", "alias2"]
-    }
-  ]
-}`;
+  "aliases": ["alias1", "alias2"],
+  "definition": "Short definition (30-80 chars, for hover preview)",
+  "content": "Detailed introduction...\\n\\n#### Examples\\n...",
+  "tags": ["tag1", "tag2"],
+  "type": "acronym | concept | theorem | tech | other"
+}
+
+## Writing requirements
+1. **definition**: One concise sentence, suitable for hover preview. Write in the same language as the term's context.
+2. **content**: Full tutorial-style wiki entry in Markdown, including:
+   - Detailed introduction (2-3 paragraphs)
+   - Examples or usage (if applicable)
+   - Related concepts (if applicable)
+   - Write formulas using KaTeX, inline formulas can use $formula$ format and display formulas use $$formula$$ format
+   - Do NOT include a top-level title for the entry (name is already displayed on the page)
+   - Use \`####\` (level-4 headings) for subsections, and avoid nesting headings
+3. **aliases**: Common alternative names or abbreviations
+4. **tags**: Categories for classification
+5. **type**: One of: acronym, concept, theorem, tech, other
+
+## Based on training knowledge
+- Use your existing knowledge to generate content
+- Do NOT fabricate non-existent information
+- If you genuinely cannot generate meaningful content, return { "unable": true }`;
 }
 
 /**
- * Builds the user prompt for term generation.
+ * Builds the user prompt for single term generation.
  *
- * @param articleContent - The full article content (without frontmatter).
- * @param articleTitle - The article title (to avoid suggesting the title itself).
- * @param existingTerms - Optional list of existing wiki term names to avoid duplicates.
+ * @param term - The term name.
+ * @param definitionHint - A short hint/definition from discovery (for reference).
+ * @param context - Optional article context (slug or snippet) for relevance.
  * @returns The user prompt string.
  */
 export function buildGenerateUserPrompt(
-  articleContent: string,
-  articleTitle: string,
-  existingTerms: string[] = [],
+  term: string,
+  definitionHint: string,
+  context?: string,
 ): string {
-  let prompt = `Analyze the following article titled "${articleTitle}" and identify technical terms that should have wiki entries.\n\n`;
+  let prompt = `Generate a wiki entry for the following term:\n\n`;
+  prompt += `- Term: ${term}\n`;
+  prompt += `- Short hint (reference only): ${definitionHint || "none"}\n`;
 
-  if (existingTerms.length > 0) {
-    prompt += `The following terms already have wiki entries — do NOT suggest them again:\n${existingTerms.map((t) => `  - ${t}`).join("\n")}\n\n`;
+  if (context) {
+    prompt += `- Context (article slug): ${context}\n`;
   }
 
-  prompt += `Article content:\n\n${articleContent}\n\n`;
-  prompt += `Return a JSON object with a "terms" array. Each term should have: "name", "definition", "tags", and "aliases".`;
+  prompt += `\nReturn a JSON object with: "aliases", "definition", "content", "tags", "type".\n`;
+  prompt += `If you cannot generate meaningful content, return { "unable": true }.`;
 
   return prompt;
 }

@@ -46,14 +46,17 @@ async function fetchEntry(
     return null;
   }
 
-  const entry = await prisma.wikiEntry.findFirst({
+  const entries = await prisma.wikiEntry.findMany({
     where: {
       OR: [
         { name, language: lang as "zh" | "en" },
         { name: slug, language: lang as "zh" | "en" },
       ],
     },
+    take: 2,
   });
+
+  const entry = entries.find((e) => e.status !== "deleted") || entries[0] || null;
 
   if (!entry) {
     return null;
@@ -73,6 +76,7 @@ async function fetchEntry(
     definition: entry.definition,
     contentPath: entry.contentPath,
     tags: entry.tags,
+    type: entry.type,
     accessGroup: entry.accessGroup,
     status: entry.status as WikiStatus,
     createdAt: entry.createdAt.toISOString(),

@@ -33,7 +33,8 @@ export interface WikiFrontmatter {
   aliases?: string[];
   language: "zh" | "en";
   tags?: string[];
-  status?: "creating" | "unreviewed" | "reviewed";
+  type?: string;
+  status?: "creating" | "unreviewed" | "reviewed" | "deleted";
   accessGroup?: string[];
 }
 
@@ -178,6 +179,7 @@ export function parseWikiFileWithMeta(content: string): ParsedWikiFile {
     aliases: (frontmatter.aliases as string[]) || [],
     language: (frontmatter.language as "zh" | "en") || "zh",
     tags: (frontmatter.tags as string[]) || [],
+    type: (frontmatter.type as string) || "concept",
     status: (frontmatter.status as WikiFrontmatter["status"]) || "creating",
     accessGroup: (frontmatter.accessGroup as string[]) || [],
   };
@@ -221,6 +223,9 @@ export function buildWikiFileWithMeta(
   yamlLines.push(`language: ${meta.language}`);
   if (meta.tags && meta.tags.length > 0) {
     yamlLines.push(`tags: [${meta.tags.join(", ")}]`);
+  }
+  if (meta.type) {
+    yamlLines.push(`type: ${meta.type}`);
   }
   if (meta.status) {
     yamlLines.push(`status: ${meta.status}`);

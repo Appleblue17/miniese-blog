@@ -8,7 +8,7 @@ import type { WikiBlocks } from "@/lib/wiki/parser";
  * Wiki entry lifecycle status.
  * Note: "proposed" was removed; manual entries go to WikiDiscovery(pending) instead.
  */
-export type WikiStatus = "creating" | "unreviewed" | "reviewed";
+export type WikiStatus = "creating" | "unreviewed" | "reviewed" | "deleted";
 
 /**
  * Metadata for a wiki entry, as stored in the database.
@@ -21,6 +21,7 @@ export interface WikiEntryMeta {
   definition: string;
   contentPath: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: WikiStatus;
   createdAt: string;
@@ -53,6 +54,7 @@ export interface WikiEntryUpdateInput {
   ai?: string;
   ref?: string;
   tags?: string[];
+  type?: string;
   accessGroup?: string[];
 }
 

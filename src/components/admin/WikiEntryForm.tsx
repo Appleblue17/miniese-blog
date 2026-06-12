@@ -58,6 +58,7 @@ export interface WikiEntryInitialData {
   language: string;
   definition: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: WikiStatus;
   createdAt: string;
@@ -410,6 +411,7 @@ function EditForm({ initialData }: { initialData: WikiEntryInitialData }) {
   const [error, setError] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>(initialData.tags || []);
   const [aliases, setAliases] = useState<string[]>(initialData.aliases || []);
+  const [entryType, setEntryType] = useState<string>(initialData.type || "concept");
 
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
@@ -439,6 +441,7 @@ function EditForm({ initialData }: { initialData: WikiEntryInitialData }) {
         ai: values.ai,
         ref: values.ref,
         tags: tags.length > 0 ? tags : [],
+        type: entryType,
       };
 
       const res = await fetch(
@@ -550,6 +553,22 @@ function EditForm({ initialData }: { initialData: WikiEntryInitialData }) {
         onChange={setTags}
         placeholder="输入标签后按回车添加"
       />
+
+      {/* Type */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium">词条类型</label>
+        <select
+          value={entryType}
+          onChange={(e) => setEntryType(e.target.value)}
+          className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+        >
+          <option value="concept">概念</option>
+          <option value="tech">技术</option>
+          <option value="theorem">定理</option>
+          <option value="acronym">缩写</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
 
       {/* Definition */}
       <div className="flex flex-col gap-1.5">

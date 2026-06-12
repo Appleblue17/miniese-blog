@@ -289,7 +289,7 @@ describe("parseWikiFileWithMeta", () => {
 
     expect(parsed.frontmatter.name).toBe("Test");
     expect(parsed.frontmatter.language).toBe("zh");
-    expect(parsed.frontmatter.status).toBe("proposed");
+    expect(parsed.frontmatter.status).toBe("creating");
     expect(parsed.frontmatter.tags).toEqual([]);
     expect(parsed.frontmatter.aliases).toEqual([]);
   });

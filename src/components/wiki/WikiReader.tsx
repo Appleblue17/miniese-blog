@@ -12,7 +12,34 @@
 
 import { Calendar, BookOpen, Bot, User, Quote, Link2, MessageSquare, Sparkles, ShieldCheck, Clock, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { renderMarkdown } from "@/lib/markdown/renderer";
 import type { WikiStatus } from "@/types/wiki";
+
+// --- Type badge helpers ---
+
+const TYPE_LABELS: Record<string, string> = {
+  acronym: "缩写",
+  concept: "概念",
+  theorem: "定理",
+  tech: "技术",
+  other: "其他",
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  acronym: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  concept: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  theorem: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  tech: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+  other: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+function typeLabel(type: string): string {
+  return TYPE_LABELS[type] || type;
+}
+
+function typeColor(type: string): string {
+  return TYPE_COLORS[type] || TYPE_COLORS.other;
+}
 
 interface WikiReaderEntry {
   name: string;
@@ -20,6 +47,7 @@ interface WikiReaderEntry {
   language: string;
   definition: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: WikiStatus;
   createdAt: string;
@@ -76,7 +104,14 @@ function SectionBlock({
   );
 }
 
-export function WikiReader({ entry, lang }: WikiReaderProps) {
+export async function WikiReader({ entry, lang }: WikiReaderProps) {
+  // Render markdown blocks server-side
+  const renderedBlocks = {
+    human: entry.blocks.human ? await renderMarkdown(entry.blocks.human, "markdown") : "",
+    ai: entry.blocks.ai ? await renderMarkdown(entry.blocks.ai, "markdown") : "",
+    ref: entry.blocks.ref ? await renderMarkdown(entry.blocks.ref, "markdown") : "",
+  };
+
   return (
     <article className="flex flex-col gap-8">
       {/* 1. Title area */}
@@ -100,6 +135,12 @@ export function WikiReader({ entry, lang }: WikiReaderProps) {
 
           {/* Status badges */}
           <div className="flex flex-col gap-1 shrink-0">
+            {/* Type badge */}
+            {entry.type && (
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(entry.type)}`}>
+                {typeLabel(entry.type)}
+              </span>
+            )}
             <Badge
               variant="outline"
               className="text-[10px] uppercase tracking-wider"
@@ -175,10 +216,10 @@ export function WikiReader({ entry, lang }: WikiReaderProps) {
         icon={<User className="size-4" />}
         title={lang === "zh" ? "博主笔记" : "Human Notes"}
       >
-        {entry.blocks.human ? (
+        {renderedBlocks.human ? (
           <div
             className="prose prose-sm dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: entry.blocks.human }}
+            dangerouslySetInnerHTML={{ __html: renderedBlocks.human }}
           />
         ) : (
           <p className="text-sm text-muted-foreground italic">
@@ -199,10 +240,10 @@ export function WikiReader({ entry, lang }: WikiReaderProps) {
             : undefined
         }
       >
-        {entry.blocks.ai ? (
+        {renderedBlocks.ai ? (
           <div
             className="prose prose-sm dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: entry.blocks.ai }}
+            dangerouslySetInnerHTML={{ __html: renderedBlocks.ai }}
           />
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">
@@ -219,10 +260,10 @@ export function WikiReader({ entry, lang }: WikiReaderProps) {
         icon={<Link2 className="size-4" />}
         title={lang === "zh" ? "参考文献" : "References"}
       >
-        {entry.blocks.ref ? (
+        {renderedBlocks.ref ? (
           <div
             className="prose prose-sm dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: entry.blocks.ref }}
+            dangerouslySetInnerHTML={{ __html: renderedBlocks.ref }}
           />
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">

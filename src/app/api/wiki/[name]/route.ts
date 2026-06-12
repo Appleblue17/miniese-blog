@@ -38,6 +38,7 @@ function serializeEntry(entry: {
   definition: string;
   contentPath: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: string;
   createdAt: Date;
@@ -51,6 +52,7 @@ function serializeEntry(entry: {
     definition: entry.definition,
     contentPath: entry.contentPath,
     tags: entry.tags,
+    type: entry.type,
     accessGroup: entry.accessGroup,
     status: entry.status as WikiStatus,
     createdAt: entry.createdAt.toISOString(),
@@ -215,6 +217,7 @@ export async function PUT(
     const newAliases = body.aliases ?? entry.aliases;
     const newTags = body.tags ?? entry.tags;
     const newAccessGroup = body.accessGroup ?? entry.accessGroup;
+    const newType = body.type ?? entry.type;
 
     const fileContent = buildWikiFileWithMeta(
       {
@@ -222,6 +225,7 @@ export async function PUT(
         language: language as "zh" | "en",
         aliases: newAliases,
         tags: newTags,
+        type: newType,
         status: entry.status as WikiStatus,
         accessGroup: newAccessGroup,
       },
@@ -248,6 +252,7 @@ export async function PUT(
       data: {
         name: newName,
         aliases: newAliases,
+        type: newType,
         definition: blocks.definition,
         contentPath: newContentPath,
         tags: newTags,
@@ -294,14 +299,24 @@ export async function DELETE(
       );
     }
 
-    // Delete file
-    const filePath = path.join(process.cwd(), entry.contentPath);
-    await unlink(filePath).catch(() => {});
+    // Soft-delete: set status to "deleted" instead of physically removing
+    const updated = await prisma.wikiEntry.update({
+      where: { id: entry.id },
+      data: { status: "deleted" },
+    });
 
-    // Delete DB record
-    await prisma.wikiEntry.delete({ where: { id: entry.id } });
+    // Also mark linked discovery as "rejected" if it exists
+    const discovery = await prisma.wikiDiscovery.findFirst({
+      where: { wikiEntryId: entry.id },
+    });
+    if (discovery && discovery.status !== "rejected") {
+      await prisma.wikiDiscovery.update({
+        where: { id: discovery.id },
+        data: { status: "rejected" },
+      });
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, entry: serializeEntry(updated) });
   } catch (error) {
     console.error("Delete wiki entry error:", error);
     return NextResponse.json(

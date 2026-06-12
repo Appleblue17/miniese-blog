@@ -32,6 +32,8 @@ import {
   Check,
   Star,
   Filter,
+  ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
@@ -55,18 +57,22 @@ type StatusTabDef = {
 
 const STATUS_TABS: StatusTabDef[] = [
   { key: "all", label: "全部", icon: <BookOpen className="size-3.5" /> },
+  { key: "|", label: "", icon: null },
   { key: "pending", label: "申请中", icon: <Hourglass className="size-3.5" /> },
-  { key: "rejected", label: "已驳回", icon: <X className="size-3.5" /> },
   { key: "creating", label: "生成中", icon: <Sparkles className="size-3.5" /> },
+  { key: "|", label: "", icon: null },
   { key: "unreviewed", label: "待审查", icon: <Clock className="size-3.5" /> },
   { key: "reviewed", label: "已审查", icon: <ShieldCheck className="size-3.5" /> },
+  { key: "|", label: "", icon: null },
+  { key: "failed", label: "生成失败", icon: <AlertCircle className="size-3.5" /> },
+  { key: "rejected", label: "已删除", icon: <X className="size-3.5" /> },
 ];
 
 /** Tabs that fetch WikiEntry data */
-const ENTRY_TABS = new Set(["all", "creating", "unreviewed", "reviewed"]);
+const ENTRY_TABS = new Set(["all", "creating", "unreviewed", "reviewed", "deleted"]);
 
 /** Tabs that fetch WikiDiscovery data */
-const DISCOVERY_TABS = new Set(["pending", "rejected"]);
+const DISCOVERY_TABS = new Set(["pending", "failed", "rejected"]);
 
 // Discovery type for client-side use
 interface DiscoveryItem {
@@ -81,6 +87,8 @@ interface DiscoveryItem {
   status: string;
   createdAt: string;
   approvedAt: string | null;
+  wikiEntryId?: string | null;
+  failedReason?: string | null;
 }
 
 function formatDate(dateStr: string): string {
@@ -115,6 +123,11 @@ const STATUS_CONFIG: Record<
     label: "已审查",
     color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
     icon: <ShieldCheck className="size-3" />,
+  },
+  deleted: {
+    label: "已删除",
+    color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+    icon: <X className="size-3" />,
   },
 };
 
@@ -154,8 +167,8 @@ function DeleteModal({
           <div className="flex-1">
             <h3 className="text-base font-semibold">确认删除词条</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              确定要删除词条 <strong className="text-foreground">{name}</strong> 吗？<br />
-              {loading ? "" : "此操作不可撤销。"}
+              确定要将词条 <strong className="text-foreground">{name}</strong> 移至已删除吗？<br />
+              {loading ? "" : "词条不会从知识库中永久移除。"}
             </p>
           </div>
           <button
@@ -193,12 +206,13 @@ function DeleteModal({
 
 // --- Entry Row ---
 
-function EntryRow({ entry }: { entry: WikiEntryMeta }) {
+function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () => void }) {
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
-  const [completing, setCompleting] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleDelete = useCallback(async () => {
@@ -216,12 +230,12 @@ function EntryRow({ entry }: { entry: WikiEntryMeta }) {
         return;
       }
       setShowDelete(false);
-      router.refresh();
+      onRefresh();
     } catch {
       setError("删除请求失败");
       setDeleting(false);
     }
-  }, [entry.name, entry.language, router]);
+  }, [entry.name, entry.language, onRefresh]);
 
   const handleReview = useCallback(async () => {
     setReviewing(true);
@@ -237,36 +251,58 @@ function EntryRow({ entry }: { entry: WikiEntryMeta }) {
         setReviewing(false);
         return;
       }
-      router.refresh();
+      onRefresh();
     } catch {
       setError("审查请求失败");
       setReviewing(false);
     }
-  }, [entry.name, entry.language, router]);
+  }, [entry.name, entry.language, onRefresh]);
 
-  const handleComplete = useCallback(async () => {
-    setCompleting(true);
+  const handleUndo = useCallback(async () => {
+    setUndoing(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/wiki/${encodeURIComponent(entry.name)}/complete?lang=${entry.language}`,
+        `/api/wiki/${encodeURIComponent(entry.name)}/undo?lang=${entry.language}`,
         { method: "POST" },
       );
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "标记完成失败");
-        setCompleting(false);
+        setError(data.error || "撤销失败");
+        setUndoing(false);
         return;
       }
-      router.refresh();
+      onRefresh();
     } catch {
-      setError("标记完成请求失败");
-      setCompleting(false);
+      setError("撤销请求失败");
+      setUndoing(false);
     }
-  }, [entry.name, entry.language, router]);
+  }, [entry.name, entry.language, onRefresh]);
+
+  const handleRetry = useCallback(async () => {
+    setRetrying(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/wiki/${encodeURIComponent(entry.name)}/retry?lang=${entry.language}`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "重新生成失败");
+        setRetrying(false);
+        return;
+      }
+      onRefresh();
+    } catch {
+      setError("重新生成请求失败");
+      setRetrying(false);
+    }
+  }, [entry.name, entry.language, onRefresh]);
 
   const canEdit = entry.status === "unreviewed" || entry.status === "reviewed";
   const canReview = entry.status === "unreviewed";
+  const canDelete = entry.status !== "deleted";
 
   return (
     <>
@@ -275,6 +311,7 @@ function EntryRow({ entry }: { entry: WikiEntryMeta }) {
           <div className="flex items-center gap-2">
             <BookOpen className="size-4 text-muted-foreground shrink-0" />
             <span className="font-medium truncate">{entry.name}</span>
+            {entry.type && <TypeBadge type={entry.type} />}
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
               {entry.language}
             </span>
@@ -293,17 +330,34 @@ function EntryRow({ entry }: { entry: WikiEntryMeta }) {
           {entry.status === "creating" && (
             <button
               type="button"
-              onClick={handleComplete}
-              disabled={completing}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors disabled:opacity-50"
-              title="标记 AI 填充完成"
+              onClick={handleUndo}
+              disabled={undoing}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
+              title="撤销（移至申请中）"
             >
-              {completing ? (
+              {undoing ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <CheckCircle2 className="size-3.5" />
+                <RefreshCw className="size-3.5" />
               )}
-              完成
+              撤销
+            </button>
+          )}
+
+          {entry.status === "unreviewed" && (
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors disabled:opacity-50"
+              title="重新生成"
+            >
+              {retrying ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              重生成
             </button>
           )}
 
@@ -334,14 +388,16 @@ function EntryRow({ entry }: { entry: WikiEntryMeta }) {
             </Link>
           )}
 
-          <button
-            type="button"
-            onClick={() => setShowDelete(true)}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            title="删除"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDelete(true)}
+              className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="移至已删除"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -447,22 +503,33 @@ function StatusTabBar({
 }) {
   return (
     <div className="flex items-center gap-1 rounded-xl bg-muted p-1" role="tablist">
-      {tabs.map((tab) => (
-        <Link
-          key={tab.key}
-          href={tab.key === "all" ? basePath : `/admin/wiki?status=${tab.key}&page=1`}
-          role="tab"
-          aria-selected={tab.key === activeKey}
-          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-            tab.key === activeKey
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {tab.icon}
-          {tab.label}
-        </Link>
-      ))}
+      {tabs.map((tab, idx) => {
+        if (tab.key === "|") {
+          return (
+            <span
+              key={`sep-${idx}`}
+              className="mx-1 h-5 w-px bg-border shrink-0"
+              aria-hidden="true"
+            />
+          );
+        }
+        return (
+          <Link
+            key={tab.key}
+            href={tab.key === "all" ? basePath : `/admin/wiki?status=${tab.key}&page=1`}
+            role="tab"
+            aria-selected={tab.key === activeKey}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              tab.key === activeKey
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -554,12 +621,16 @@ function DiscoveryCard({
   onApprove,
   onReject,
   onUndoReject,
+  onRetry,
+  onUndoGenerated,
   processing,
 }: {
   discovery: DiscoveryItem;
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
   onUndoReject: (id: string) => Promise<void>;
+  onRetry: (id: string) => Promise<void>;
+  onUndoGenerated: (id: string) => Promise<void>;
   processing: boolean;
 }) {
   return (
@@ -573,6 +644,18 @@ function DiscoveryCard({
             <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
               {discovery.articleLang === "zh" ? "中文" : "EN"}
             </span>
+            {discovery.status === "generated" && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                <CheckCircle2 className="size-3" />
+                已生成
+              </span>
+            )}
+            {discovery.status === "failed" && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                <AlertCircle className="size-3" />
+                生成失败
+              </span>
+            )}
           </div>
 
           {/* Definition */}
@@ -598,16 +681,25 @@ function DiscoveryCard({
             )}
             {!discovery.articleSlug && <span>手动添加</span>}
             <span>{formatDate(discovery.createdAt)}</span>
-            {discovery.status !== "pending" && (
-              <span
-                className={
-                  discovery.status === "approved"
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }
+            {discovery.status !== "pending" && discovery.approvedAt && (
+              <span>
+                {discovery.status === "approved" ? "已同意" : "已删除"}
+                {" · "}{formatDate(discovery.approvedAt)}
+              </span>
+            )}
+            {/* Link to generated wiki entry */}
+            {discovery.status === "generated" && discovery.wikiEntryId && (
+              <Link
+                href={`/admin/wiki/${discovery.wikiEntryId}`}
+                className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 underline hover:text-green-700"
               >
-                {discovery.status === "approved" ? "已同意" : "已驳回"}
-                {discovery.approvedAt && ` · ${formatDate(discovery.approvedAt)}`}
+                <ExternalLink className="size-3" />
+                查看词条
+              </Link>
+            )}
+            {discovery.status === "failed" && discovery.failedReason && (
+              <span className="text-red-500" title={discovery.failedReason}>
+                原因: {discovery.failedReason.length > 30 ? discovery.failedReason.slice(0, 30) + "..." : discovery.failedReason}
               </span>
             )}
           </div>
@@ -633,23 +725,49 @@ function DiscoveryCard({
                 onClick={() => onReject(discovery.id)}
                 disabled={processing}
                 className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 cursor-pointer"
-                title="驳回"
+                title="删除"
               >
                 <X className="size-3.5" />
               </button>
             </div>
           )}
 
-          {/* Undo reject button for rejected items (Issue 4) */}
+          {/* Undo reject button for rejected/deleted items */}
           {discovery.status === "rejected" && (
             <button
               onClick={() => onUndoReject(discovery.id)}
               disabled={processing}
               className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50 cursor-pointer"
-              title="撤销驳回"
+              title="撤销删除"
             >
               <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
-              撤销驳回
+              撤销删除
+            </button>
+          )}
+
+          {/* Retry button for failed items */}
+          {discovery.status === "failed" && (
+            <button
+              onClick={() => onRetry(discovery.id)}
+              disabled={processing}
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+              title="重新生成"
+            >
+              <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
+              重新生成
+            </button>
+          )}
+
+          {/* Undo generated button */}
+          {discovery.status === "generated" && (
+            <button
+              onClick={() => onUndoGenerated(discovery.id)}
+              disabled={processing}
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+              title="撤销（回到申请中）"
+            >
+              <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
+              撤销
             </button>
           )}
         </div>
@@ -702,7 +820,7 @@ export function AdminWikiList({
     try {
       const statuses =
         activeStatus === "all"
-          ? ["unreviewed", "reviewed"]
+          ? ["unreviewed", "reviewed", "deleted"]
           : [activeStatus];
 
       const results: WikiEntryMeta[] = [];
@@ -854,10 +972,13 @@ export function AdminWikiList({
       const res = await fetch(`/api/admin/discoveries/${id}/approve`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error("Approve failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `操作失败 (${res.status})`);
+      }
       await fetchDiscoveries();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Approve failed");
+      setError(err instanceof Error ? err.message : "操作失败");
     } finally {
       setProcessing(false);
     }
@@ -888,6 +1009,42 @@ export function AdminWikiList({
       await fetchDiscoveries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Undo reject failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function retryDiscovery(id: string) {
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}/retry`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "重新生成失败");
+      }
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "重新生成失败");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function undoGeneratedDiscovery(id: string) {
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}/undo`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "撤销失败");
+      }
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "撤销失败");
     } finally {
       setProcessing(false);
     }
@@ -1104,9 +1261,11 @@ export function AdminWikiList({
           <p className="text-lg">
             {activeStatus === "pending"
               ? "暂无待审批的词条"
-              : activeStatus === "rejected"
-                ? "暂无已驳回的词条"
-                : "暂无词条"}
+              : activeStatus === "failed"
+                ? "暂无生成失败的词条"
+                : activeStatus === "rejected"
+                  ? "暂无已删除的词条"
+                  : "暂无词条"}
           </p>
           <p className="text-sm">
             {activeStatus === "pending"
@@ -1121,7 +1280,7 @@ export function AdminWikiList({
         <div className="flex flex-col gap-1">
           {isEntryTab &&
             entries.map((entry) => (
-              <EntryRow key={entry.id} entry={entry} />
+              <EntryRow key={entry.id} entry={entry} onRefresh={fetchEntries} />
             ))}
           {isDiscoveryTab &&
             discoveries.map((d) => (
@@ -1131,6 +1290,8 @@ export function AdminWikiList({
                 onApprove={approveDiscovery}
                 onReject={rejectDiscovery}
                 onUndoReject={undoRejectDiscovery}
+                onRetry={retryDiscovery}
+                onUndoGenerated={undoGeneratedDiscovery}
                 processing={processing}
               />
             ))}

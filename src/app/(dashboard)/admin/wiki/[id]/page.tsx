@@ -19,6 +19,7 @@ interface WikiApiResponse {
     language: string;
     definition: string;
     tags: string[];
+    type: string;
     accessGroup: string[];
     status: WikiStatus;
     createdAt: string;

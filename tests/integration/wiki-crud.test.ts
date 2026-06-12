@@ -1,12 +1,19 @@
 /**
- * Integration tests for wiki CRUD API endpoints.
+ * Integration tests for wiki API endpoints (new flow).
  *
- * Tests: POST /api/wiki, GET /api/wiki, GET /api/wiki/[name],
- *        PUT /api/wiki/[name], DELETE /api/wiki/[name],
- *        POST /api/wiki/[name]/approve, POST /api/wiki/[name]/review
+ * The new wiki lifecycle is:
+ * 1. POST /api/wiki      → Creates WikiDiscovery (status: pending)
+ * 2. POST /api/admin/discoveries/[id]/approve → Creates WikiEntry (status: creating) + file
+ * 3. POST /api/wiki/[name]/complete → creating → unreviewed (manual or AI-filled)
+ * 4. PUT /api/wiki/[name]  → Edit entries (unreviewed or reviewed)
+ * 5. POST /api/wiki/[name]/review → unreviewed → reviewed
+ * 6. GET /api/wiki         → List entries (default: unreviewed + reviewed)
+ * 7. GET /api/wiki/[name]  → Get single entry with blocks
+ * 8. DELETE /api/wiki/[name] → Delete entry + file
  *
- * These tests require a running PostgreSQL database.
- * They will be skipped if the database is not available.
+ * POST /api/wiki/[name]/approve is deprecated (returns 410).
+ *
+ * Requires: PostgreSQL running (Redis optional; queue enqueue failure is non-fatal).
  */
 
 import { describe, it, expect, afterAll } from "vitest";
@@ -18,42 +25,54 @@ import { isDatabaseAvailable } from "./setup";
 
 const isDbAvailable = await isDatabaseAvailable();
 
+/** Tracks created WikiEntry IDs for cleanup. */
 const createdEntryIds: string[] = [];
+/** Tracks created WikiDiscovery IDs for cleanup. */
+const createdDiscoveryIds: string[] = [];
 
 const describeDb = isDbAvailable ? describe : describe.skip;
 
-describeDb("Wiki CRUD API", () => {
+describeDb("Wiki CRUD API (new flow)", () => {
   // --- Clean up after all tests ---
   afterAll(async () => {
+    const { prisma } = await import("./db-client");
+
+    // Delete WikiEntry files
     if (createdEntryIds.length > 0) {
-      const { prisma } = await import("./db-client");
       const entries = await prisma.wikiEntry.findMany({
         where: { id: { in: createdEntryIds } },
       });
-      // Delete files
       for (const entry of entries) {
         const filePath = path.join(process.cwd(), entry.contentPath);
         await unlink(filePath).catch(() => {});
       }
-      // Delete DB records
-      await prisma.wikiEntry.deleteMany({
-        where: { id: { in: createdEntryIds } },
-      });
     }
+
+    // Delete WikiEntry DB records
+    await prisma.wikiEntry.deleteMany({
+      where: { id: { in: createdEntryIds } },
+    }).catch(() => {});
+
+    // Delete WikiDiscovery DB records
+    await prisma.wikiDiscovery.deleteMany({
+      where: { id: { in: createdDiscoveryIds } },
+    }).catch(() => {});
+
+    // Clean up the article used for discovery (if any were created)
+    await prisma.wikiDiscovery.deleteMany({
+      where: { article: { slug: "test-wiki-crud-article" } },
+    }).catch(() => {});
+    await prisma.article.deleteMany({
+      where: { slug: "test-wiki-crud-article" },
+    }).catch(() => {});
   });
 
-  let createdId: string;
+  // --- POST /api/wiki (creates WikiDiscovery) ---
 
-  // --- POST /api/wiki ---
-
-  it("creates a new wiki entry (proposed status)", async () => {
+  it("creates a new wiki discovery (pending status)", async () => {
     const { POST } = await import("@/app/api/wiki/route");
 
-    const body = {
-      name: "Integration Test Entry",
-      language: "zh" as const,
-    };
-
+    const body = { name: "CRUD Test Term", language: "zh" };
     const request = createJsonRequest(
       "http://localhost:3000/api/wiki",
       "POST",
@@ -63,17 +82,12 @@ describeDb("Wiki CRUD API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(201);
-    expect(data.entry).toBeDefined();
-    expect(data.entry.name).toBe("Integration Test Entry");
-    expect(data.entry.language).toBe("zh");
-    expect(data.entry.aliases).toEqual([]);
-    expect(data.entry.definition).toBe("");
-    expect(data.entry.tags).toEqual([]);
-    expect(data.entry.status).toBe("proposed");
-    expect(data.entry.contentPath).toContain("content/wiki/zh/");
+    expect(data.discovery).toBeDefined();
+    expect(data.discovery.term).toBe("CRUD Test Term");
+    expect(data.discovery.status).toBe("pending");
+    expect(data.discovery.id).toBeTruthy();
 
-    createdId = data.entry.id;
-    createdEntryIds.push(createdId);
+    createdDiscoveryIds.push(data.discovery.id);
   });
 
   it("returns 400 when name is missing", async () => {
@@ -108,13 +122,10 @@ describeDb("Wiki CRUD API", () => {
     expect(data.error).toContain("language");
   });
 
-  it("returns 409 when entry with same name+language exists", async () => {
+  it("returns 409 when same pending discovery already exists", async () => {
     const { POST } = await import("@/app/api/wiki/route");
 
-    const body = {
-      name: "Integration Test Entry",
-      language: "zh",
-    };
+    const body = { name: "CRUD Test Term", language: "zh" };
     const request = createJsonRequest(
       "http://localhost:3000/api/wiki",
       "POST",
@@ -127,48 +138,68 @@ describeDb("Wiki CRUD API", () => {
     expect(data.error).toContain("already exists");
   });
 
-  // --- POST /api/wiki/[name]/approve ---
+  // --- Approve via admin API (creates WikiEntry) ---
 
-  it("approves a proposed entry (proposed → creating)", async () => {
-    const { POST } = await import("@/app/api/wiki/[name]/approve/route");
+  it("approves a discovery and creates WikiEntry(creating)", async () => {
+    const { prisma } = await import("./db-client");
 
+    // Get the discovery ID we created earlier
+    const discovery = await prisma.wikiDiscovery.findFirst({
+      where: { term: "CRUD Test Term", status: "pending" },
+    });
+    expect(discovery).toBeDefined();
+    const discoveryId = discovery!.id;
+
+    // Approve it
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
+    );
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}/approve?lang=zh`,
+        `http://localhost:3000/api/admin/discoveries/${discoveryId}/approve`,
         { method: "POST" },
       ),
     );
     const response = await POST(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ id: discoveryId }),
     });
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.entry).toBeDefined();
-    expect(data.entry.status).toBe("creating");
+    expect(data.success).toBe(true);
+    expect(data.discovery.status).toBe("approved");
+    expect(data.wikiEntry).toBeDefined();
+    expect(data.wikiEntry.status).toBe("creating");
+
+    createdEntryIds.push(data.wikiEntry.id);
   });
 
-  it("returns 409 approving a non-proposed entry", async () => {
-    const { POST } = await import("@/app/api/wiki/[name]/approve/route");
+  it("returns 409 when approving already-approved discovery", async () => {
+    const { prisma } = await import("./db-client");
 
+    const discovery = await prisma.wikiDiscovery.findFirst({
+      where: { term: "CRUD Test Term", status: "approved" },
+    });
+    expect(discovery).toBeDefined();
+
+    const { POST } = await import(
+      "@/app/api/admin/discoveries/[id]/approve/route"
+    );
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}/approve?lang=zh`,
+        `http://localhost:3000/api/admin/discoveries/${discovery!.id}/approve`,
         { method: "POST" },
       ),
     );
     const response = await POST(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ id: discovery!.id }),
     });
-    const data = await response.json();
-
     expect(response.status).toBe(409);
-    expect(data.error).toContain("Cannot approve");
   });
 
-  // --- GET /api/wiki (default: unreviewed + reviewed) ---
+  // --- GET /api/wiki (list) ---
 
-  it("lists unreviewed and reviewed entries by default", async () => {
+  it("does NOT list creating entries by default (only unreviewed+reviewed)", async () => {
     const { GET } = await import("@/app/api/wiki/route");
 
     const request = toNextRequest(
@@ -182,12 +213,12 @@ describeDb("Wiki CRUD API", () => {
     // The entry is "creating" status, so it should NOT appear in default list
     expect(
       data.entries.some(
-        (e: { name: string }) => e.name === "Integration Test Entry",
+        (e: { name: string }) => e.name === "CRUD Test Term",
       ),
     ).toBe(false);
   });
 
-  it("filters by status parameter", async () => {
+  it("filters by status parameter (creating)", async () => {
     const { GET } = await import("@/app/api/wiki/route");
 
     const request = toNextRequest(
@@ -198,7 +229,9 @@ describeDb("Wiki CRUD API", () => {
 
     expect(response.status).toBe(200);
     expect(data.entries.length).toBeGreaterThanOrEqual(1);
-    expect(data.entries[0].status).toBe("creating");
+    data.entries.forEach((e: { status: string }) => {
+      expect(e.status).toBe("creating");
+    });
   });
 
   it("filters entries by language", async () => {
@@ -214,7 +247,7 @@ describeDb("Wiki CRUD API", () => {
     // The created entry is zh, so en list should not include it
     expect(
       data.entries.some(
-        (e: { name: string }) => e.name === "Integration Test Entry",
+        (e: { name: string }) => e.name === "CRUD Test Term",
       ),
     ).toBe(false);
   });
@@ -245,27 +278,29 @@ describeDb("Wiki CRUD API", () => {
     expect(data.error).toContain("Invalid status");
   });
 
-  // --- GET /api/wiki/[name] ---
+  // --- GET /api/wiki/[name] (detail) ---
 
   it("gets a wiki entry by name", async () => {
     const { GET } = await import("@/app/api/wiki/[name]/route");
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       ),
     );
     const response = await GET(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.entry).toBeDefined();
-    expect(data.entry.name).toBe("Integration Test Entry");
+    expect(data.entry.name).toBe("CRUD Test Term");
     expect(data.entry.status).toBe("creating");
     expect(data.entry.blocks).toBeDefined();
-    expect(data.entry.blocks.definition).toBe("");
+    // Definition is AI-refined (via refineTerm), so it's a non-empty Chinese string
+    expect(data.entry.blocks.definition).toBeTruthy();
+    expect(typeof data.entry.blocks.definition).toBe("string");
     expect(data.entry.blocks.human).toBe("");
     expect(data.entry.blocks.ai).toBe("");
     expect(data.entry.blocks.ref).toBe("");
@@ -286,22 +321,19 @@ describeDb("Wiki CRUD API", () => {
     expect(data.error).toContain("not found");
   });
 
-  // --- PUT /api/wiki/[name] ---
+  // --- PUT /api/wiki/[name] (edit) ---
 
-  it("returns 403 when editing a non-editable entry (creating)", async () => {
+  it("returns 403 when editing a creating entry", async () => {
     const { PUT } = await import("@/app/api/wiki/[name]/route");
 
-    const body = {
-      definition: "Updated definition.",
-    };
-
+    const body = { definition: "Updated definition." };
     const request = createJsonRequest(
-      `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+      `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       "PUT",
       body,
     );
     const response = await PUT(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
@@ -309,33 +341,48 @@ describeDb("Wiki CRUD API", () => {
     expect(data.error).toContain("Cannot edit");
   });
 
-  // --- Simulate marking as unreviewed (by manually updating status) ---
+  // --- POST /api/wiki/[name]/complete (creating → unreviewed) ---
 
-  it("allows editing after status change to unreviewed", async () => {
-    const { prisma } = await import("./db-client");
+  it("completes a creating entry (creating → unreviewed)", async () => {
+    const { POST } = await import("@/app/api/wiki/[name]/complete/route");
 
-    // Manually update the entry status to unreviewed (simulating AI filling completion)
-    await prisma.wikiEntry.update({
-      where: { id: createdId },
-      data: { status: "unreviewed" },
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}/complete?lang=zh`,
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
+    const data = await response.json();
 
-    // Also update file frontmatter
-    const entry = await prisma.wikiEntry.findUnique({ where: { id: createdId } });
-    const { readFile, writeFile } = await import("fs/promises");
-    const { buildWikiFileWithMeta, parseWikiFileWithMeta } = await import(
-      "@/lib/wiki/parser"
-    );
-    const filePath = path.join(process.cwd(), entry!.contentPath);
-    const content = await readFile(filePath, "utf-8");
-    const parsed = parseWikiFileWithMeta(content);
-    const updatedFile = buildWikiFileWithMeta(
-      { ...parsed.frontmatter, status: "unreviewed" },
-      parsed.blocks,
-    );
-    await writeFile(filePath, updatedFile, "utf-8");
+    expect(response.status).toBe(200);
+    expect(data.entry).toBeDefined();
+    expect(data.entry.status).toBe("unreviewed");
+  });
 
-    // Now try to update
+  it("returns 409 when completing a non-creating entry", async () => {
+    const { POST } = await import("@/app/api/wiki/[name]/complete/route");
+
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}/complete?lang=zh`,
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ name: "CRUD Test Term" }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toContain("Cannot complete");
+  });
+
+  // --- PUT /api/wiki/[name] (now allowed since entry is unreviewed) ---
+
+  it("allows editing after status is unreviewed", async () => {
     const { PUT } = await import("@/app/api/wiki/[name]/route");
 
     const body = {
@@ -345,12 +392,12 @@ describeDb("Wiki CRUD API", () => {
     };
 
     const request = createJsonRequest(
-      `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+      `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       "PUT",
       body,
     );
     const response = await PUT(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
@@ -366,11 +413,11 @@ describeDb("Wiki CRUD API", () => {
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       ),
     );
     const response = await GET(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
@@ -380,19 +427,19 @@ describeDb("Wiki CRUD API", () => {
     expect(data.entry.blocks.human).toContain("Updated Notes");
   });
 
-  // --- POST /api/wiki/[name]/review ---
+  // --- POST /api/wiki/[name]/review (unreviewed → reviewed) ---
 
   it("reviews an unreviewed entry (unreviewed → reviewed)", async () => {
     const { POST } = await import("@/app/api/wiki/[name]/review/route");
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}/review?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}/review?lang=zh`,
         { method: "POST" },
       ),
     );
     const response = await POST(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
@@ -405,17 +452,57 @@ describeDb("Wiki CRUD API", () => {
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}/review?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}/review?lang=zh`,
         { method: "POST" },
       ),
     );
     const response = await POST(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
     expect(response.status).toBe(409);
     expect(data.error).toContain("Cannot review");
+  });
+
+  // --- POST /api/wiki/[name]/approve (deprecated) ---
+
+  it("returns 410 on deprecated approve endpoint", async () => {
+    const { POST } = await import("@/app/api/wiki/[name]/approve/route");
+
+    const request = toNextRequest(
+      new Request(
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}/approve?lang=zh`,
+        { method: "POST" },
+      ),
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ name: "CRUD Test Term" }),
+    });
+    expect(response.status).toBe(410);
+  });
+
+  // --- GET /api/wiki now shows the entry since it's reviewed ---
+
+  it("now lists the entry (reviewed appears in default list)", async () => {
+    const { GET } = await import("@/app/api/wiki/route");
+
+    const request = toNextRequest(
+      new Request("http://localhost:3000/api/wiki?lang=zh"),
+    );
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(
+      data.entries.some(
+        (e: { name: string }) => e.name === "CRUD Test Term",
+      ),
+    ).toBe(true);
+    const entry = data.entries.find(
+      (e: { name: string }) => e.name === "CRUD Test Term",
+    );
+    expect(entry.status).toBe("reviewed");
   });
 
   // --- DELETE /api/wiki/[name] ---
@@ -425,11 +512,11 @@ describeDb("Wiki CRUD API", () => {
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       ),
     );
     const response = await DELETE(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
     const data = await response.json();
 
@@ -442,11 +529,11 @@ describeDb("Wiki CRUD API", () => {
 
     const request = toNextRequest(
       new Request(
-        `http://localhost:3000/api/wiki/${encodeURIComponent("Integration Test Entry")}?lang=zh`,
+        `http://localhost:3000/api/wiki/${encodeURIComponent("CRUD Test Term")}?lang=zh`,
       ),
     );
     const response = await GET(request, {
-      params: Promise.resolve({ name: "Integration Test Entry" }),
+      params: Promise.resolve({ name: "CRUD Test Term" }),
     });
 
     expect(response.status).toBe(404);

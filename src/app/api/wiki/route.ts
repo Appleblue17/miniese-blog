@@ -17,7 +17,7 @@ import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
 
 // --- Helpers ---
 
-const VALID_STATUSES: WikiStatus[] = ["creating", "unreviewed", "reviewed"];
+const VALID_STATUSES: WikiStatus[] = ["creating", "unreviewed", "reviewed", "deleted"];
 
 /**
  * Serializes a Prisma WikiEntry to a WikiEntryMeta response object.
@@ -30,6 +30,7 @@ function serializeEntry(entry: {
   definition: string;
   contentPath: string;
   tags: string[];
+  type: string;
   accessGroup: string[];
   status: string;
   createdAt: Date;
@@ -43,6 +44,7 @@ function serializeEntry(entry: {
     definition: entry.definition,
     contentPath: entry.contentPath,
     tags: entry.tags,
+    type: entry.type,
     accessGroup: entry.accessGroup,
     status: entry.status as WikiStatus,
     createdAt: entry.createdAt.toISOString(),
