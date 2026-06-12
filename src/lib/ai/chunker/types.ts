@@ -45,6 +45,6 @@ export interface ContextConfig {
 
 /** Default context configuration */
 export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
-  targetSize: 1000,
+  targetSize: 500,
   maxSize: 2000,
 };

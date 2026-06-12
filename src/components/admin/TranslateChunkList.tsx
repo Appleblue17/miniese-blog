@@ -124,7 +124,7 @@ function ChunkCard({
           {hasContext && showContext && chunk.aboveContext && (
             <div className="border-b border-border bg-muted/20 px-4 py-2.5">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">上文（仅参考）</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">上文</span>
               </div>
               <pre className="text-[9px] leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-2 overflow-x-auto font-mono whitespace-pre-wrap">
                 {chunk.aboveContext}
@@ -166,9 +166,9 @@ function ChunkCard({
           {hasContext && showContext && chunk.belowContext && (
             <div className="border-t border-border bg-muted/20 px-4 py-2.5">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">下文（仅参考）</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">下文</span>
               </div>
-              <pre className="text-[11px] leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-2 overflow-x-auto font-mono whitespace-pre-wrap">
+              <pre className="text-[9px] leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-2 overflow-x-auto font-mono whitespace-pre-wrap">
                 {chunk.belowContext}
               </pre>
             </div>
@@ -186,7 +186,7 @@ export default function TranslateChunkList({
   sourceLanguage = "zh",
   targetLanguage = "en",
 }: TranslateChunkListProps) {
-  const [showContext, setShowContext] = useState(true);
+  const [showContext, setShowContext] = useState(false);
   const hasAnyContext = chunks.some((c) => c.hasContext);
 
   return (

@@ -4,12 +4,9 @@
  * Given a diff block (a contiguous range of changed lines), extends it
  * upward and downward to provide surrounding context for the AI.
  *
- * The extension algorithm:
- * 1. Extend upward/downward line by line, accumulating character count
- * 2. Prefer to stop/start at heading boundaries (lines starting with #)
- * 3. Respect targetSize (aim to include this many chars of context)
- *    and maxSize (hard cap, never exceed)
- * 4. Always include at least the diff block itself
+ * Strategy: extend upward line by line until we either reach targetSize
+ * OR hit a heading boundary. Same for downward. The heading boundary
+ * wins — if we hit a heading before reaching targetSize, we stop there.
  */
 
 import { type DiffBlock, type ContextConfig, DEFAULT_CONTEXT_CONFIG } from "./types";
@@ -41,129 +38,114 @@ export function buildContext(
   const contextBudget = config.maxSize - diffSize;
   const targetContext = Math.min(config.targetSize, contextBudget);
 
-  // Distribute: try to allocate target/2 to each side, with heading alignment
-  const halfTarget = Math.floor(targetContext / 2);
+  // Extend upward: collect until we hit targetSize or a heading
+  const upwardStart = extendUpward(lines, diffBlock.startLine - 1, targetContext);
+  const upwardChars = upwardStart > 0
+    ? computeRangeSize(lines, upwardStart, diffBlock.startLine - 1)
+    : 0;
 
-  // Extend upward
-  const upwardEnd = extendUpward(lines, diffBlock.startLine - 1, halfTarget, contextBudget);
-  const upwardChars = computeRangeSize(lines, upwardEnd, diffBlock.startLine - 1);
-
-  // Remaining budget for downward
+  // Extend downward: remaining budget
   const remainingBudget = contextBudget - upwardChars;
-  const downwardTarget = Math.min(
-    Math.floor(targetContext / 2) + Math.max(0, halfTarget - upwardChars),
-    remainingBudget,
-  );
-
-  // Extend downward
-  const downwardEnd = extendDownward(lines, diffBlock.endLine + 1, downwardTarget, remainingBudget);
+  const downwardTarget = Math.min(targetContext, remainingBudget);
+  const downwardEnd = extendDownward(lines, diffBlock.endLine + 1, downwardTarget);
 
   return {
-    startLine: upwardEnd,
-    endLine: downwardEnd,
+    startLine: upwardStart > 0 ? upwardStart : diffBlock.startLine,
+    endLine: downwardEnd > 0 ? downwardEnd : diffBlock.endLine,
   };
 }
 
 /**
- * Extends the context upward from `startLine` (exclusive, moving toward line 1).
+ * Extends the context upward from `fromLine` (exclusive, moving toward line 1).
+ *
+ * Stops when either:
+ * - targetChars of context has been accumulated, OR
+ * - a heading line (starting with #) is encountered
  *
  * @param lines - Complete lines array
  * @param fromLine - The line just above the diff block (1-based), where extension starts
  * @param targetChars - Target number of characters to include
- * @param maxChars - Maximum number of characters to include
- * @returns The new start line (1-based, inclusive)
+ * @returns The new start line (1-based, inclusive), or 0 if no context added
  */
 function extendUpward(
   lines: string[],
   fromLine: number,
   targetChars: number,
-  maxChars: number,
 ): number {
-  if (fromLine < 1 || maxChars <= 0) {
-    return fromLine + 1; // Return the original diff start
+  if (fromLine < 1 || targetChars <= 0) {
+    return 0;
   }
 
   let collected = 0;
   let currentLine = fromLine;
-  let lastHeadingLine = -1;
 
   while (currentLine >= 1) {
-    const lineLen = lines[currentLine - 1].length + 1; // +1 for newline
+    const line = lines[currentLine - 1];
 
-    // Check if this is a heading (prefer to include entire heading sections)
-    if (/^#{1,4} /.test(lines[currentLine - 1])) {
-      lastHeadingLine = currentLine;
+    // Stop at heading boundary (include the heading in context)
+    if (/^#{1,4} /.test(line)) {
+      return currentLine;
     }
 
-    if (collected + lineLen > maxChars) {
-      // If we haven't collected enough for target but hit max, stop
-      break;
+    collected += line.length + 1;
+
+    // Stop if we've collected enough
+    if (collected >= targetChars) {
+      return currentLine;
     }
 
-    collected += lineLen;
     currentLine--;
   }
 
-  // If we found a heading within the collected range, align to it
-  if (lastHeadingLine !== -1) {
-    return lastHeadingLine;
-  }
-
-  return currentLine + 1;
+  // Reached the top of the article
+  return 1;
 }
 
 /**
- * Extends the context downward from `endLine` (exclusive, moving toward end).
+ * Extends the context downward from `fromLine` (exclusive, moving toward end).
+ *
+ * Stops when either:
+ * - targetChars of context has been accumulated, OR
+ * - a heading line (starting with #) is encountered
  *
  * @param lines - Complete lines array
  * @param fromLine - The line just below the diff block (1-based), where extension starts
  * @param targetChars - Target number of characters to include
- * @param maxChars - Maximum number of characters to include
- * @returns The new end line (1-based, inclusive)
+ * @returns The new end line (1-based, inclusive), or 0 if no context added
  */
 function extendDownward(
   lines: string[],
   fromLine: number,
   targetChars: number,
-  maxChars: number,
 ): number {
   const totalLines = lines.length;
-  if (fromLine > totalLines || maxChars <= 0) {
-    return fromLine - 1; // Return the original diff end
+  if (fromLine > totalLines || targetChars <= 0) {
+    return 0;
   }
 
   let collected = 0;
   let currentLine = fromLine;
 
-  // Track if we pass a heading — we want to include the whole section after a heading
-  let pendingHeadingLine = -1;
-
   while (currentLine <= totalLines) {
-    const lineLen = lines[currentLine - 1].length + 1;
+    const line = lines[currentLine - 1];
 
-    // If we encounter a heading, mark it (we might want to include its section)
-    if (/^#{1,4} /.test(lines[currentLine - 1]) && collected > 0) {
-      // This heading would start a new section; stop before it unless we're below target
-      if (collected >= targetChars) {
-        return currentLine - 1;
-      }
-      pendingHeadingLine = currentLine;
+    // Stop at heading boundary (don't include the next section's heading)
+    if (/^#{1,4} /.test(line)) {
+      return currentLine - 1;
     }
 
-    if (collected + lineLen > maxChars) {
-      break;
+    collected += line.length + 1;
+
+    // Stop if we've collected enough
+    if (collected >= targetChars) {
+      return currentLine;
     }
 
-    collected += lineLen;
     currentLine++;
   }
 
-  // If we passed a heading, include up to just before it
-  if (pendingHeadingLine !== -1 && pendingHeadingLine < currentLine) {
-    return pendingHeadingLine - 1;
-  }
-
-  return currentLine - 1;
+  // Reached the bottom of the article
+  return totalLines;
 }
 
 /**
