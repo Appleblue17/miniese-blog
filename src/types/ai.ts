@@ -1,4 +1,4 @@
-export type AiTaskType = "review" | "translate" | "generate" | "scan";
+export type AiTaskType = "review" | "translate" | "generate" | "scan" | "discover";
 export type AiTaskStatus = "pending" | "processing" | "completed" | "failed";
 
 export interface AiTaskMeta {

@@ -1,16 +1,18 @@
 /**
- * @file AdminWikiList - Client-side wiki entry list for the admin dashboard.
+ * @file AdminWikiList - Client-side wiki management list for the admin dashboard.
  *
  * Features:
- * - Status tab bar (全部 / 申请中 / 生成中 / 待审查 / 已审查)
- * - Paginated entry list per status
- * - Approve (proposed → creating), Complete (creating → unreviewed),
- *   Review (unreviewed → reviewed), Edit, Delete actions
+ * - Status tab bar (全部 / 申请中 / 已驳回 / 生成中 / 待审查 / 已审查)
+ * - "全部" / "生成中" / "待审查" / "已审查" tabs: fetches WikiEntry data
+ * - "申请中" / "已驳回" tabs: fetches WikiDiscovery data
+ * - WikiDiscovery cards: importance bar, term type badge, approve/reject actions
+ * - WikiEntry cards: status badge, complete/review/edit/delete actions
+ * - Batch operations for "申请中" tab
  */
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Trash2,
@@ -26,16 +28,24 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
+  Check,
+  Star,
+  Filter,
 } from "lucide-react";
 import Link from "next/link";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
 
+// ---------------------------------------------------------------------------
+// Props & Constants
+// ---------------------------------------------------------------------------
+
 interface AdminWikiListProps {
-  entries: WikiEntryMeta[];
   activeStatus: string;
   currentPage: number;
-  totalPages: number;
 }
+
+const PAGE_SIZE = 20;
 
 type StatusTabDef = {
   key: string;
@@ -44,12 +54,34 @@ type StatusTabDef = {
 };
 
 const STATUS_TABS: StatusTabDef[] = [
-  { key: "all", label: "全部", icon: null },
-  { key: "proposed", label: "申请中", icon: <Hourglass className="size-3.5" /> },
+  { key: "all", label: "全部", icon: <BookOpen className="size-3.5" /> },
+  { key: "pending", label: "申请中", icon: <Hourglass className="size-3.5" /> },
+  { key: "rejected", label: "已驳回", icon: <X className="size-3.5" /> },
   { key: "creating", label: "生成中", icon: <Sparkles className="size-3.5" /> },
   { key: "unreviewed", label: "待审查", icon: <Clock className="size-3.5" /> },
   { key: "reviewed", label: "已审查", icon: <ShieldCheck className="size-3.5" /> },
 ];
+
+/** Tabs that fetch WikiEntry data */
+const ENTRY_TABS = new Set(["all", "creating", "unreviewed", "reviewed"]);
+
+/** Tabs that fetch WikiDiscovery data */
+const DISCOVERY_TABS = new Set(["pending", "rejected"]);
+
+// Discovery type for client-side use
+interface DiscoveryItem {
+  id: string;
+  articleId: string | null;
+  articleSlug: string;
+  articleLang: string;
+  term: string;
+  type: string;
+  definition: string;
+  importance: number;
+  status: string;
+  createdAt: string;
+  approvedAt: string | null;
+}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -69,11 +101,6 @@ const STATUS_CONFIG: Record<
   WikiStatus,
   { label: string; color: string; icon: React.ReactNode }
 > = {
-  proposed: {
-    label: "申请中",
-    color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-    icon: <Hourglass className="size-3" />,
-  },
   creating: {
     label: "生成中",
     color: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
@@ -440,15 +467,396 @@ function StatusTabBar({
   );
 }
 
+// --- Discovery Card (importance bar, type badge, approve/reject) ---
+
+function ImportanceBar({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const color =
+    value >= 0.9
+      ? "bg-green-500"
+      : value >= 0.7
+        ? "bg-blue-500"
+        : value >= 0.5
+          ? "bg-yellow-500"
+          : "bg-slate-300 dark:bg-slate-600";
+
+  return (
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700">
+        <div
+          className={`h-1.5 rounded-full ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const config: Record<string, { label: string; color: string }> = {
+    acronym: {
+      label: "缩写",
+      color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+    },
+    concept: {
+      label: "概念",
+      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    },
+    theorem: {
+      label: "定理",
+      color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    },
+    tech: {
+      label: "技术",
+      color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+    },
+    other: {
+      label: "其他",
+      color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    },
+  };
+
+  const c = config[type] ?? {
+    label: type,
+    color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${c.color}`}
+    >
+      {c.label}
+    </span>
+  );
+}
+
+function DiscoveryCard({
+  discovery,
+  onApprove,
+  onReject,
+  processing,
+}: {
+  discovery: DiscoveryItem;
+  onApprove: (id: string) => Promise<void>;
+  onReject: (id: string) => Promise<void>;
+  processing: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          {/* Term name + badges */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-semibold text-sm">{discovery.term}</span>
+            <TypeBadge type={discovery.type} />
+            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+              {discovery.articleLang === "zh" ? "中文" : "EN"}
+            </span>
+          </div>
+
+          {/* Importance bar */}
+          <div className="mb-1">
+            <ImportanceBar value={discovery.importance} />
+          </div>
+
+          {/* Definition */}
+          {discovery.definition && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {discovery.definition}
+            </p>
+          )}
+
+          {/* Meta */}
+          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+            {discovery.articleSlug && (
+              <span>
+                来自:{" "}
+                <Link
+                  href={`/${discovery.articleLang}/articles/${discovery.articleSlug}`}
+                  className="underline hover:text-foreground"
+                  target="_blank"
+                >
+                  {discovery.articleSlug}
+                </Link>
+              </span>
+            )}
+            {!discovery.articleSlug && <span>手动添加</span>}
+            <span>{formatDate(discovery.createdAt)}</span>
+            {discovery.status !== "pending" && (
+              <span
+                className={
+                  discovery.status === "approved"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }
+              >
+                {discovery.status === "approved" ? "已同意" : "已驳回"}
+                {discovery.approvedAt && ` · ${formatDate(discovery.approvedAt)}`}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons for pending items */}
+        {discovery.status === "pending" && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onApprove(discovery.id)}
+              disabled={processing}
+              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 transition-colors disabled:opacity-50 cursor-pointer"
+              title="同意"
+            >
+              <Check className="size-3.5" />
+            </button>
+            <button
+              onClick={() => onReject(discovery.id)}
+              disabled={processing}
+              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
+              title="驳回"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Main Component ---
 
 export function AdminWikiList({
-  entries,
   activeStatus,
   currentPage,
-  totalPages,
 }: AdminWikiListProps) {
   const basePath = "/admin/wiki";
+
+  // -----------------------------------------------------------------------
+  // State
+  // -----------------------------------------------------------------------
+
+  // WikiEntry data
+  const [entries, setEntries] = useState<WikiEntryMeta[]>([]);
+  const [entryTotal, setEntryTotal] = useState(0);
+  const [entryTotalPages, setEntryTotalPages] = useState(1);
+
+  // WikiDiscovery data
+  const [discoveries, setDiscoveries] = useState<DiscoveryItem[]>([]);
+  const [discoveryTotal, setDiscoveryTotal] = useState(0);
+  const [discoveryTotalPages, setDiscoveryTotalPages] = useState(1);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Batch operation
+  const [processing, setProcessing] = useState(false);
+  const [showCustomDialog, setShowCustomDialog] = useState(false);
+  const [customCount, setCustomCount] = useState(5);
+  const [customThreshold, setCustomThreshold] = useState(0.7);
+  const [batchConfirm, setBatchConfirm] = useState<{ action: string; label: string } | null>(null);
+
+  // -----------------------------------------------------------------------
+  // Data fetching
+  // -----------------------------------------------------------------------
+
+  const fetchEntries = useCallback(async () => {
+    if (!ENTRY_TABS.has(activeStatus)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const statuses =
+        activeStatus === "all"
+          ? ["unreviewed", "reviewed"]
+          : [activeStatus];
+
+      const results: WikiEntryMeta[] = [];
+      let total = 0;
+
+      for (const status of statuses) {
+        for (const lang of ["zh", "en"] as const) {
+          const res = await fetch(
+            `/api/wiki?lang=${lang}&page=${currentPage}&limit=${PAGE_SIZE}&status=${status}`,
+            { cache: "no-store" },
+          );
+          if (res.ok) {
+            const data = await res.json();
+            results.push(...data.entries);
+            total += data.total;
+          }
+        }
+      }
+
+      setEntries(results);
+      setEntryTotal(total);
+      setEntryTotalPages(
+        activeStatus === "all" ? 1 : Math.ceil(total / (PAGE_SIZE * 2)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch entries");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeStatus, currentPage]);
+
+  const fetchDiscoveries = useCallback(async () => {
+    if (!DISCOVERY_TABS.has(activeStatus)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        status: activeStatus,
+      });
+
+      const res = await fetch(`/api/admin/discoveries?${params}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDiscoveries(data.discoveries ?? []);
+        setDiscoveryTotal(data.total ?? 0);
+        setDiscoveryTotalPages(data.totalPages ?? 1);
+      } else {
+        throw new Error("Failed to fetch discoveries");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch discoveries");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeStatus, currentPage]);
+
+  useEffect(() => {
+    if (ENTRY_TABS.has(activeStatus)) {
+      fetchEntries();
+    } else if (DISCOVERY_TABS.has(activeStatus)) {
+      fetchDiscoveries();
+    }
+  }, [activeStatus, currentPage, fetchEntries, fetchDiscoveries]);
+
+  // -----------------------------------------------------------------------
+  // Batch operations for pending discoveries
+  // -----------------------------------------------------------------------
+
+  async function batchOperation(params: Record<string, unknown>) {
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/admin/discoveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      if (!res.ok) throw new Error("Operation failed");
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Operation failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function approveAll() {
+    setBatchConfirm({ action: "approve", label: "同意全部" });
+  }
+
+  function approveHighImportance() {
+    setBatchConfirm({ action: "approve_high", label: "高重要性" });
+  }
+
+  function approveTopN(n: number) {
+    setBatchConfirm({ action: "approve_top", label: `前${n}个` });
+  }
+
+  function rejectBatch() {
+    setBatchConfirm({ action: "reject", label: "驳回" });
+  }
+
+  function confirmBatch() {
+    if (!batchConfirm) return;
+    switch (batchConfirm.action) {
+      case "approve":
+        batchOperation({ action: "approve" });
+        break;
+      case "approve_high":
+        batchOperation({ action: "approve", minImportance: 0.7, limit: 9999 });
+        break;
+      case "approve_top":
+        batchOperation({ action: "approve", limit: 5 });
+        break;
+      case "reject":
+        batchOperation({ action: "reject" });
+        break;
+    }
+    setBatchConfirm(null);
+  }
+
+  function approveCustom() {
+    if (customCount > 0) {
+      batchOperation({ action: "approve", limit: customCount });
+    }
+    setShowCustomDialog(false);
+  }
+
+  function approveByThreshold() {
+    batchOperation({
+      action: "approve",
+      minImportance: customThreshold,
+      limit: 9999,
+    });
+    setShowCustomDialog(false);
+  }
+
+  // -----------------------------------------------------------------------
+  // Single discovery operations
+  // -----------------------------------------------------------------------
+
+  async function approveDiscovery(id: string) {
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}/approve`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Approve failed");
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Approve failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function rejectDiscovery(id: string) {
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}/reject`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Reject failed");
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reject failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Derived state
+  // -----------------------------------------------------------------------
+
+  const isEntryTab = ENTRY_TABS.has(activeStatus);
+  const isDiscoveryTab = DISCOVERY_TABS.has(activeStatus);
+  const isEmpty = isEntryTab
+    ? entries.length === 0
+    : discoveries.length === 0;
+  const listTotal = isEntryTab ? entryTotal : discoveryTotal;
+  const listTotalPages = isEntryTab ? entryTotalPages : discoveryTotalPages;
 
   // Build base params for pagination links
   const baseParams = new URLSearchParams();
@@ -462,26 +870,233 @@ export function AdminWikiList({
         basePath={basePath}
       />
 
-      {entries.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
-          <p className="text-lg">暂无词条</p>
-          <p className="text-sm">
-            该状态暂无词条。
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {entries.map((entry) => (
-            <EntryRow key={entry.id} entry={entry} />
-          ))}
+      {/* Batch operation toolbar (pending discoveries only) */}
+      {activeStatus === "pending" && discoveries.length > 0 && !loading && (
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+          <span className="text-xs font-medium text-muted-foreground mr-2">
+            批量操作:
+          </span>
+          <button
+            onClick={approveAll}
+            disabled={processing}
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Check className="size-3 mr-1" />
+            同意全部
+          </button>
+          <button
+            onClick={approveHighImportance}
+            disabled={processing}
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Star className="size-3 mr-1" />
+            高重要性
+          </button>
+          <button
+            onClick={() => approveTopN(5)}
+            disabled={processing}
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Filter className="size-3 mr-1" />
+            前5个
+          </button>
+          <button
+            onClick={() => setShowCustomDialog(true)}
+            disabled={processing}
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Filter className="size-3 mr-1" />
+            自定义
+          </button>
+          <span className="text-muted-foreground/40 mx-1">|</span>
+          <button
+            onClick={rejectBatch}
+            disabled={processing}
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <X className="size-3 mr-1" />
+            驳回
+          </button>
         </div>
       )}
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        baseParams={baseParams}
-      />
+      {/* Custom dialog */}
+      {showCustomDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-card border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold mb-4">自定义批量操作</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  按数量同意
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={customCount}
+                    onChange={(e) => setCustomCount(parseInt(e.target.value, 10) || 1)}
+                    className="w-20 rounded-lg border border-border bg-card px-3 py-1.5 text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground">个最高重要性词条</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">或</span>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  按阈值同意
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={customThreshold}
+                    onChange={(e) => setCustomThreshold(parseFloat(e.target.value) || 0.7)}
+                    className="w-20 rounded-lg border border-border bg-card px-3 py-1.5 text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground">及以上重要性</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowCustomDialog(false)}
+                className="rounded-md px-3 py-1.5 text-sm border border-border hover:bg-accent"
+              >
+                取消
+              </button>
+              <button
+                onClick={approveCustom}
+                className="rounded-md px-3 py-1.5 text-sm bg-primary text-primary-foreground hover:opacity-90"
+              >
+                同意（按数量）
+              </button>
+              <button
+                onClick={approveByThreshold}
+                className="rounded-md px-3 py-1.5 text-sm bg-primary text-primary-foreground hover:opacity-90"
+              >
+                同意（按阈值）
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch confirmation dialog */}
+      {batchConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setBatchConfirm(null)} />
+          <div className="relative mx-4 w-full max-w-sm rounded-xl bg-background p-6 shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-primary/10 p-2">
+                <AlertTriangle className="size-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold">确认批量操作</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  确定要执行 <strong className="text-foreground">{batchConfirm.label}</strong> 操作吗？
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  此操作将直接修改 {discoveries.length} 条候选词条记录。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBatchConfirm(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBatchConfirm(null)}
+                className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={confirmBatch}
+                disabled={processing}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {processing && <Loader2 className="size-4 animate-spin" />}
+                {processing ? "执行中..." : "确认执行"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <RefreshCw className="size-6 animate-spin mr-2" />
+          加载中...
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && isEmpty && (
+        <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
+          <p className="text-lg">
+            {activeStatus === "pending"
+              ? "暂无待审批的词条"
+              : activeStatus === "rejected"
+                ? "暂无已驳回的词条"
+                : "暂无词条"}
+          </p>
+          <p className="text-sm">
+            {activeStatus === "pending"
+              ? "新建词条或发布文章后，AI 会自动推荐术语。"
+              : "该状态下暂无内容。"}
+          </p>
+        </div>
+      )}
+
+      {/* List */}
+      {!loading && !isEmpty && (
+        <div className="flex flex-col gap-1">
+          {isEntryTab &&
+            entries.map((entry) => (
+              <EntryRow key={entry.id} entry={entry} />
+            ))}
+          {isDiscoveryTab &&
+            discoveries.map((d) => (
+              <DiscoveryCard
+                key={d.id}
+                discovery={d}
+                onApprove={approveDiscovery}
+                onReject={rejectDiscovery}
+                processing={processing}
+              />
+            ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {listTotalPages > 1 && !loading && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={listTotalPages}
+          baseParams={baseParams}
+        />
+      )}
     </div>
   );
 }

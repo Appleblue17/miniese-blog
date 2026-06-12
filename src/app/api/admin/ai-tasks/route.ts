@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-const VALID_TYPES = ["review", "translate"] as const;
+const VALID_TYPES = ["review", "translate", "generate", "discover"] as const;
 
 export interface AiTaskItem {
   id: string;

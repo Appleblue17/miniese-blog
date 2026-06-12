@@ -33,7 +33,7 @@ export interface WikiFrontmatter {
   aliases?: string[];
   language: "zh" | "en";
   tags?: string[];
-  status?: "proposed" | "creating" | "unreviewed" | "reviewed";
+  status?: "creating" | "unreviewed" | "reviewed";
   accessGroup?: string[];
 }
 
@@ -178,7 +178,7 @@ export function parseWikiFileWithMeta(content: string): ParsedWikiFile {
     aliases: (frontmatter.aliases as string[]) || [],
     language: (frontmatter.language as "zh" | "en") || "zh",
     tags: (frontmatter.tags as string[]) || [],
-    status: (frontmatter.status as WikiFrontmatter["status"]) || "proposed",
+    status: (frontmatter.status as WikiFrontmatter["status"]) || "creating",
     accessGroup: (frontmatter.accessGroup as string[]) || [],
   };
 

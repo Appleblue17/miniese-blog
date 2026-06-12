@@ -36,7 +36,7 @@ async function fetchEntry(id: string): Promise<WikiApiResponse["entry"] | null> 
   try {
     // Fetch all entries with all statuses to find by ID
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const allStatuses = ["proposed", "creating", "unreviewed", "reviewed"];
+    const allStatuses = ["creating", "unreviewed", "reviewed"];
     const allEntries: Array<{ id: string; name: string; language: string }> = [];
 
     for (const status of allStatuses) {

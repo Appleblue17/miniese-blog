@@ -211,9 +211,11 @@ function PublishedArticleRow({
   const [creatingDraft, setCreatingDraft] = useState(false);
   const [refreshingLinks, setRefreshingLinks] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasPendingTranslate = activeTaskTypes.includes("translate");
+  const hasPendingDiscover = activeTaskTypes.includes("discover");
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -316,6 +318,30 @@ function PublishedArticleRow({
     }
   }, [article.id, article.language, router]);
 
+  const handleDiscover = useCallback(async () => {
+    setDiscovering(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleId: article.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "词条发现任务提交失败");
+        setDiscovering(false);
+        return;
+      }
+      setDiscovering(false);
+      // Redirect to discoveries page
+      router.push("/admin/wiki/discoveries");
+    } catch {
+      setError("词条发现请求失败");
+      setDiscovering(false);
+    }
+  }, [article.id, router]);
+
   return (
     <>
       <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
@@ -388,15 +414,16 @@ function PublishedArticleRow({
             <span className="hidden sm:inline ml-1">{hasPendingTranslate ? "翻译中" : "翻译"}</span>
           </button>
 
-          {/* Generate terms button (disabled — feature temporarily unavailable) */}
+          {/* Discover terms button */}
           <button
             type="button"
-            disabled
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground/40 cursor-not-allowed"
-            title="词条生成功能暂时不可用"
+            onClick={handleDiscover}
+            disabled={discovering || hasPendingDiscover}
+            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={hasPendingDiscover ? "词条发现任务处理中" : "扫描文章发现新词条"}
           >
-            <Sparkles className="size-3.5 text-muted-foreground/40" />
-            <span className="hidden sm:inline ml-1">生成词条</span>
+            <Sparkles className={`size-3.5 ${discovering ? "animate-pulse" : hasPendingDiscover ? "text-yellow-400" : ""}`} />
+            <span className="hidden sm:inline ml-1">{hasPendingDiscover ? "发现中" : "发现词条"}</span>
           </button>
 
           {/* Delete button */}

@@ -20,6 +20,7 @@ import { buildGenerateSystemPrompt, buildGenerateUserPrompt } from "./lib/ai/pro
 import { renderMarkdown } from "./lib/markdown/renderer";
 import { detectWikiLinks } from "./lib/markdown/linkDetector";
 import { parseFrontmatter } from "./lib/articles/frontmatter";
+import { discoverWikiCandidates } from "./lib/ai/discovery";
 import type { Job } from "bull";
 import type { Prisma } from "./generated/prisma/client";
 
@@ -675,7 +676,7 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
           contentPath,
           tags: term.tags,
           aliases: term.aliases,
-          status: "proposed",
+          status: "creating",
           accessGroup: [],
         },
       });
@@ -715,6 +716,108 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   };
 }
 
+/**
+ * Processes an AI term discovery job.
+ *
+ * Flow:
+ * 1. Read article content from file system
+ * 2. Call discoverWikiCandidates() which uses the unified chunking pipeline
+ *    (splitArticle) for long articles, calls DeepSeek per chunk, deduplicates
+ * 3. Store candidates in the WikiDiscovery table
+ * 4. Return summary
+ *
+ * Payload required fields:
+ * - `articleId`: ID of the article to scan
+ * - `articleSlug`: Slug of the article
+ * - `articleLang`: Language code ("zh" | "en")
+ */
+async function processDiscover(job: Job): Promise<Record<string, unknown>> {
+  const payload = (job.data.payload ?? {}) as Record<string, unknown>;
+  const { articleId, articleSlug, articleLang } = payload;
+
+  const articleIdStr = String(articleId ?? "");
+  const slugStr = String(articleSlug ?? "");
+  const langStr = String(articleLang ?? "zh");
+
+  console.log(`[Worker] Processing term discovery for article ${articleIdStr}`);
+
+  if (!articleIdStr) {
+    throw new Error("Missing required payload field: articleId");
+  }
+
+  // 1. Read article content from DB + file system
+  const article = await prisma.article.findUnique({
+    where: { id: articleIdStr },
+    select: { contentPath: true },
+  });
+
+  if (!article) {
+    throw new Error(`Article not found: ${articleIdStr}`);
+  }
+
+  const filePath = path.join(process.cwd(), article.contentPath);
+  let content: string;
+  try {
+    content = await fs.readFile(filePath, "utf-8");
+  } catch (err) {
+    throw new Error(
+      `Could not read article file: ${article.contentPath} (${err instanceof Error ? err.message : String(err)})`,
+    );
+  }
+
+  // 2. Perform discovery using the unified chunking pipeline
+  const candidates = await discoverWikiCandidates(
+    articleIdStr,
+    langStr,
+    content,
+  );
+
+  console.log(
+    `[Worker] Discovery found ${candidates.length} candidate terms for article ${articleIdStr}`,
+  );
+
+  // 3. Store candidates in the WikiDiscovery table
+  let storedCount = 0;
+  for (const c of candidates) {
+    try {
+      await prisma.wikiDiscovery.create({
+        data: {
+          articleId: articleIdStr,
+          articleSlug: slugStr,
+          articleLang: langStr as "zh" | "en",
+          term: c.term,
+          type: c.type,
+          definition: c.definition,
+          importance: c.importance,
+          status: "pending",
+        },
+      });
+      storedCount++;
+    } catch (err) {
+      // Unique constraint violation (articleId + term) — skip
+      console.warn(
+        `[Worker] Failed to store candidate "${c.term}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  console.log(
+    `[Worker] Discovery complete: ${storedCount}/${candidates.length} candidates stored`,
+  );
+
+  // 4. Return summary
+  return {
+    articleId: articleIdStr,
+    discoveredAt: new Date().toISOString(),
+    candidateCount: storedCount,
+    candidates: candidates.map((c) => ({
+      term: c.term,
+      type: c.type,
+      importance: c.importance,
+    })),
+  };
+}
+
 async function processScan(job: Job): Promise<Record<string, unknown>> {
   console.log(`[Worker] Processing article scan`);
   await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -731,6 +834,7 @@ const HANDLERS: Record<
 > = {
   review: processReview,
   translate: processTranslate,
+  discover: processDiscover,
   // generate: disabled for now
   // scan: disabled for now
 };

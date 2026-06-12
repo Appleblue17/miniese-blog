@@ -323,11 +323,10 @@ export async function POST(request: NextRequest) {
       console.error("Auto-translate trigger failed (non-fatal):", err);
     });
 
-    // // --- Trigger auto term generation (always runs on publish) ---
-    // // Disabled for now
-    // triggerAutoGenerate(article.id).catch((err) => {
-    //   console.error("Auto-generate trigger failed (non-fatal):", err);
-    // });
+    // --- Trigger auto term generation (always runs on publish) ---
+    triggerAutoGenerate(article.id, slug, language).catch((err) => {
+      console.error("Auto-generate trigger failed (non-fatal):", err);
+    });
 
     return NextResponse.json({
       success: true,
@@ -456,17 +455,26 @@ async function triggerAutoTranslate(params: {
 }
 
 /**
- * Triggers AI term generation for a newly published article.
+ * Triggers AI term discovery for a newly published article.
  *
- * Creates a "generate" task that will scan the article content and
- * discover potential wiki terms, creating proposed wiki entries.
+ * Creates a "discover" task that will scan the article content and
+ * discover potential wiki terms, storing them as WikiDiscovery records
+ * for the blogger to review in the dashboard.
  *
  * This function is fire-and-forget.
  *
  * @param articleId - The ID of the published article
+ * @param articleSlug - The slug of the published article
+ * @param articleLang - The language code ("zh" | "en")
  */
-async function triggerAutoGenerate(articleId: string): Promise<void> {
-  await addJob("generate", {
+async function triggerAutoGenerate(
+  articleId: string,
+  articleSlug: string,
+  articleLang: string,
+): Promise<void> {
+  await addJob("discover", {
     articleId,
+    articleSlug,
+    articleLang,
   });
 }

@@ -31,10 +31,10 @@ enum AiTaskType {
   translate
   generate
   scan
+  discover
 }
 
 enum WikiStatus {
-  proposed
   creating
   unreviewed
   reviewed
@@ -45,6 +45,12 @@ enum AiTaskStatus {
   processing
   completed
   failed
+}
+
+enum DiscoveryStatus {
+  pending
+  approved
+  rejected
 }
 
 model Article {
@@ -81,6 +87,7 @@ model Article {
   wikiLinks   ArticleWikiLink[]
   comments    Comment[]
   aiTasks     AiTask[]
+  discoveries WikiDiscovery[]
 
   @@unique([slug, language])
   @@unique([originalId, language])
@@ -96,7 +103,7 @@ model WikiEntry {
   contentPath String
   tags        String[]
   accessGroup String[]
-  status      WikiStatus      @default(proposed)
+  status      WikiStatus      @default(creating)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -140,4 +147,24 @@ model Comment {
   createdAt  DateTime @default(now())
 
   article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model WikiDiscovery {
+  id            String          @id @default(uuid())
+  articleId     String?
+  articleSlug   String
+  articleLang   ArticleLanguage
+  term          String
+  type          String          // acronym | concept | theorem | tech | other
+  definition    String          // 简短解释（仅参考）
+  importance    Float           // 0-1
+  status        DiscoveryStatus @default(pending)
+  createdAt     DateTime        @default(now())
+  approvedAt    DateTime?
+
+  article       Article?        @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([articleId, term])
+  @@index([status])
+  @@index([articleId])
 }

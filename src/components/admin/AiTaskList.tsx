@@ -27,6 +27,7 @@ const TYPE_TABS: TypeTabDef[] = [
   { key: "all", label: "全部", icon: null },
   { key: "review", label: "审查", icon: <Bot className="size-3.5" /> },
   { key: "translate", label: "翻译", icon: <Globe className="size-3.5" /> },
+  { key: "discover", label: "词条发现", icon: <Sparkles className="size-3.5" /> },
   { key: "generate", label: "生成词条", icon: <Sparkles className="size-3.5" /> },
 ];
 
@@ -84,6 +85,8 @@ function TaskTypeIcon({ type }: { type: string }) {
       return <Globe className="size-4 text-blue-500" />;
     case "generate":
       return <Sparkles className="size-4 text-purple-500" />;
+    case "discover":
+      return <Sparkles className="size-4 text-amber-500" />;
     default:
       return <Bot className="size-4 text-muted-foreground" />;
   }
@@ -94,6 +97,7 @@ function TaskTypeLabel(type: string) {
     case "review": return "审查";
     case "translate": return "翻译";
     case "generate": return "生成词条";
+    case "discover": return "词条发现";
     default: return type;
   }
 }
@@ -120,6 +124,13 @@ function getTaskSummary(task: AiTaskItem): string | null {
       const count = (task.output as Record<string, unknown>)?.termsCount;
       if (typeof count === "number") {
         return `${count} 个词条`;
+      }
+      return null;
+    }
+    case "discover": {
+      const count = (task.output as Record<string, unknown>)?.candidateCount;
+      if (typeof count === "number") {
+        return `${count} 个候选词条`;
       }
       return null;
     }

@@ -1,21 +1,16 @@
 /**
  * @file POST /api/wiki/[name]/approve
  *
- * Approves a proposed wiki entry, moving it from "proposed" to "creating" status.
+ * NOTE: This endpoint is deprecated. WikiDiscovery entries use
+ * POST /api/admin/discoveries/[id]/approve instead.
  *
- * In Phase 3, this is a simple state transition. AI filling (creating → unreviewed)
- * will be implemented in a later phase.
- *
- * Query params: lang (required)
- * Body: none
- * Response: { entry: WikiEntryMeta }
+ * This endpoint is kept for backward compatibility but will always
+ * return an error, since WikiEntry no longer has "proposed" status.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/db";
-import { parseWikiFileWithMeta, buildWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
+import { slugifyName } from "@/lib/wiki/parser";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
 
 // --- Helpers ---
@@ -84,46 +79,11 @@ export async function POST(
       );
     }
 
-    // Only proposed entries can be approved
-    if (entry.status !== "proposed") {
-      return NextResponse.json(
-        { error: `Cannot approve entry with status "${entry.status}". Only "proposed" entries can be approved.` },
-        { status: 409 },
-      );
-    }
-
-    // Read existing file and update frontmatter status
-    const filePath = path.join(process.cwd(), entry.contentPath);
-    let fileContent: string;
-    try {
-      fileContent = await readFile(filePath, "utf-8");
-    } catch {
-      return NextResponse.json(
-        { error: "Entry file not found on disk." },
-        { status: 500 },
-      );
-    }
-
-    const parsed = parseWikiFileWithMeta(fileContent);
-    const updatedFile = buildWikiFileWithMeta(
-      {
-        ...parsed.frontmatter,
-        status: "creating",
-      },
-      parsed.blocks,
+    // Only proposed entries can be approved — but "proposed" no longer exists
+    return NextResponse.json(
+      { error: "This endpoint is deprecated. Use POST /api/admin/discoveries/[id]/approve instead." },
+      { status: 410 },
     );
-
-    await writeFile(filePath, updatedFile, "utf-8");
-
-    // Update DB record
-    const updated = await prisma.wikiEntry.update({
-      where: { id: entry.id },
-      data: { status: "creating" },
-    });
-
-    return NextResponse.json({
-      entry: serializeEntry(updated),
-    });
   } catch (error) {
     console.error("Approve wiki entry error:", error);
     return NextResponse.json(

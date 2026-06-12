@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readFile } from "fs/promises";
 import path from "path";
-import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import ReviewChunkList from "@/components/admin/ReviewChunkList";
@@ -81,12 +81,22 @@ interface GenerateOutput {
   }>;
 }
 
+interface DiscoverOutput {
+  candidateCount: number;
+  candidates: Array<{
+    term: string;
+    type: string;
+    definition: string;
+    importance: number;
+  }>;
+}
+
 interface TaskDetail {
   id: string;
   type: string;
   status: string;
   input: Record<string, unknown>;
-  output: ReviewOutput | TranslateOutput | GenerateOutput | null;
+  output: ReviewOutput | TranslateOutput | GenerateOutput | DiscoverOutput | null;
   error: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -164,6 +174,8 @@ function TaskTypeIcon({ type }: { type: string }) {
       return <Globe className="size-5 text-blue-500" />;
     case "generate":
       return <Sparkles className="size-5 text-purple-500" />;
+    case "discover":
+      return <Sparkles className="size-5 text-amber-500" />;
     default:
       return <Bot className="size-5 text-muted-foreground" />;
   }
@@ -174,6 +186,7 @@ function TaskTypeLabel({ type }: { type: string }) {
     case "review": return "AI 审查";
     case "translate": return "AI 翻译";
     case "generate": return "词条生成";
+    case "discover": return "词条发现";
     default: return type;
   }
 }
@@ -232,9 +245,11 @@ export default async function TaskDetailPage({
   const isReview = task.type === "review";
   const isTranslate = task.type === "translate";
   const isGenerate = task.type === "generate";
+  const isDiscover = task.type === "discover";
   const reviewOutput = isReview ? (output as ReviewOutput | null) : null;
   const translateOutput = isTranslate ? (output as TranslateOutput | null) : null;
   const generateOutput = isGenerate ? (output as GenerateOutput | null) : null;
+  const discoverOutput = isDiscover ? (output as DiscoverOutput | null) : null;
 
   // Build translate chunks for the TranslateChunkList component.
   //
@@ -529,6 +544,36 @@ export default async function TaskDetailPage({
                   <p className="text-sm text-muted-foreground mt-1">{term.definition}</p>
                   {term.aliases.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">别名: {term.aliases.join(", ")}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Discovery summary */}
+      {discoverOutput && task.status === "completed" && (
+        <div className="mb-8">
+          <div className="rounded-lg border border-border bg-card p-4 text-center inline-block">
+            <p className="text-2xl font-bold">{discoverOutput.candidateCount}</p>
+            <p className="text-xs text-muted-foreground mt-1">候选词条</p>
+          </div>
+          {discoverOutput.candidates.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2">
+              {discoverOutput.candidates.map((candidate, idx) => (
+                <div key={idx} className="rounded-lg border border-border bg-card/50 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium">{candidate.term}</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-2 py-0.5">
+                      {candidate.type === "acronym" ? "缩写" : candidate.type === "concept" ? "概念" : candidate.type === "theorem" ? "定理" : candidate.type === "tech" ? "技术" : candidate.type}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      重要性: {Math.round(candidate.importance * 100)}%
+                    </span>
+                  </div>
+                  {candidate.definition && (
+                    <p className="text-sm text-muted-foreground">{candidate.definition}</p>
                   )}
                 </div>
               ))}
