@@ -67,9 +67,7 @@ export function PublishForm({
   initialExtraFrontmatter,
 }: PublishFormProps) {
   // Step management
-  const [step, setStep] = useState<Step>(
-    initialContent ? "review" : "upload",
-  );
+  const [step, setStep] = useState<Step>(initialContent ? "review" : "upload");
 
   // Upload state
   const [fileName, setFileName] = useState<string>(initialFileName || "");
@@ -88,9 +86,9 @@ export function PublishForm({
   );
 
   // Extra frontmatter fields (not managed by UI)
-  const [extraFrontmatter, setExtraFrontmatter] = useState<
-    Record<string, unknown>
-  >(initialExtraFrontmatter || {});
+  const [extraFrontmatter, setExtraFrontmatter] = useState<Record<string, unknown>>(
+    initialExtraFrontmatter || {},
+  );
 
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -134,7 +132,9 @@ export function PublishForm({
 
     (async () => {
       try {
-        const res = await fetch(`/api/admin/reviews?articleId=${encodeURIComponent(draftId)}&limit=1`);
+        const res = await fetch(
+          `/api/admin/reviews?articleId=${encodeURIComponent(draftId)}&limit=1`,
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -153,12 +153,14 @@ export function PublishForm({
         setReviewSubmitted(true);
 
         if (latest.status === "completed" && latest.output) {
-          const summary = (latest.output as Record<string, unknown>).summary as {
-            totalIssues: number;
-            errors: number;
-            warnings: number;
-            suggestions: number;
-          } | undefined;
+          const summary = (latest.output as Record<string, unknown>).summary as
+            | {
+                totalIssues: number;
+                errors: number;
+                warnings: number;
+                suggestions: number;
+              }
+            | undefined;
           if (summary) {
             setReviewSummary(summary);
           }
@@ -168,13 +170,17 @@ export function PublishForm({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [draftId]);
 
   // Cleanup polling interval on unmount
   useEffect(() => {
     return () => {
-      const interval = (window as unknown as Record<string, unknown>).__reviewPollInterval as number | undefined;
+      const interval = (window as unknown as Record<string, unknown>).__reviewPollInterval as
+        | number
+        | undefined;
       if (interval) {
         clearInterval(interval);
         delete (window as unknown as Record<string, unknown>).__reviewPollInterval;
@@ -204,14 +210,25 @@ export function PublishForm({
       setMeta({
         title: (data.title as string) || "",
         language: (data.language === "en" ? "en" : "zh") as "zh" | "en",
-        fileType: ((data.fileType || data.contentType || "markdown") as "markdown" | "notesaw"),
+        fileType: (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw",
         tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
         author: (data.author as string) || "博主",
         summary: (data.summary as string) || "",
       });
 
       // Collect extra frontmatter
-      const managedKeys = new Set(["title", "language", "fileType", "contentType", "tags", "author", "summary", "slug", "accessGroup", "changelog"]);
+      const managedKeys = new Set([
+        "title",
+        "language",
+        "fileType",
+        "contentType",
+        "tags",
+        "author",
+        "summary",
+        "slug",
+        "accessGroup",
+        "changelog",
+      ]);
       const extra: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(data)) {
         if (!managedKeys.has(key)) {
@@ -378,10 +395,12 @@ export function PublishForm({
           // Show chunk progress during processing
           if (newStatus === "processing") {
             const output = (statusData.output ?? {}) as Record<string, unknown>;
-            const progress = output.progress as {
-              totalChunks: number;
-              processedChunks: number;
-            } | undefined;
+            const progress = output.progress as
+              | {
+                  totalChunks: number;
+                  processedChunks: number;
+                }
+              | undefined;
             if (progress) {
               setReviewProgress(progress);
             }
@@ -390,12 +409,14 @@ export function PublishForm({
           if (newStatus === "completed") {
             clearInterval(pollInterval);
             const output = (statusData.output ?? {}) as Record<string, unknown>;
-            const summary = output.summary as {
-              totalIssues: number;
-              errors: number;
-              warnings: number;
-              suggestions: number;
-            } | undefined;
+            const summary = output.summary as
+              | {
+                  totalIssues: number;
+                  errors: number;
+                  warnings: number;
+                  suggestions: number;
+                }
+              | undefined;
             if (summary) {
               setReviewSummary(summary);
             }
@@ -520,9 +541,7 @@ export function PublishForm({
           <Label htmlFor="meta-language">语言</Label>
           <Select
             value={meta.language}
-            onValueChange={(v) =>
-              setMeta((m) => ({ ...m, language: v as "zh" | "en" }))
-            }
+            onValueChange={(v) => setMeta((m) => ({ ...m, language: v as "zh" | "en" }))}
           >
             <SelectTrigger id="meta-language">
               <SelectValue />
@@ -537,9 +556,7 @@ export function PublishForm({
           <Label htmlFor="meta-filetype">文件格式</Label>
           <Select
             value={meta.fileType}
-            onValueChange={(v) =>
-              setMeta((m) => ({ ...m, fileType: v as "markdown" | "notesaw" }))
-            }
+            onValueChange={(v) => setMeta((m) => ({ ...m, fileType: v as "markdown" | "notesaw" }))}
           >
             <SelectTrigger id="meta-filetype">
               <SelectValue />
@@ -654,16 +671,17 @@ export function PublishForm({
             prefix = "-";
           }
           return (
-            <div key={idx} className={`flex ${bg} px-3 py-0.5 border-b border-border/50 last:border-b-0`}>
+            <div
+              key={idx}
+              className={`flex ${bg} px-3 py-0.5 border-b border-border/50 last:border-b-0`}
+            >
               <span className="w-8 text-right text-muted-foreground/50 select-none shrink-0">
                 {line.lineNumOld || line.lineNumNew || " "}
               </span>
               <span className="w-4 text-center shrink-0 text-muted-foreground/50 select-none">
                 {prefix}
               </span>
-              <span className="flex-1 pl-1 whitespace-pre-wrap break-all">
-                {line.value || " "}
-              </span>
+              <span className="flex-1 pl-1 whitespace-pre-wrap break-all">{line.value || " "}</span>
             </div>
           );
         })}
@@ -729,11 +747,7 @@ export function PublishForm({
 
             {/* Action buttons — only save as draft or go to confirm, no review here */}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={savingDraft}
-              >
+              <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
                 {savingDraft ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
@@ -742,10 +756,7 @@ export function PublishForm({
                 存为草稿
               </Button>
 
-              <Button
-                onClick={handleGoToConfirm}
-                disabled={!fileContent}
-              >
+              <Button onClick={handleGoToConfirm} disabled={!fileContent}>
                 <Send className="size-4" />
                 下一步 · 确认发布
               </Button>
@@ -768,7 +779,14 @@ export function PublishForm({
     return (
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setError(null); setStep("upload"); }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setError(null);
+              setStep("upload");
+            }}
+          >
             <ArrowLeft className="size-4" />
           </Button>
           <div>
@@ -787,9 +805,7 @@ export function PublishForm({
                 <FileText className="size-3" />
                 {fileName}
               </Badge>
-              {draftId && (
-                <Badge variant="outline">草稿</Badge>
-              )}
+              {draftId && <Badge variant="outline">草稿</Badge>}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -804,7 +820,10 @@ export function PublishForm({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setError(null); setStep("upload"); }}
+                onClick={() => {
+                  setError(null);
+                  setStep("upload");
+                }}
                 className="gap-1.5 text-xs"
               >
                 <Upload className="size-3.5" />
@@ -842,9 +861,7 @@ export function PublishForm({
           </div>
 
           {!reviewTaskId && !reviewStatus && (
-            <p className="text-sm text-muted-foreground">
-              点击「交给助手审查」按钮发起 AI 审查。
-            </p>
+            <p className="text-sm text-muted-foreground">点击「交给助手审查」按钮发起 AI 审查。</p>
           )}
 
           {reviewTaskId && (
@@ -877,7 +894,8 @@ export function PublishForm({
                           />
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          已处理 {reviewProgress.processedChunks}/{reviewProgress.totalChunks} 个段落
+                          已处理 {reviewProgress.processedChunks}/{reviewProgress.totalChunks}{" "}
+                          个段落
                         </p>
                       </div>
                     )}
@@ -899,9 +917,15 @@ export function PublishForm({
 
               {reviewSummary && (
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                  <span className="text-red-600 dark:text-red-400">{reviewSummary.errors} 错误</span>
-                  <span className="text-yellow-600 dark:text-yellow-400">{reviewSummary.warnings} 警告</span>
-                  <span className="text-blue-600 dark:text-blue-400">{reviewSummary.suggestions} 建议</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    {reviewSummary.errors} 错误
+                  </span>
+                  <span className="text-yellow-600 dark:text-yellow-400">
+                    {reviewSummary.warnings} 警告
+                  </span>
+                  <span className="text-blue-600 dark:text-blue-400">
+                    {reviewSummary.suggestions} 建议
+                  </span>
                   <span>共 {reviewSummary.totalIssues} 个问题</span>
                 </div>
               )}
@@ -919,11 +943,7 @@ export function PublishForm({
               onClick={handleRefreshPreview}
               disabled={previewLoading}
             >
-              {previewLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "刷新预览"
-              )}
+              {previewLoading ? <Loader2 className="size-4 animate-spin" /> : "刷新预览"}
             </Button>
           </div>
 
@@ -940,8 +960,14 @@ export function PublishForm({
 
         {/* Re-review confirm dialog */}
         {showReviewConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowReviewConfirm(false)}>
-            <div className="mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setShowReviewConfirm(false)}
+          >
+            <div
+              className="mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h3 className="text-lg font-semibold mb-2">重新提交审查？</h3>
               <p className="text-sm text-muted-foreground mb-6">
                 这篇文章已经提交过 AI 审查，确定要再次提交吗？
@@ -995,10 +1021,7 @@ export function PublishForm({
             <Sparkles className="size-4" />
             {reviewSubmitted ? "已提交审查" : "交给助手审查"}
           </Button>
-          <Button
-            onClick={handleGoToConfirm}
-            className="sm:order-3"
-          >
+          <Button onClick={handleGoToConfirm} className="sm:order-3">
             <Send className="size-4" />
             上传 · 进入确认页
           </Button>
@@ -1018,7 +1041,14 @@ export function PublishForm({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => { setError(null); setStep("review"); }}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setError(null);
+            setStep("review");
+          }}
+        >
           <ArrowLeft className="size-4" />
         </Button>
         <div>
@@ -1089,12 +1119,7 @@ export function PublishForm({
             <FileText className="size-3" />
             {fileName}
           </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDownload}
-            className="gap-1.5 text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
             <Download className="size-3.5" />
             下载
           </Button>
@@ -1105,7 +1130,10 @@ export function PublishForm({
           <Badge variant="outline">{charCount} 字符</Badge>
           {diffResult && (
             <>
-              <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+              <Badge
+                variant="outline"
+                className="border-green-500 text-green-700 dark:text-green-400"
+              >
                 +{diffResult.added} 行
               </Badge>
               <Badge variant="outline" className="border-red-500 text-red-700 dark:text-red-400">
@@ -1144,9 +1172,7 @@ export function PublishForm({
             value={changelog}
             onChange={(e) => setChangelog(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
-            AI 生成建议版本功能将在后续版本中实现。
-          </p>
+          <p className="text-xs text-muted-foreground">AI 生成建议版本功能将在后续版本中实现。</p>
         </div>
       </Card>
 
@@ -1163,9 +1189,7 @@ export function PublishForm({
         <div className="flex items-center gap-3 rounded-lg bg-green-50 dark:bg-green-950 p-4 text-sm">
           <Check className="size-5 text-green-600 dark:text-green-400" />
           <div>
-            <p className="font-medium text-green-800 dark:text-green-300">
-              发布成功！
-            </p>
+            <p className="font-medium text-green-800 dark:text-green-300">发布成功！</p>
             <a
               href={published.url}
               className="text-green-700 dark:text-green-400 underline underline-offset-2 hover:text-green-600"
@@ -1178,18 +1202,17 @@ export function PublishForm({
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
-            onClick={() => { setError(null); setStep("review"); }}
+            onClick={() => {
+              setError(null);
+              setStep("review");
+            }}
             disabled={publishing}
             className="sm:order-1"
           >
             <ArrowLeft className="size-4" />
             取消上传
           </Button>
-          <Button
-            onClick={handlePublish}
-            disabled={publishing}
-            className="sm:order-2"
-          >
+          <Button onClick={handlePublish} disabled={publishing} className="sm:order-2">
             {publishing ? (
               <>
                 <Loader2 className="size-4 animate-spin" />

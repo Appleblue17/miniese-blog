@@ -12,10 +12,7 @@ import { Footer } from "@/components/layout/Footer";
 
 const featherSprite = (() => {
   try {
-    return readFileSync(
-      path.join(process.cwd(), "public", "icon", "feather-sprite.svg"),
-      "utf-8",
-    );
+    return readFileSync(path.join(process.cwd(), "public", "icon", "feather-sprite.svg"), "utf-8");
   } catch {
     return "";
   }

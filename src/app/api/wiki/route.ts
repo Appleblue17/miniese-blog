@@ -58,10 +58,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") || "20", 10)),
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
     const statusParam = searchParams.get("status");
@@ -111,10 +108,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("List wiki entries error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
 
@@ -148,17 +142,11 @@ export async function POST(request: NextRequest) {
     // --- Validation ---
 
     if (!name || !name.trim()) {
-      return NextResponse.json(
-        { error: "name is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "name is required." }, { status: 400 });
     }
 
     if (language !== "zh" && language !== "en") {
-      return NextResponse.json(
-        { error: "language must be 'zh' or 'en'." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
     }
 
     const termName = name.trim();
@@ -227,8 +215,8 @@ export async function POST(request: NextRequest) {
 
     const discovery = await prisma.wikiDiscovery.create({
       data: {
-        articleId: null,        // No associated article for manual entries
-        articleSlug: "",        // No associated article
+        articleId: null, // No associated article for manual entries
+        articleSlug: "", // No associated article
         articleLang: lang,
         term: termName,
         type,
@@ -254,9 +242,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("Create wiki discovery error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

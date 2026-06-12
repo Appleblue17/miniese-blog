@@ -18,12 +18,7 @@
  * Provides both `splitArticle` (full content) and `splitRange` (line range).
  */
 
-import {
-  type Chunk,
-  TARGET_CHUNK_SIZE,
-  MIN_CHUNK_SIZE,
-  MAX_CHUNK_SIZE,
-} from "./types";
+import { type Chunk, TARGET_CHUNK_SIZE, MIN_CHUNK_SIZE, MAX_CHUNK_SIZE } from "./types";
 
 export type { Chunk };
 
@@ -195,10 +190,7 @@ function splitIntoSections(lines: string[]): Section[] {
   // Each heading section
   for (let h = 0; h < headingLines.length; h++) {
     const start = headingLines[h];
-    const end =
-      h + 1 < headingLines.length
-        ? headingLines[h + 1] - 1
-        : lines.length;
+    const end = h + 1 < headingLines.length ? headingLines[h + 1] - 1 : lines.length;
     sections.push({
       startLine: start,
       endLine: end,
@@ -221,9 +213,7 @@ function splitByParagraphs(lines: string[]): Section[] {
     const isBlank = i >= lines.length || lines[i].trim() === "";
 
     if (isBlank && lineNum > paraStart) {
-      const hasContent = lines
-        .slice(paraStart - 1, lineNum - 1)
-        .some((l) => l.trim().length > 0);
+      const hasContent = lines.slice(paraStart - 1, lineNum - 1).some((l) => l.trim().length > 0);
       if (hasContent) {
         sections.push({
           startLine: paraStart,
@@ -245,10 +235,7 @@ function splitByParagraphs(lines: string[]): Section[] {
 /**
  * Merges sections into chunks that respect size boundaries.
  */
-function mergeSectionsIntoChunks(
-  sections: Section[],
-  lines: string[],
-): Chunk[] {
+function mergeSectionsIntoChunks(sections: Section[], lines: string[]): Chunk[] {
   const chunks: Chunk[] = [];
 
   let pending: Section[] = [];
@@ -319,11 +306,7 @@ function computeSectionSize(section: Section, lines: string[]): number {
 /**
  * Builds a single Chunk from one or more consecutive sections.
  */
-function buildChunk(
-  sections: Section[],
-  lines: string[],
-  chunkId: number,
-): Chunk {
+function buildChunk(sections: Section[], lines: string[], chunkId: number): Chunk {
   const startLine = sections[0].startLine;
   const endLine = sections[sections.length - 1].endLine;
 
@@ -337,9 +320,7 @@ function buildChunk(
     title = firstSection.heading;
   } else {
     const firstLine = chunkLines.find((l) => l.trim().length > 0);
-    title = firstLine
-      ? firstLine.trim().substring(0, 60)
-      : `Section ${chunkId + 1}`;
+    title = firstLine ? firstLine.trim().substring(0, 60) : `Section ${chunkId + 1}`;
   }
 
   return {
@@ -355,11 +336,7 @@ function buildChunk(
  * Splits a single oversized section (exceeds MAX_CHUNK_SIZE) into sub-chunks.
  * First tries paragraph boundaries, then falls back to fixed length.
  */
-function splitOversizedSection(
-  section: Section,
-  lines: string[],
-  startChunkId: number,
-): Chunk[] {
+function splitOversizedSection(section: Section, lines: string[], startChunkId: number): Chunk[] {
   const sectionLines = lines.slice(section.startLine - 1, section.endLine);
   const content = sectionLines.join("\n");
   const chunkIdOffset = startChunkId;
@@ -470,14 +447,10 @@ function splitByTargetSizeLines(
     const lineLen = sectionLines[i].length + 1;
     if (charCount + lineLen > TARGET_CHUNK_SIZE && charCount > 0) {
       const chunkContent = sectionLines.slice(startIdx, i).join("\n");
-      const firstLine = chunkContent
-        .split("\n")
-        .find((l) => l.trim().length > 0);
+      const firstLine = chunkContent.split("\n").find((l) => l.trim().length > 0);
       chunks.push({
         id: chunkIdOffset + chunks.length,
-        title: firstLine
-          ? firstLine.trim().substring(0, 60)
-          : `Part ${chunks.length + 1}`,
+        title: firstLine ? firstLine.trim().substring(0, 60) : `Part ${chunks.length + 1}`,
         content: chunkContent,
         startLine: section.startLine + startIdx,
         endLine: section.startLine + i - 1,
@@ -492,14 +465,10 @@ function splitByTargetSizeLines(
   // Flush remaining
   if (startIdx < sectionLines.length) {
     const chunkContent = sectionLines.slice(startIdx).join("\n");
-    const firstLine = chunkContent
-      .split("\n")
-      .find((l) => l.trim().length > 0);
+    const firstLine = chunkContent.split("\n").find((l) => l.trim().length > 0);
     chunks.push({
       id: chunkIdOffset + chunks.length,
-      title: firstLine
-        ? firstLine.trim().substring(0, 60)
-        : `Part ${chunks.length + 1}`,
+      title: firstLine ? firstLine.trim().substring(0, 60) : `Part ${chunks.length + 1}`,
       content: chunkContent,
       startLine: section.startLine + startIdx,
       endLine: section.endLine,

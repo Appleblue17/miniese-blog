@@ -33,17 +33,11 @@ export async function POST(request: NextRequest) {
     // --- Validation ---
 
     if (!articleId) {
-      return NextResponse.json(
-        { error: "articleId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "articleId is required." }, { status: 400 });
     }
 
     if (lang !== "zh" && lang !== "en") {
-      return NextResponse.json(
-        { error: "lang must be 'zh' or 'en'." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "lang must be 'zh' or 'en'." }, { status: 400 });
     }
 
     // --- Find the article ---
@@ -53,10 +47,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!article) {
-      return NextResponse.json(
-        { error: `Article not found: ${articleId}` },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: `Article not found: ${articleId}` }, { status: 404 });
     }
 
     if (article.status !== "published") {
@@ -111,9 +102,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Render error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

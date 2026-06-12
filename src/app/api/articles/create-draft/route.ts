@@ -20,10 +20,7 @@ export async function POST(request: NextRequest) {
     const { articleId } = body;
 
     if (!articleId) {
-      return NextResponse.json(
-        { error: "articleId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "articleId is required." }, { status: 400 });
     }
 
     // Find the published article
@@ -43,10 +40,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!article || article.status !== "published") {
-      return NextResponse.json(
-        { error: "Published article not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Published article not found." }, { status: 404 });
     }
 
     // Check if a draft already exists for this article
@@ -69,15 +63,9 @@ export async function POST(request: NextRequest) {
     // Read the published content file
     let content = "";
     try {
-      content = await readFile(
-        path.join(process.cwd(), article.contentPath),
-        "utf-8",
-      );
+      content = await readFile(path.join(process.cwd(), article.contentPath), "utf-8");
     } catch {
-      return NextResponse.json(
-        { error: "Published article file not found." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Published article file not found." }, { status: 500 });
     }
 
     // Write to drafts directory
@@ -113,9 +101,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Create draft error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

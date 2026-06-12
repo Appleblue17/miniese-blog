@@ -30,10 +30,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") || "15", 10)),
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "15", 10)));
 
     // Get total count of published ORIGINAL articles (exclude translations)
     const total = await prisma.article.count({
@@ -69,10 +66,7 @@ export async function GET(request: NextRequest) {
 
     // Get active AI tasks (pending or processing) for all linked articles
     // to enable anti-duplicate protection on translate/generate buttons
-    const allArticleIds = [
-      ...linkedArticleIds,
-      ...allTranslations.map((t) => t.id),
-    ];
+    const allArticleIds = [...linkedArticleIds, ...allTranslations.map((t) => t.id)];
     const activeTasks = await prisma.aiTask.findMany({
       where: {
         articleId: { in: allArticleIds },
@@ -177,9 +171,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Admin articles list error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

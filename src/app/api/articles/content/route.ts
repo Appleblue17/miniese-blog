@@ -22,10 +22,7 @@ export async function GET(request: NextRequest) {
     const isDownload = searchParams.get("download") === "1";
 
     if (!id) {
-      return NextResponse.json(
-        { error: "id query parameter is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "id query parameter is required." }, { status: 400 });
     }
 
     const article = await prisma.article.findUnique({
@@ -34,10 +31,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!article) {
-      return NextResponse.json(
-        { error: "Article not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Article not found." }, { status: 404 });
     }
 
     const filePath = path.join(process.cwd(), article.contentPath);
@@ -64,9 +58,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ content, fileName });
   } catch (error) {
     console.error("Get article content error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

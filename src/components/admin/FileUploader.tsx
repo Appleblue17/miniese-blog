@@ -103,9 +103,7 @@ export function FileUploader({ onUpload }: FileUploaderProps) {
       >
         <Upload className="size-8 text-muted-foreground" />
         <div>
-          <p className="text-sm font-medium">
-            拖拽文件到此处，或点击选择文件
-          </p>
+          <p className="text-sm font-medium">拖拽文件到此处，或点击选择文件</p>
           <p className="mt-1 text-xs text-muted-foreground">
             仅支持 {ACCEPTED_EXTENSIONS.join(", ")} 格式
           </p>

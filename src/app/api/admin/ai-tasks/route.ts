@@ -31,17 +31,14 @@ export async function GET(request: NextRequest) {
     const typeFilter = searchParams.get("type");
     const articleIdFilter = searchParams.get("articleId");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") || "20", 10)),
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Build Prisma where clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
 
     if (typeFilter) {
-      if (!VALID_TYPES.includes(typeFilter as typeof VALID_TYPES[number])) {
+      if (!VALID_TYPES.includes(typeFilter as (typeof VALID_TYPES)[number])) {
         return NextResponse.json(
           { error: `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}` },
           { status: 400 },
@@ -72,9 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Batch lookup discovery term names for generate tasks
     const discoveryIds: string[] = [];
-    const generateTasks = tasks.filter(
-      (t) => t.type === "generate" && !t.articleId,
-    );
+    const generateTasks = tasks.filter((t) => t.type === "generate" && !t.articleId);
     for (const t of generateTasks) {
       const input = (t.input ?? {}) as Record<string, unknown>;
       const discoveryId = input.discoveryId as string | undefined;
@@ -84,16 +79,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Batch query all discovery records for their term names
-    const discoveries = discoveryIds.length > 0
-      ? await prisma.wikiDiscovery.findMany({
-          where: { id: { in: discoveryIds } },
-          select: { id: true, term: true },
-        })
-      : [];
+    const discoveries =
+      discoveryIds.length > 0
+        ? await prisma.wikiDiscovery.findMany({
+            where: { id: { in: discoveryIds } },
+            select: { id: true, term: true },
+          })
+        : [];
 
-    const discoveryTermMap = new Map(
-      discoveries.map((d) => [d.id, d.term]),
-    );
+    const discoveryTermMap = new Map(discoveries.map((d) => [d.id, d.term]));
 
     const mapped: AiTaskItem[] = tasks.map((t) => {
       let articleTitle: string | null = t.article?.title ?? null;
@@ -130,9 +124,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Admin AI tasks list error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

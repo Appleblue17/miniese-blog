@@ -47,9 +47,7 @@ function getConfig(): { apiKey: string; baseUrl: string } {
   const baseUrl = process.env.DEEPSEEK_BASE_URL;
 
   if (!apiKey) {
-    throw new Error(
-      "DEEPSEEK_API_KEY is not set. Please configure it in your .env file.",
-    );
+    throw new Error("DEEPSEEK_API_KEY is not set. Please configure it in your .env file.");
   }
 
   return {
@@ -115,9 +113,7 @@ export async function callDeepSeek(options: CallOptions): Promise<CallResult> {
     if (attempt > 0) {
       // Exponential backoff: 1s, 2s, 4s
       const delay = 1000 * Math.pow(2, attempt - 1);
-      console.log(
-        `[DeepSeek] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms`,
-      );
+      console.log(`[DeepSeek] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms`);
       await sleep(delay);
     }
 
@@ -161,7 +157,9 @@ export async function callDeepSeek(options: CallOptions): Promise<CallResult> {
       };
 
       // Debug logging
-      const rawChoices = (data as Record<string, unknown>)?.choices as Array<Record<string, unknown>> | undefined;
+      const rawChoices = (data as Record<string, unknown>)?.choices as
+        | Array<Record<string, unknown>>
+        | undefined;
       const finishReason = rawChoices?.[0]?.finish_reason as string | undefined;
       console.log(
         `[DeepSeek] Success: ${usage.total_tokens} tokens used ` +

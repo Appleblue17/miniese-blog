@@ -86,7 +86,9 @@ export async function POST(
     // Only unreviewed entries can be reviewed
     if (entry.status !== "unreviewed") {
       return NextResponse.json(
-        { error: `Cannot review entry with status "${entry.status}". Only "unreviewed" entries can be reviewed.` },
+        {
+          error: `Cannot review entry with status "${entry.status}". Only "unreviewed" entries can be reviewed.`,
+        },
         { status: 409 },
       );
     }
@@ -97,10 +99,7 @@ export async function POST(
     try {
       fileContent = await readFile(filePath, "utf-8");
     } catch {
-      return NextResponse.json(
-        { error: "Entry file not found on disk." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Entry file not found on disk." }, { status: 500 });
     }
 
     const parsed = parseWikiFileWithMeta(fileContent);
@@ -125,9 +124,6 @@ export async function POST(
     });
   } catch (error) {
     console.error("Review wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

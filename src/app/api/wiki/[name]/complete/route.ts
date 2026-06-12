@@ -87,7 +87,9 @@ export async function POST(
     // Only creating entries can be completed
     if (entry.status !== "creating") {
       return NextResponse.json(
-        { error: `Cannot complete entry with status "${entry.status}". Only "creating" entries can be marked as complete.` },
+        {
+          error: `Cannot complete entry with status "${entry.status}". Only "creating" entries can be marked as complete.`,
+        },
         { status: 409 },
       );
     }
@@ -98,10 +100,7 @@ export async function POST(
     try {
       fileContent = await readFile(filePath, "utf-8");
     } catch {
-      return NextResponse.json(
-        { error: "Entry file not found on disk." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Entry file not found on disk." }, { status: 500 });
     }
 
     const parsed = parseWikiFileWithMeta(fileContent);
@@ -126,9 +125,6 @@ export async function POST(
     });
   } catch (error) {
     console.error("Complete wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

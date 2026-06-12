@@ -31,10 +31,7 @@ interface ArticleApiResponse {
   html: string;
 }
 
-async function fetchArticle(
-  lang: string,
-  slug: string,
-): Promise<ArticleApiResponse | null> {
+async function fetchArticle(lang: string, slug: string): Promise<ArticleApiResponse | null> {
   try {
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
     const url = `${baseUrl}/api/articles/${slug}?lang=${lang}`;

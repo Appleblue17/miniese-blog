@@ -75,9 +75,7 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
       <div>
         <h1 className="text-2xl font-bold">{title}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {data && !loading
-            ? `共 ${data.total} ${subtitle}`
-            : "加载中..."}
+          {data && !loading ? `共 ${data.total} ${subtitle}` : "加载中..."}
         </p>
       </div>
 
@@ -91,9 +89,7 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
       {/* Empty state */}
       {!loading && data && data.entries.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
-          <p className="text-lg">
-            {lang === "zh" ? "暂无词条" : "No entries"}
-          </p>
+          <p className="text-lg">{lang === "zh" ? "暂无词条" : "No entries"}</p>
           <p className="text-sm">
             {lang === "zh"
               ? "知识库还没有任何词条，请稍后再来。"
@@ -107,11 +103,7 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
         <>
           <div className="flex flex-col gap-4">
             {data.entries.map((entry: WikiEntryMeta) => (
-              <WikiCard
-                key={entry.id}
-                entry={entry}
-                lang={lang}
-              />
+              <WikiCard key={entry.id} entry={entry} lang={lang} />
             ))}
           </div>
 

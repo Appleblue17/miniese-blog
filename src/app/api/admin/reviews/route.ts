@@ -30,10 +30,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const articleIdFilter = searchParams.get("articleId");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") || "20", 10)),
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Build Prisma where clause using the relational articleId column
     const where: Record<string, unknown> = { type: "review" };
@@ -78,9 +75,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Admin reviews list error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

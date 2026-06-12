@@ -209,10 +209,7 @@ export function parseWikiFileWithMeta(content: string): ParsedWikiFile {
  * );
  * ```
  */
-export function buildWikiFileWithMeta(
-  meta: WikiFrontmatter,
-  blocks: WikiBlocks,
-): string {
+export function buildWikiFileWithMeta(meta: WikiFrontmatter, blocks: WikiBlocks): string {
   // Build frontmatter string using the raw approach
   const yamlLines: string[] = [];
   yamlLines.push("---");

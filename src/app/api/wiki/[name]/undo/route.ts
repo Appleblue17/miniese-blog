@@ -1,18 +1,21 @@
 /**
  * @file POST /api/wiki/[name]/undo
  *
- * Undoes a "creating" wiki entry: deletes the WikiEntry record and file,
- * and moves the linked discovery back to "pending" status.
+ * Undoes a wiki entry based on its current status:
  *
- * Query params: lang (required)
+ * - "creating": deletes the WikiEntry record and file, moves linked discovery back to "pending"
+ * - "unreviewed": deletes the WikiEntry record and file, moves linked discovery back to "pending"
+ * - "reviewed": moves the entry back to "unreviewed" (撤销审查)
+ *
+ * Query params: lang (required), mode (optional, "unreview" to only move reviewed → unreviewed)
  * Response: { success: true }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { unlink } from "fs/promises";
+import { readFile, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { slugifyName } from "@/lib/wiki/parser";
+import { parseWikiFileWithMeta, buildWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
 
 export async function POST(
   _request: NextRequest,
@@ -48,10 +51,35 @@ export async function POST(
       );
     }
 
-    // Only "creating" entries can be undone
-    if (entry.status !== "creating") {
+    // --- Handle "reviewed" → "unreviewed" (撤销审查) ---
+    if (entry.status === "reviewed") {
+      // Update file frontmatter
+      const filePath = path.join(process.cwd(), entry.contentPath);
+      const fileContent = await readFile(filePath, "utf-8").catch(() => null);
+      if (fileContent !== null) {
+        const parsed = parseWikiFileWithMeta(fileContent);
+        const updatedFile = buildWikiFileWithMeta(
+          { ...parsed.frontmatter, status: "unreviewed" },
+          parsed.blocks,
+        );
+        await writeFile(filePath, updatedFile, "utf-8");
+      }
+
+      // Update DB record
+      await prisma.wikiEntry.update({
+        where: { id: entry.id },
+        data: { status: "unreviewed" },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // --- Handle "creating" or "unreviewed" → delete + move discovery back to pending ---
+    if (entry.status !== "creating" && entry.status !== "unreviewed") {
       return NextResponse.json(
-        { error: `Cannot undo entry with status "${entry.status}". Only "creating" entries can be undone.` },
+        {
+          error: `Cannot undo entry with status "${entry.status}". Only "creating" or "unreviewed" entries can be undone via deletion.`,
+        },
         { status: 409 },
       );
     }
@@ -83,9 +111,6 @@ export async function POST(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Undo wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

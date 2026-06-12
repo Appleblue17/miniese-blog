@@ -40,9 +40,7 @@ import { discoverWikiCandidates, type DiscoveryCandidate } from "./discovery";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeCandidate(
-  overrides: Partial<DiscoveryCandidate> = {},
-): DiscoveryCandidate {
+function makeCandidate(overrides: Partial<DiscoveryCandidate> = {}): DiscoveryCandidate {
   return {
     term: "TypeScript",
     type: "tech",
@@ -68,12 +66,21 @@ describe("discoverWikiCandidates", () => {
       content: JSON.stringify({
         candidates: [
           makeCandidate({ term: "TypeScript", importance: 0.95 }),
-          makeCandidate({ term: "Closure", type: "concept", definition: "A function with its lexical environment", importance: 0.8 }),
+          makeCandidate({
+            term: "Closure",
+            type: "concept",
+            definition: "A function with its lexical environment",
+            importance: 0.8,
+          }),
         ],
       }),
     });
 
-    const result = await discoverWikiCandidates("article-1", "zh", "# Test\n\nTypeScript and Closure are related.");
+    const result = await discoverWikiCandidates(
+      "article-1",
+      "zh",
+      "# Test\n\nTypeScript and Closure are related.",
+    );
 
     expect(result).toHaveLength(2);
     expect(result[0].term).toBe("TypeScript");
@@ -87,7 +94,12 @@ describe("discoverWikiCandidates", () => {
         candidates: [
           makeCandidate({ term: "TypeScript" }),
           makeCandidate({ term: "typescript" }), // duplicate
-          makeCandidate({ term: "Docker", type: "tech", definition: "Container runtime", importance: 0.85 }),
+          makeCandidate({
+            term: "Docker",
+            type: "tech",
+            definition: "Container runtime",
+            importance: 0.85,
+          }),
         ],
       }),
     });
@@ -99,15 +111,18 @@ describe("discoverWikiCandidates", () => {
   });
 
   it("should filter out terms that already exist as wiki entries", async () => {
-    mockPrisma.wikiEntry.findMany.mockResolvedValue([
-      { name: "TypeScript", language: "zh" },
-    ]);
+    mockPrisma.wikiEntry.findMany.mockResolvedValue([{ name: "TypeScript", language: "zh" }]);
 
     mockCallDeepSeek.mockResolvedValueOnce({
       content: JSON.stringify({
         candidates: [
           makeCandidate({ term: "TypeScript" }),
-          makeCandidate({ term: "Docker", type: "tech", definition: "Container runtime", importance: 0.85 }),
+          makeCandidate({
+            term: "Docker",
+            type: "tech",
+            definition: "Container runtime",
+            importance: 0.85,
+          }),
         ],
       }),
     });
@@ -119,15 +134,18 @@ describe("discoverWikiCandidates", () => {
   });
 
   it("should filter out terms with already pending proposals", async () => {
-    mockPrisma.wikiDiscovery.findMany.mockResolvedValue([
-      { term: "Docker" },
-    ]);
+    mockPrisma.wikiDiscovery.findMany.mockResolvedValue([{ term: "Docker" }]);
 
     mockCallDeepSeek.mockResolvedValueOnce({
       content: JSON.stringify({
         candidates: [
           makeCandidate({ term: "TypeScript" }),
-          makeCandidate({ term: "Docker", type: "tech", definition: "Container runtime", importance: 0.85 }),
+          makeCandidate({
+            term: "Docker",
+            type: "tech",
+            definition: "Container runtime",
+            importance: 0.85,
+          }),
         ],
       }),
     });
@@ -141,9 +159,7 @@ describe("discoverWikiCandidates", () => {
   it("should query existing wiki entries filtered by language", async () => {
     mockCallDeepSeek.mockResolvedValueOnce({
       content: JSON.stringify({
-        candidates: [
-          makeCandidate({ term: "TypeScript" }),
-        ],
+        candidates: [makeCandidate({ term: "TypeScript" })],
       }),
     });
 
@@ -161,9 +177,7 @@ describe("discoverWikiCandidates", () => {
   it("should query existing proposals filtered by articleId", async () => {
     mockCallDeepSeek.mockResolvedValueOnce({
       content: JSON.stringify({
-        candidates: [
-          makeCandidate({ term: "TypeScript" }),
-        ],
+        candidates: [makeCandidate({ term: "TypeScript" })],
       }),
     });
 
@@ -213,21 +227,28 @@ describe("discoverWikiCandidates", () => {
 
   it("should use splitArticle for long articles and merge results", async () => {
     // Create a long article that would be split into multiple chunks
-    const longArticle = Array.from({ length: 100 }, (_, i) => `## Section ${i + 1}\n\nThis is content for section ${i + 1} with some technical terms like TypeScript and Docker.\n`).join("\n");
+    const longArticle = Array.from(
+      { length: 100 },
+      (_, i) =>
+        `## Section ${i + 1}\n\nThis is content for section ${i + 1} with some technical terms like TypeScript and Docker.\n`,
+    ).join("\n");
 
     // The article is long enough to be split; AI is called per chunk
     mockCallDeepSeek
       .mockResolvedValueOnce({
         content: JSON.stringify({
-          candidates: [
-            makeCandidate({ term: "TypeScript" }),
-          ],
+          candidates: [makeCandidate({ term: "TypeScript" })],
         }),
       })
       .mockResolvedValueOnce({
         content: JSON.stringify({
           candidates: [
-            makeCandidate({ term: "Docker", type: "tech", definition: "Container runtime", importance: 0.85 }),
+            makeCandidate({
+              term: "Docker",
+              type: "tech",
+              definition: "Container runtime",
+              importance: 0.85,
+            }),
           ],
         }),
       });

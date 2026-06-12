@@ -24,10 +24,7 @@ export async function POST(request: NextRequest) {
     const { id } = body;
 
     if (!id) {
-      return NextResponse.json(
-        { error: "id is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "id is required." }, { status: 400 });
     }
 
     // Find the article
@@ -41,10 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!article) {
-      return NextResponse.json(
-        { error: "Article not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Article not found." }, { status: 404 });
     }
 
     // If deleting a published article, also delete its linked translations and drafts
@@ -110,9 +104,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete article error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

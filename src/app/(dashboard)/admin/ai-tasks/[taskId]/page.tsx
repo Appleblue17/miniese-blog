@@ -8,7 +8,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readFile } from "fs/promises";
 import path from "path";
-import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search, BookOpen, CheckCircle2, Edit } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  AlertCircle,
+  Download,
+  Globe,
+  Sparkles,
+  Search,
+  BookOpen,
+  CheckCircle2,
+  Edit,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import ReviewChunkList from "@/components/admin/ReviewChunkList";
@@ -121,7 +132,9 @@ async function fetchTask(taskId: string): Promise<TaskDetail | null> {
   }
 }
 
-async function fetchSourceContent(articleId: string): Promise<{ content: string; fileName: string } | null> {
+async function fetchSourceContent(
+  articleId: string,
+): Promise<{ content: string; fileName: string } | null> {
   try {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
@@ -151,14 +164,25 @@ function formatDate(dateStr: string): string {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string }> = {
-    pending: { label: "等待中", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-    processing: { label: "处理中", color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
-    completed: { label: "已完成", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
+    pending: {
+      label: "等待中",
+      color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    },
+    processing: {
+      label: "处理中",
+      color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    },
+    completed: {
+      label: "已完成",
+      color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    },
     failed: { label: "失败", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
   };
   const c = config[status] ?? { label: status, color: "bg-slate-100 text-slate-700" };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.color}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.color}`}
+    >
       {c.label}
     </span>
   );
@@ -181,19 +205,20 @@ function TaskTypeIcon({ type }: { type: string }) {
 
 function TaskTypeLabel({ type }: { type: string }) {
   switch (type) {
-    case "review": return "AI 审查";
-    case "translate": return "AI 翻译";
-    case "generate": return "词条生成";
-    case "discover": return "词条发现";
-    default: return type;
+    case "review":
+      return "AI 审查";
+    case "translate":
+      return "AI 翻译";
+    case "generate":
+      return "词条生成";
+    case "discover":
+      return "词条发现";
+    default:
+      return type;
   }
 }
 
-export default async function TaskDetailPage({
-  params,
-}: {
-  params: Promise<{ taskId: string }>;
-}) {
+export default async function TaskDetailPage({ params }: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await params;
 
   // Fetch task directly from DB (Server Component, no fetch caching)
@@ -433,35 +458,48 @@ export default async function TaskDetailPage({
               <p className="font-medium text-sm text-blue-800 dark:text-blue-200">
                 任务正在{task.status === "pending" ? "等待" : "处理"}中
               </p>
-              {task.status === "processing" && isTranslate && (() => {
-                const rawOutput = output as unknown as Record<string, unknown> | null;
-                const progress = rawOutput?.progress as { totalChunks?: number; processedChunks?: number } | undefined;
-                if (progress && typeof progress.totalChunks === "number" && progress.totalChunks > 0 && typeof progress.processedChunks === "number") {
-                  const pct = Math.round((progress.processedChunks / progress.totalChunks) * 100);
-                  return (
-                    <>
-                      <div className="mt-2">
-                        <div className="h-1.5 w-full rounded-full bg-blue-200 dark:bg-blue-800 overflow-hidden max-w-xs">
-                          <div
-                            className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                            style={{ width: `${pct}%` }}
-                          />
+              {task.status === "processing" &&
+                isTranslate &&
+                (() => {
+                  const rawOutput = output as unknown as Record<string, unknown> | null;
+                  const progress = rawOutput?.progress as
+                    | { totalChunks?: number; processedChunks?: number }
+                    | undefined;
+                  if (
+                    progress &&
+                    typeof progress.totalChunks === "number" &&
+                    progress.totalChunks > 0 &&
+                    typeof progress.processedChunks === "number"
+                  ) {
+                    const pct = Math.round((progress.processedChunks / progress.totalChunks) * 100);
+                    return (
+                      <>
+                        <div className="mt-2">
+                          <div className="h-1.5 w-full rounded-full bg-blue-200 dark:bg-blue-800 overflow-hidden max-w-xs">
+                            <div
+                              className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            已翻译 {progress.processedChunks}/{progress.totalChunks} 个段落
+                          </p>
                         </div>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                          已翻译 {progress.processedChunks}/{progress.totalChunks} 个段落
-                        </p>
-                      </div>
-                      <Link
-                        href={`/admin/ai-tasks/${taskId}`}
-                        className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-500 mt-2 inline-block"
-                      >
-                        刷新页面
-                      </Link>
-                    </>
+                        <Link
+                          href={`/admin/ai-tasks/${taskId}`}
+                          className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 hover:text-blue-500 mt-2 inline-block"
+                        >
+                          刷新页面
+                        </Link>
+                      </>
+                    );
+                  }
+                  return (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                      正在分析段落内容...
+                    </p>
                   );
-                }
-                return <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">正在分析段落内容...</p>;
-              })()}
+                })()}
               {(!isTranslate || task.status === "pending") && (
                 <>
                   <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
@@ -488,15 +526,21 @@ export default async function TaskDetailPage({
             <p className="text-xs text-muted-foreground mt-1">问题总数</p>
           </div>
           <div className="rounded-lg border border-red-200 dark:border-red-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{reviewOutput.summary.errors}</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+              {reviewOutput.summary.errors}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">错误</p>
           </div>
           <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{reviewOutput.summary.warnings}</p>
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+              {reviewOutput.summary.warnings}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">警告</p>
           </div>
           <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{reviewOutput.summary.suggestions}</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {reviewOutput.summary.suggestions}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">建议</p>
           </div>
         </div>
@@ -530,7 +574,9 @@ export default async function TaskDetailPage({
                   <CheckCircle2 className="size-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-green-700 dark:text-green-400">生成成功</p>
+                  <p className="text-lg font-semibold text-green-700 dark:text-green-400">
+                    生成成功
+                  </p>
                   <p className="text-sm text-muted-foreground">{generateOutput.message}</p>
                 </div>
               </>
@@ -603,32 +649,47 @@ export default async function TaskDetailPage({
                 const pct = Math.round(candidate.importance * 100);
                 const typeLabel = (t: string) => {
                   switch (t) {
-                    case "acronym": return "缩写";
-                    case "concept": return "概念";
-                    case "theorem": return "定理";
-                    case "tech": return "技术";
-                    default: return t;
+                    case "acronym":
+                      return "缩写";
+                    case "concept":
+                      return "概念";
+                    case "theorem":
+                      return "定理";
+                    case "tech":
+                      return "技术";
+                    default:
+                      return t;
                   }
                 };
                 const typeColor = (t: string) => {
                   switch (t) {
-                    case "acronym": return "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300";
-                    case "concept": return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
-                    case "theorem": return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
-                    case "tech": return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300";
-                    default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+                    case "acronym":
+                      return "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300";
+                    case "concept":
+                      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+                    case "theorem":
+                      return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+                    case "tech":
+                      return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300";
+                    default:
+                      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
                   }
                 };
 
                 return (
-                  <div key={idx} className="rounded-lg border border-border bg-card px-5 py-4 hover:border-muted-foreground/30 hover:bg-accent/30 transition-all duration-200">
+                  <div
+                    key={idx}
+                    className="rounded-lg border border-border bg-card px-5 py-4 hover:border-muted-foreground/30 hover:bg-accent/30 transition-all duration-200"
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         {/* Term name + type badge + lang (matching wiki management style) */}
                         <div className="flex items-center gap-2 mb-2">
                           <BookOpen className="size-4 text-muted-foreground shrink-0" />
                           <span className="font-semibold text-sm">{candidate.term}</span>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(candidate.type)}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(candidate.type)}`}
+                          >
                             {typeLabel(candidate.type)}
                           </span>
                         </div>
@@ -636,8 +697,12 @@ export default async function TaskDetailPage({
                         {/* Definition as "简要解释" */}
                         {candidate.definition && (
                           <div className="flex flex-col gap-0.5 mb-1">
-                            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">简要解释</span>
-                            <p className="text-sm text-foreground leading-relaxed">{candidate.definition}</p>
+                            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                              简要解释
+                            </span>
+                            <p className="text-sm text-foreground leading-relaxed">
+                              {candidate.definition}
+                            </p>
                           </div>
                         )}
                         {!candidate.definition && (
@@ -649,16 +714,31 @@ export default async function TaskDetailPage({
                       <div className="flex flex-col items-center gap-1 shrink-0">
                         <div className="relative size-10">
                           <svg className="size-10 -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3"
-                              className="text-slate-200 dark:text-slate-700" />
-                            <circle cx="18" cy="18" r="16" fill="none" strokeWidth="3"
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="16"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="3"
+                              className="text-slate-200 dark:text-slate-700"
+                            />
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="16"
+                              fill="none"
+                              strokeWidth="3"
                               strokeDasharray={`${(pct / 100) * 100.53} 100.53`}
                               strokeLinecap="round"
                               className={
-                                pct >= 90 ? "stroke-green-500" :
-                                pct >= 70 ? "stroke-blue-500" :
-                                pct >= 50 ? "stroke-yellow-500" :
-                                "stroke-slate-400"
+                                pct >= 90
+                                  ? "stroke-green-500"
+                                  : pct >= 70
+                                    ? "stroke-blue-500"
+                                    : pct >= 50
+                                      ? "stroke-yellow-500"
+                                      : "stroke-slate-400"
                               }
                             />
                           </svg>

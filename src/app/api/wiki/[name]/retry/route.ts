@@ -104,9 +104,6 @@ export async function POST(
     return NextResponse.json({ success: true, generateTaskId: taskId });
   } catch (error) {
     console.error("Retry wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

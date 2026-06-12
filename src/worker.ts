@@ -139,17 +139,21 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
     "latest",
     // Report progress after each sub-chunk (fire-and-forget, don't block)
     (processed, total) => {
-      prisma.$executeRawUnsafe(
-        `UPDATE "AiTask" SET output = jsonb_set(
+      prisma
+        .$executeRawUnsafe(
+          `UPDATE "AiTask" SET output = jsonb_set(
           COALESCE(output, '{}'::jsonb),
           '{progress}',
           $2::jsonb
         ) WHERE id = $1`,
-        taskId,
-        JSON.stringify({ totalChunks: total, processedChunks: processed }),
-      ).catch((err) => {
-        console.warn(`[Worker] Failed to update review progress: ${err instanceof Error ? err.message : String(err)}`);
-      });
+          taskId,
+          JSON.stringify({ totalChunks: total, processedChunks: processed }),
+        )
+        .catch((err) => {
+          console.warn(
+            `[Worker] Failed to update review progress: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
     },
   );
 
@@ -206,7 +210,6 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   const targetLang = String(targetLanguage ?? "en");
   const sourceLang = String(sourceLanguage ?? "zh");
 
-
   console.log(
     `[Worker] Processing translation for article ${articleIdStr} ` +
       `(${sourceLang} → ${targetLang})`,
@@ -242,14 +245,10 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   }
 
   // 3. Read old source content from payload (provided by publish API)
-  const oldSourceContent =
-    typeof rawOldContent === "string" ? rawOldContent : "";
+  const oldSourceContent = typeof rawOldContent === "string" ? rawOldContent : "";
 
   // 4. Load existing translations from the latest completed translate task
-  const existingTranslationMap = await loadExistingTranslations(
-    articleIdStr,
-    targetLang,
-  );
+  const existingTranslationMap = await loadExistingTranslations(articleIdStr, targetLang);
 
   // 5. Detect source/target language names for prompts
   const sourceLangName = sourceLang === "zh" ? "Chinese" : "English";
@@ -278,17 +277,21 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     targetLangName,
     // Report progress after each sub-chunk (fire-and-forget, don't block)
     (processed, total) => {
-      prisma.$executeRawUnsafe(
-        `UPDATE "AiTask" SET output = jsonb_set(
+      prisma
+        .$executeRawUnsafe(
+          `UPDATE "AiTask" SET output = jsonb_set(
           COALESCE(output, '{}'::jsonb),
           '{progress}',
           $2::jsonb
         ) WHERE id = $1`,
-        translateTaskId,
-        JSON.stringify({ totalChunks: total, processedChunks: processed }),
-      ).catch((err) => {
-        console.warn(`[Worker] Failed to update translate progress: ${err instanceof Error ? err.message : String(err)}`);
-      });
+          translateTaskId,
+          JSON.stringify({ totalChunks: total, processedChunks: processed }),
+        )
+        .catch((err) => {
+          console.warn(
+            `[Worker] Failed to update translate progress: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
     },
   );
 
@@ -410,7 +413,9 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     where: { id: targetArticleIdStr },
     data: dbUpdateData,
   });
-  console.log(`[Worker] Target article DB record updated: title="${translatedTitle || "(kept original)"}", language=${targetLang}`);
+  console.log(
+    `[Worker] Target article DB record updated: title="${translatedTitle || "(kept original)"}", language=${targetLang}`,
+  );
 
   // 10. Re-render the target article's Markdown content to HTML
   //    The public page reads `renderedContent` from the database,
@@ -436,9 +441,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
       data: { renderedContent: html },
     });
 
-    console.log(
-      `[Worker] Rendered content updated for article ${targetArticleIdStr}`,
-    );
+    console.log(`[Worker] Rendered content updated for article ${targetArticleIdStr}`);
   } catch (err) {
     // Rendering is a best-effort step — don't fail the whole task
     console.warn(
@@ -584,9 +587,7 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
 
   // 2. Look up the associated WikiEntry(creating)
   if (!discovery.wikiEntryId) {
-    throw new Error(
-      `Discovery record "${discoveryIdStr}" has no associated WikiEntry.`,
-    );
+    throw new Error(`Discovery record "${discoveryIdStr}" has no associated WikiEntry.`);
   }
 
   const entry = await prisma.wikiEntry.findUnique({
@@ -606,24 +607,16 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   }
 
   if (entry.status !== "creating") {
-    throw new Error(
-      `WikiEntry "${entry.id}" has status "${entry.status}", expected "creating".`,
-    );
+    throw new Error(`WikiEntry "${entry.id}" has status "${entry.status}", expected "creating".`);
   }
 
   // 3. Call generateWikiEntry() with term + definition hint + optional context
   const context = discovery.articleSlug || undefined;
-  const result = await generateWikiEntry(
-    discovery.term,
-    discovery.definition,
-    context,
-  );
+  const result = await generateWikiEntry(discovery.term, discovery.definition, context);
 
   if (!result.success || !result.entry) {
     const reason = result.reason || "unknown";
-    console.warn(
-      `[Worker] Generation failed for term "${discovery.term}": ${reason}`,
-    );
+    console.warn(`[Worker] Generation failed for term "${discovery.term}": ${reason}`);
 
     // Update discovery to failed
     await prisma.wikiDiscovery.update({
@@ -644,9 +637,7 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   }
 
   const gen = result.entry;
-  console.log(
-    `[Worker] Successfully generated content for term: "${discovery.term}"`,
-  );
+  console.log(`[Worker] Successfully generated content for term: "${discovery.term}"`);
 
   // 4. Read existing WikiEntry file and update with generated content
   const filePath = path.join(process.cwd(), entry.contentPath);
@@ -661,7 +652,8 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   }
 
   // Build new file content using buildWikiFileWithMeta
-  const { buildWikiFileWithMeta, parseWikiFileWithMeta, slugifyName } = await import("./lib/wiki/parser");
+  const { buildWikiFileWithMeta, parseWikiFileWithMeta, slugifyName } =
+    await import("./lib/wiki/parser");
 
   let updatedFileContent: string;
 
@@ -796,11 +788,7 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
   }
 
   // 2. Perform discovery using the unified chunking pipeline
-  const candidates = await discoverWikiCandidates(
-    articleIdStr,
-    langStr,
-    content,
-  );
+  const candidates = await discoverWikiCandidates(articleIdStr, langStr, content);
 
   console.log(
     `[Worker] Discovery found ${candidates.length} candidate terms for article ${articleIdStr}`,
@@ -831,9 +819,7 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     }
   }
 
-  console.log(
-    `[Worker] Discovery complete: ${storedCount}/${candidates.length} candidates stored`,
-  );
+  console.log(`[Worker] Discovery complete: ${storedCount}/${candidates.length} candidates stored`);
 
   // 4. Return summary
   return {
@@ -859,10 +845,7 @@ async function processScan(job: Job): Promise<Record<string, unknown>> {
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-const HANDLERS: Record<
-  string,
-  (job: Job) => Promise<Record<string, unknown>>
-> = {
+const HANDLERS: Record<string, (job: Job) => Promise<Record<string, unknown>>> = {
   review: processReview,
   translate: processTranslate,
   discover: processDiscover,
@@ -912,9 +895,7 @@ workerQueue.process("*", 1, async (job) => {
       },
     });
 
-    console.log(
-      `[Worker] Job ${job.id} (task ${taskId}) completed successfully`,
-    );
+    console.log(`[Worker] Job ${job.id} (task ${taskId}) completed successfully`);
     return result;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -928,9 +909,7 @@ workerQueue.process("*", 1, async (job) => {
       },
     });
 
-    console.error(
-      `[Worker] Job ${job.id} (task ${taskId}) failed: ${errorMessage}`,
-    );
+    console.error(`[Worker] Job ${job.id} (task ${taskId}) failed: ${errorMessage}`);
     throw err; // Let Bull handle retry logic
   }
 });
@@ -940,9 +919,7 @@ workerQueue.on("completed", (job) => {
 });
 
 workerQueue.on("failed", (job, err) => {
-  console.error(
-    `[Worker] Job ${job.id} failed after attempts: ${err.message}`,
-  );
+  console.error(`[Worker] Job ${job.id} failed after attempts: ${err.message}`);
 });
 
 console.log("[Worker] ai-tasks worker started. Waiting for jobs...");

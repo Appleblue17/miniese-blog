@@ -35,10 +35,7 @@ interface Props {
   params: Promise<{ lang: string; name: string }>;
 }
 
-async function fetchEntry(
-  lang: string,
-  rawName: string,
-): Promise<WikiEntryDetail | null> {
+async function fetchEntry(lang: string, rawName: string): Promise<WikiEntryDetail | null> {
   const name = decodeParam(rawName);
   const slug = slugifyName(name);
 

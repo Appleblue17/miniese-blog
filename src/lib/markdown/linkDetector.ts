@@ -62,9 +62,7 @@ interface ExcludedRegion {
  * // => [{ id: "1", name: "DFS", aliases: ["深度优先搜索"], language: "zh" }, ...]
  * ```
  */
-export async function findWikiEntriesForLang(
-  lang: string,
-): Promise<WikiLinkEntry[]> {
+export async function findWikiEntriesForLang(lang: string): Promise<WikiLinkEntry[]> {
   return prisma.wikiEntry.findMany({
     where: { language: lang as "zh" | "en" },
     select: { id: true, name: true, aliases: true, language: true },
@@ -93,9 +91,7 @@ export async function findWikiEntriesForLang(
  * // => '<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 是一种重要的算法。'
  * ```
  */
-export async function detectWikiLinks(
-  options: LinkDetectorOptions,
-): Promise<string> {
+export async function detectWikiLinks(options: LinkDetectorOptions): Promise<string> {
   const { lang, content } = options;
 
   if (!content) {
@@ -128,9 +124,7 @@ export async function detectWikiLinks(
   }
 
   // 3. Build sorted match keys (longest first) for greedy matching
-  const matchKeys = Array.from(matchMap.keys()).sort(
-    (a, b) => b.length - a.length,
-  );
+  const matchKeys = Array.from(matchMap.keys()).sort((a, b) => b.length - a.length);
 
   // If no match keys, return content as-is
   if (matchKeys.length === 0) {
@@ -204,10 +198,7 @@ function findExcludedRegions(content: string): ExcludedRegion[] {
   for (const region of regions) {
     if (merged.length > 0 && region.start <= merged[merged.length - 1].end) {
       // Merge overlapping regions
-      merged[merged.length - 1].end = Math.max(
-        merged[merged.length - 1].end,
-        region.end,
-      );
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, region.end);
     } else {
       merged.push({ ...region });
     }
@@ -223,10 +214,7 @@ function findExcludedRegions(content: string): ExcludedRegion[] {
  * @param regions - The sorted array of excluded regions
  * @returns The containing region, or null if position is not in any excluded region
  */
-function findExcludedRegionAt(
-  pos: number,
-  regions: ExcludedRegion[],
-): ExcludedRegion | null {
+function findExcludedRegionAt(pos: number, regions: ExcludedRegion[]): ExcludedRegion | null {
   // Binary search for efficiency
   let low = 0;
   let high = regions.length - 1;
@@ -296,9 +284,7 @@ function replaceMatches(
         // Character after the match: if it's an ASCII letter/digit/underscore, reject
         // (prevents partial matches like "DFSs" matching "DFS")
         // CJK characters after a match are allowed (Chinese has no word separators)
-        const charAfter = i + key.length < content.length
-          ? content[i + key.length]
-          : " ";
+        const charAfter = i + key.length < content.length ? content[i + key.length] : " ";
 
         const isBoundaryBefore = !isWordChar(charBefore);
         // Only reject if next char is ASCII alphanumeric or underscore (word-joining)
@@ -310,9 +296,7 @@ function replaceMatches(
           if (!findExcludedRegionAt(endPos - 1, excludedRegions)) {
             const wikiName = matchMap.get(key)!;
             const url = `/${lang}/wiki/${wikiName}`;
-            result.push(
-              `<a href="${url}" data-wiki-name="${wikiName}">${key}</a>`,
-            );
+            result.push(`<a href="${url}" data-wiki-name="${wikiName}">${key}</a>`);
             i = endPos;
             matched = true;
             break;
@@ -381,9 +365,12 @@ function isWordChar(char: string): boolean {
 
   // Full-width characters: keep only full-width letters (FF21-FF3A, FF41-FF5A)
   // and full-width digits (FF10-FF19), exclude full-width punctuation like （ ）！
-  if ((code >= 0xff10 && code <= 0xff19) || // full-width digits
-      (code >= 0xff21 && code <= 0xff3a) || // full-width A-Z
-      (code >= 0xff41 && code <= 0xff5a)) { // full-width a-z
+  if (
+    (code >= 0xff10 && code <= 0xff19) || // full-width digits
+    (code >= 0xff21 && code <= 0xff3a) || // full-width A-Z
+    (code >= 0xff41 && code <= 0xff5a)
+  ) {
+    // full-width a-z
     return true;
   }
 

@@ -117,11 +117,7 @@ describe("incrementalReview", () => {
   // -----------------------------------------------------------------------
 
   it("full review: reviews all content when old is empty", async () => {
-    const content = [
-      "# Hello",
-      "",
-      "This is some content.",
-    ].join("\n");
+    const content = ["# Hello", "", "This is some content."].join("\n");
 
     mockReviewResponse();
 
@@ -139,15 +135,9 @@ describe("incrementalReview", () => {
   });
 
   it("full review: stores content snapshot for next incremental run", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-      "",
-      "# Section 2",
-      "",
-      "Content 2.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1.", "", "# Section 2", "", "Content 2."].join(
+      "\n",
+    );
 
     mockCleanReviewResponse();
 
@@ -192,25 +182,13 @@ describe("incrementalReview", () => {
   // -----------------------------------------------------------------------
 
   it("incremental: reuses chunk from contentMap when boundaries match exactly", async () => {
-    const oldBody = [
-      "# Stable",
-      "",
-      "Unchanged content.",
-      "",
-      "## Changed",
-      "",
-      "Old text.",
-    ].join("\n");
+    const oldBody = ["# Stable", "", "Unchanged content.", "", "## Changed", "", "Old text."].join(
+      "\n",
+    );
 
-    const newBody = [
-      "# Stable",
-      "",
-      "Unchanged content.",
-      "",
-      "## Changed",
-      "",
-      "New text.",
-    ].join("\n");
+    const newBody = ["# Stable", "", "Unchanged content.", "", "## Changed", "", "New text."].join(
+      "\n",
+    );
     // Line 7 changed: "Old text." → "New text."
 
     // Simulate a previous review that stored contentMap with the old body
@@ -272,13 +250,7 @@ describe("incrementalReview", () => {
 
     mockReviewResponse(); // For the changed line 7
 
-    const result = await incrementalReview(
-      oldBody,
-      newBody,
-      existingMap,
-      "article-1",
-      "1.0",
-    );
+    const result = await incrementalReview(oldBody, newBody, existingMap, "article-1", "1.0");
 
     // The unchanged chunk (# Stable section) should be reused
     // The changed sub-chunk (## Changed with "New text.") should not have
@@ -373,13 +345,7 @@ describe("incrementalReview", () => {
 
     mockCleanReviewResponse(); // For the changed line 7
 
-    const result = await incrementalReview(
-      oldBody,
-      newBody,
-      existingMap,
-      "article-1",
-      "1.0",
-    );
+    const result = await incrementalReview(oldBody, newBody, existingMap, "article-1", "1.0");
 
     // All unchanged lines should be found via line-level lookup:
     // multi-line key is split into individual lines, each line maps to
@@ -401,13 +367,9 @@ describe("incrementalReview", () => {
   });
 
   it("incremental: reuses all unchanged content when only one line changes", async () => {
-    const oldBody = [
-      "# Stable Heading",
-      "",
-      "Stable paragraph 1.",
-      "",
-      "Stable paragraph 2.",
-    ].join("\n");
+    const oldBody = ["# Stable Heading", "", "Stable paragraph 1.", "", "Stable paragraph 2."].join(
+      "\n",
+    );
 
     const newBody = [
       "# Stable Heading",
@@ -452,13 +414,7 @@ describe("incrementalReview", () => {
 
     mockCleanReviewResponse();
 
-    const result = await incrementalReview(
-      oldBody,
-      newBody,
-      existingMap,
-      "article-1",
-      "1.0",
-    );
+    const result = await incrementalReview(oldBody, newBody, existingMap, "article-1", "1.0");
 
     // Expect at least one reused chunk
     expect(result.reusedCount).toBeGreaterThan(0);
@@ -475,11 +431,7 @@ describe("incrementalReview", () => {
   // -----------------------------------------------------------------------
 
   it("no changes: reuses all chunks when content is identical", async () => {
-    const content = [
-      "# Stable",
-      "",
-      "Same content.",
-    ].join("\n");
+    const content = ["# Stable", "", "Same content."].join("\n");
 
     const existingMap: Record<string, ReviewChunk> = {};
     existingMap["# Stable\n\nSame content."] = {
@@ -505,13 +457,7 @@ describe("incrementalReview", () => {
       ],
     };
 
-    const result = await incrementalReview(
-      content,
-      content,
-      existingMap,
-      "article-1",
-      "1.0",
-    );
+    const result = await incrementalReview(content, content, existingMap, "article-1", "1.0");
 
     expect(callDeepSeek).not.toHaveBeenCalled();
     expect(result.reviewedCount).toBe(0);
@@ -525,15 +471,9 @@ describe("incrementalReview", () => {
   });
 
   it("no changes: falls back to line-level when exact match fails", async () => {
-    const content = [
-      "# Section A",
-      "",
-      "Content A.",
-      "",
-      "# Section B",
-      "",
-      "Content B.",
-    ].join("\n");
+    const content = ["# Section A", "", "Content A.", "", "# Section B", "", "Content B."].join(
+      "\n",
+    );
 
     // Store with a different key structure (full body as one key)
     const existingMap: Record<string, ReviewChunk> = {};
@@ -560,13 +500,7 @@ describe("incrementalReview", () => {
       ],
     };
 
-    const result = await incrementalReview(
-      content,
-      content,
-      existingMap,
-      "article-1",
-      "1.0",
-    );
+    const result = await incrementalReview(content, content, existingMap, "article-1", "1.0");
 
     expect(callDeepSeek).not.toHaveBeenCalled();
     // Even though the exact key doesn't match the splitRange output,
@@ -588,9 +522,9 @@ describe("incrementalReview", () => {
     const content = [
       "# Code Example",
       "",
-      '```python',
+      "```python",
       'print("hello")',
-      '```',
+      "```",
       "",
       "Some text.",
     ].join("\n");
@@ -627,15 +561,7 @@ describe("incrementalReview", () => {
   });
 
   it("preserves frontmatter in contentSnapshot (frontmatter is stripped from body)", async () => {
-    const content = [
-      "---",
-      "title: Test",
-      "---",
-      "",
-      "# Hello",
-      "",
-      "Body content.",
-    ].join("\n");
+    const content = ["---", "title: Test", "---", "", "# Hello", "", "Body content."].join("\n");
 
     mockReviewResponse();
 
@@ -648,11 +574,7 @@ describe("incrementalReview", () => {
   });
 
   it("populates groups for detail page rendering", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1."].join("\n");
 
     mockReviewResponse();
 
@@ -665,15 +587,9 @@ describe("incrementalReview", () => {
   });
 
   it("computes correct summary with multiple issues", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-      "",
-      "# Section 2",
-      "",
-      "Content 2.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1.", "", "# Section 2", "", "Content 2."].join(
+      "\n",
+    );
 
     // Mock a response with multiple issues across sections
     const report: ReviewReport = {
@@ -765,11 +681,7 @@ describe("incrementalReview", () => {
   // -----------------------------------------------------------------------
 
   it("calls progress callback with correct values", async () => {
-    const content = [
-      "# Progress Test",
-      "",
-      "Testing progress callback.",
-    ].join("\n");
+    const content = ["# Progress Test", "", "Testing progress callback."].join("\n");
 
     mockReviewResponse();
     const progressFn = vi.fn();
@@ -790,11 +702,7 @@ describe("incrementalReview", () => {
   // -----------------------------------------------------------------------
 
   it("handles AI call failure gracefully with fallback", async () => {
-    const content = [
-      "# Error Test",
-      "",
-      "Content that triggers error.",
-    ].join("\n");
+    const content = ["# Error Test", "", "Content that triggers error."].join("\n");
 
     // Mock a failed API call
     (callDeepSeek as Mock).mockRejectedValue(new Error("API timeout"));
@@ -811,18 +719,15 @@ describe("incrementalReview", () => {
     // Create content with 2 sections that splitRange will produce 2 sub-chunks
     // Each section under 8000 chars, combined over 8000 chars
     const lines1: string[] = ["# Section 1"];
-    for (let i = 0; i < 130; i++) lines1.push(
-      `Line ${i} padding text for section one to get around 5k chars.`,
-    );
+    for (let i = 0; i < 130; i++)
+      lines1.push(`Line ${i} padding text for section one to get around 5k chars.`);
     const lines2: string[] = ["# Section 2"];
-    for (let i = 0; i < 130; i++) lines2.push(
-      `Line ${i} padding text for section two to get around 5k chars.`,
-    );
+    for (let i = 0; i < 130; i++)
+      lines2.push(`Line ${i} padding text for section two to get around 5k chars.`);
     const content = lines1.join("\n") + "\n\n" + lines2.join("\n");
 
     // First call fails, subsequent calls succeed
-    (callDeepSeek as Mock)
-      .mockRejectedValueOnce(new Error("First call failed"));
+    (callDeepSeek as Mock).mockRejectedValueOnce(new Error("First call failed"));
     // All remaining calls succeed (including 2nd sub-chunk)
     (callDeepSeek as Mock).mockResolvedValue({
       content: JSON.stringify({

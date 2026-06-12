@@ -10,7 +10,19 @@
  * 6. Backlinks (placeholder)
  */
 
-import { Calendar, BookOpen, Bot, User, Quote, Link2, MessageSquare, Sparkles, ShieldCheck, Clock, Tag } from "lucide-react";
+import {
+  Calendar,
+  BookOpen,
+  Bot,
+  User,
+  Quote,
+  Link2,
+  MessageSquare,
+  Sparkles,
+  ShieldCheck,
+  Clock,
+  Tag,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { renderMarkdown } from "@/lib/markdown/renderer";
 import type { WikiStatus } from "@/types/wiki";
@@ -95,9 +107,7 @@ function SectionBlock({
       <div className="flex items-center gap-2 border-b border-border pb-2">
         <span className="text-muted-foreground shrink-0">{icon}</span>
         <h2 className="text-lg font-semibold">{title}</h2>
-        {subtitle && (
-          <span className="text-xs text-muted-foreground ml-auto">{subtitle}</span>
-        )}
+        {subtitle && <span className="text-xs text-muted-foreground ml-auto">{subtitle}</span>}
       </div>
       <div className="markdown-body">{children}</div>
     </section>
@@ -137,14 +147,13 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
           <div className="flex flex-col gap-1 shrink-0">
             {/* Type badge */}
             {entry.type && (
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(entry.type)}`}>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(entry.type)}`}
+              >
                 {typeLabel(entry.type)}
               </span>
             )}
-            <Badge
-              variant="outline"
-              className="text-[10px] uppercase tracking-wider"
-            >
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
               {entry.language}
             </Badge>
             {entry.status === "creating" && (
@@ -200,14 +209,10 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
           icon={<Quote className="size-4" />}
           title={lang === "zh" ? "定义" : "Definition"}
           subtitle={
-            entry.status === "creating"
-              ? lang === "zh" ? "AI生成" : "AI-generated"
-              : undefined
+            entry.status === "creating" ? (lang === "zh" ? "AI生成" : "AI-generated") : undefined
           }
         >
-          <p className="text-base leading-relaxed">
-            {entry.blocks.definition || entry.definition}
-          </p>
+          <p className="text-base leading-relaxed">{entry.blocks.definition || entry.definition}</p>
         </SectionBlock>
       )}
 
@@ -235,8 +240,12 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
         subtitle={
           entry.blocks.ai
             ? entry.status === "reviewed"
-              ? lang === "zh" ? "已人工审查" : "Reviewed"
-              : lang === "zh" ? "AI生成，待审查" : "AI-generated, unreviewed"
+              ? lang === "zh"
+                ? "已人工审查"
+                : "Reviewed"
+              : lang === "zh"
+                ? "AI生成，待审查"
+                : "AI-generated, unreviewed"
             : undefined
         }
       >

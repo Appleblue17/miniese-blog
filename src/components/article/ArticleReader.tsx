@@ -5,7 +5,17 @@
 
 "use client";
 
-import { Calendar, Clock, Eye, Heart, User, Tag, GitCommit, MessageSquare, Copyright } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Eye,
+  Heart,
+  User,
+  Tag,
+  GitCommit,
+  MessageSquare,
+  Copyright,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { TableOfContents } from "@/components/article/TableOfContents";
@@ -71,9 +81,7 @@ export function ArticleReader({
         <article className="flex flex-col gap-8">
           {/* Header section */}
           <header className="flex flex-col gap-4">
-            <h1 className="text-3xl font-bold leading-tight tracking-tight">
-              {title}
-            </h1>
+            <h1 className="text-3xl font-bold leading-tight tracking-tight">{title}</h1>
 
             {/* Metadata bar */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -154,10 +162,7 @@ export function ArticleReader({
           <hr className="border-border" />
 
           {/* Rendered content */}
-          <div
-            className="markdown-body"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+          <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
 
           {/* Divider before footer */}
           <hr className="border-border" />
@@ -184,9 +189,7 @@ export function ArticleReader({
               <div className="flex items-start gap-3 rounded-lg border border-border p-4">
                 <GitCommit className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0">
-                  <p className="font-medium">
-                    {lang === "zh" ? "更新记录" : "Changelog"}
-                  </p>
+                  <p className="font-medium">{lang === "zh" ? "更新记录" : "Changelog"}</p>
                   <p className="text-muted-foreground mt-1 whitespace-pre-wrap break-words">
                     <span className="text-xs text-muted-foreground/60 mr-2">
                       {formatDate(updatedAt)}

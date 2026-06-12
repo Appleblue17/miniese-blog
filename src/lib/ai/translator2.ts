@@ -100,20 +100,18 @@ function buildChunkPrompt(
 ): string {
   const lines: string[] = [];
 
-  lines.push(
-    `Translate the following content from ${sourceLang} to ${targetLang}.`,
-  );
+  lines.push(`Translate the following content from ${sourceLang} to ${targetLang}.`);
   lines.push(
     "Requirements:\n" +
-    "1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。\n" +
-    "2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改它们。\n" +
-    "3. Keep all formatting, syntax markers, and code blocks unchanged.\n" +
-    "4. Keep all technical terms and proper nouns in their original form.\n" +
-    "5. Keep code inside code blocks unchanged.\n" +
-    "6. Keep inline links, images, and other syntax unchanged.\n" +
-    "7. Do NOT add any explanations or notes.\n" +
-    "8. Return ONLY the translated content, wrapped in the same " +
-    "[TRANSLATE_START]/[TRANSLATE_END] markers.",
+      "1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。\n" +
+      "2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改它们。\n" +
+      "3. Keep all formatting, syntax markers, and code blocks unchanged.\n" +
+      "4. Keep all technical terms and proper nouns in their original form.\n" +
+      "5. Keep code inside code blocks unchanged.\n" +
+      "6. Keep inline links, images, and other syntax unchanged.\n" +
+      "7. Do NOT add any explanations or notes.\n" +
+      "8. Return ONLY the translated content, wrapped in the same " +
+      "[TRANSLATE_START]/[TRANSLATE_END] markers.",
   );
 
   if (contextText.trim()) {
@@ -155,10 +153,7 @@ function parseTranslatedChunk(response: string): string {
  *
  * Example: totalLines=7, blocks=[{2,3},{5,6}] → [{1,1},{4,4},{7,7}]
  */
-function complementRanges(
-  totalLines: number,
-  blocks: DiffBlock[],
-): DiffBlock[] {
+function complementRanges(totalLines: number, blocks: DiffBlock[]): DiffBlock[] {
   if (blocks.length === 0) {
     return [{ startLine: 1, endLine: totalLines }];
   }
@@ -257,11 +252,10 @@ export async function incrementalTranslate(
     const translatedBody = translatedLines.join("\n");
 
     return {
-      translatedContent: newFrontmatter
-        ? newFrontmatter + "\n\n" + translatedBody
-        : translatedBody,
+      translatedContent: newFrontmatter ? newFrontmatter + "\n\n" + translatedBody : translatedBody,
       translatedCount: 0,
-      reusedCount: translatedLines.filter((_, i) => existingTranslations[newLines[i]] !== undefined).length,
+      reusedCount: translatedLines.filter((_, i) => existingTranslations[newLines[i]] !== undefined)
+        .length,
       totalTokensUsed: 0,
       translations: { ...existingTranslations },
       translatedGroups: [],
@@ -341,12 +335,7 @@ export async function incrementalTranslate(
     if (newTranslations[originalContent] !== undefined) {
       // Already translated (either from existingTranslations or previous sub-chunk)
       const translated = newTranslations[originalContent];
-      outputLines = replaceLines(
-        outputLines,
-        subChunk.startLine,
-        subChunk.endLine,
-        translated,
-      );
+      outputLines = replaceLines(outputLines, subChunk.startLine, subChunk.endLine, translated);
       reusedCount++;
       continue;
     }
@@ -374,12 +363,7 @@ export async function incrementalTranslate(
     const targetText = targetParts.join("\n");
 
     // Build prompt and call AI
-    const prompt = buildChunkPrompt(
-      sourceLang,
-      targetLang,
-      contextText,
-      targetText,
-    );
+    const prompt = buildChunkPrompt(sourceLang, targetLang, contextText, targetText);
 
     const result = await callDeepSeek({
       prompt,
@@ -396,12 +380,7 @@ export async function incrementalTranslate(
       translatedCount++;
 
       // Replace lines in output
-      outputLines = replaceLines(
-        outputLines,
-        subChunk.startLine,
-        subChunk.endLine,
-        translated,
-      );
+      outputLines = replaceLines(outputLines, subChunk.startLine, subChunk.endLine, translated);
     } else {
       // Fallback: use original content
       console.warn(
@@ -452,11 +431,5 @@ export async function translateFull(
   sourceLang: string,
   targetLang: string,
 ): Promise<TranslateResult> {
-  return incrementalTranslate(
-    "",
-    sourceContent,
-    {},
-    sourceLang,
-    targetLang,
-  );
+  return incrementalTranslate("", sourceContent, {}, sourceLang, targetLang);
 }

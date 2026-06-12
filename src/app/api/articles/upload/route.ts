@@ -38,17 +38,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!file.name.endsWith(".md")) {
-      return NextResponse.json(
-        { error: "Only .md files are accepted." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Only .md files are accepted." }, { status: 400 });
     }
 
     if (file.size === 0) {
-      return NextResponse.json(
-        { error: "File is empty." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "File is empty." }, { status: 400 });
     }
 
     // Read file content and parse frontmatter
@@ -71,7 +65,18 @@ export async function POST(request: NextRequest) {
 
     // Collect extra frontmatter fields (not managed by UI)
     const extraFrontmatter: Record<string, unknown> = {};
-    const managedKeys = new Set(["title", "language", "fileType", "contentType", "tags", "author", "summary", "slug", "accessGroup", "changelog"]);
+    const managedKeys = new Set([
+      "title",
+      "language",
+      "fileType",
+      "contentType",
+      "tags",
+      "author",
+      "summary",
+      "slug",
+      "accessGroup",
+      "changelog",
+    ]);
     for (const [key, value] of Object.entries(frontmatter)) {
       if (!managedKeys.has(key)) {
         extraFrontmatter[key] = value;
@@ -155,9 +160,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

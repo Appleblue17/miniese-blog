@@ -25,36 +25,22 @@ const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      fileName: _fileName,
-      fileContent,
-      language,
-      draftOfId,
-      meta,
-    } = body;
+    const { fileName: _fileName, fileContent, language, draftOfId, meta } = body;
 
     if (!fileContent) {
-      return NextResponse.json(
-        { error: "fileContent is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "fileContent is required." }, { status: 400 });
     }
 
     const resolvedMeta: ArticleMeta | null = meta || null;
 
     if (!resolvedMeta) {
       if (language !== "zh" && language !== "en") {
-        return NextResponse.json(
-          { error: "language must be 'zh' or 'en'." },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
       }
     }
 
     // Build file content with frontmatter from metadata
-    const finalContent = resolvedMeta
-      ? buildFrontmatter(fileContent, resolvedMeta)
-      : fileContent;
+    const finalContent = resolvedMeta ? buildFrontmatter(fileContent, resolvedMeta) : fileContent;
 
     // Parse frontmatter for DB fields
     const { default: matter } = await import("gray-matter");
@@ -150,9 +136,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Save draft error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

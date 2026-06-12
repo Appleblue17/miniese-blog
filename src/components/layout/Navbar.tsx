@@ -46,10 +46,7 @@ export function Navbar() {
         `}
       >
         {/* Logo */}
-        <Link
-          href={localize("")}
-          className="mb-8 mt-2 text-lg font-semibold tracking-tight"
-        >
+        <Link href={localize("")} className="mb-8 mt-2 text-lg font-semibold tracking-tight">
           Miniese&apos;s Blog
         </Link>
 

@@ -18,17 +18,11 @@ export async function POST(request: NextRequest) {
     const { name, language } = body as { name?: string; language?: string };
 
     if (!name || !name.trim()) {
-      return NextResponse.json(
-        { error: "name is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "name is required." }, { status: 400 });
     }
 
     if (language !== "zh" && language !== "en") {
-      return NextResponse.json(
-        { error: "language must be 'zh' or 'en'." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
     }
 
     const result = await refineTerm(name.trim(), language);
@@ -36,9 +30,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Refine term API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

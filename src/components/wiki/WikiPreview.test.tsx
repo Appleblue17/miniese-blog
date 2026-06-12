@@ -56,11 +56,7 @@ afterEach(() => {
 });
 
 // Helper to create a DOM element with data-wiki-name
-function createWikiLink(
-  wikiName: string,
-  text: string,
-  container: HTMLElement,
-): HTMLElement {
+function createWikiLink(wikiName: string, text: string, container: HTMLElement): HTMLElement {
   const link = document.createElement("a");
   link.setAttribute("href", `/zh/wiki/${wikiName}`);
   link.setAttribute("data-wiki-name", wikiName);

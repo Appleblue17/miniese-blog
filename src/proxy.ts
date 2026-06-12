@@ -76,9 +76,7 @@ export function proxy(request: NextRequest) {
   let preferredLang = request.cookies.get("preferred_lang")?.value;
   if (
     !preferredLang ||
-    !SUPPORTED_LANGUAGES.includes(
-      preferredLang as (typeof SUPPORTED_LANGUAGES)[number],
-    )
+    !SUPPORTED_LANGUAGES.includes(preferredLang as (typeof SUPPORTED_LANGUAGES)[number])
   ) {
     const acceptLang = request.headers.get("accept-language") || "";
     preferredLang = acceptLang.startsWith("zh") ? "zh" : DEFAULT_LANGUAGE;

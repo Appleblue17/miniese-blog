@@ -20,13 +20,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile, unlink } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import {
-  parseWikiFileWithMeta,
-  buildWikiFileWithMeta,
-  slugifyName,
-} from "@/lib/wiki/parser";
+import { parseWikiFileWithMeta, buildWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
 import type { WikiBlocks } from "@/lib/wiki/parser";
-import type { WikiEntryMeta, WikiEntryDetail, WikiEntryUpdateInput, WikiStatus } from "@/types/wiki";
+import type {
+  WikiEntryMeta,
+  WikiEntryDetail,
+  WikiEntryUpdateInput,
+  WikiStatus,
+} from "@/types/wiki";
 
 // --- Helpers ---
 
@@ -90,10 +91,7 @@ async function readWikiContent(contentPath: string) {
 
 // --- GET /api/wiki/[name] ---
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   try {
     const { name } = await params;
     const { searchParams } = new URL(request.url);
@@ -108,10 +106,7 @@ export async function GET(
 
     const slug = slugifyName(name);
     if (!slug) {
-      return NextResponse.json(
-        { error: "Invalid wiki entry name." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Invalid wiki entry name." }, { status: 400 });
     }
 
     const entry = await findEntry(name, language);
@@ -134,19 +129,13 @@ export async function GET(
     return NextResponse.json({ entry: detail });
   } catch (error) {
     console.error("Get wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
 
 // --- PUT /api/wiki/[name] ---
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   try {
     const { name } = await params;
     const { searchParams } = new URL(request.url);
@@ -174,7 +163,9 @@ export async function PUT(
     // Only unreviewed/reviewed entries can be edited
     if (entry.status !== "unreviewed" && entry.status !== "reviewed") {
       return NextResponse.json(
-        { error: `Cannot edit entry with status "${entry.status}". Only "unreviewed" or "reviewed" entries can be edited.` },
+        {
+          error: `Cannot edit entry with status "${entry.status}". Only "unreviewed" or "reviewed" entries can be edited.`,
+        },
         { status: 403 },
       );
     }
@@ -265,10 +256,7 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Update wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
 
@@ -319,9 +307,6 @@ export async function DELETE(
     return NextResponse.json({ success: true, entry: serializeEntry(updated) });
   } catch (error) {
     console.error("Delete wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

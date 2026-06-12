@@ -83,14 +83,13 @@ export async function POST(
 
     // Only proposed entries can be approved — but "proposed" no longer exists
     return NextResponse.json(
-      { error: "This endpoint is deprecated. Use POST /api/admin/discoveries/[id]/approve instead." },
+      {
+        error: "This endpoint is deprecated. Use POST /api/admin/discoveries/[id]/approve instead.",
+      },
       { status: 410 },
     );
   } catch (error) {
     console.error("Approve wiki entry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

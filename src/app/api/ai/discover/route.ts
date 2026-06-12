@@ -44,10 +44,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!article) {
-      return NextResponse.json(
-        { error: `Article not found: ${body.articleId}` },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: `Article not found: ${body.articleId}` }, { status: 404 });
     }
 
     // Only allow discovery on published articles
@@ -69,9 +66,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ taskId }, { status: 201 });
   } catch (error) {
     console.error("Error submitting discover task:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

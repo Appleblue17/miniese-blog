@@ -63,9 +63,7 @@ vi.mock("@/lib/db", () => {
     prisma: {
       wikiEntry: {
         findMany: vi.fn().mockImplementation(({ where }: { where: { language: string } }) => {
-          return Promise.resolve(
-            mockWikiEntries.filter((e) => e.language === where.language),
-          );
+          return Promise.resolve(mockWikiEntries.filter((e) => e.language === where.language));
         }),
       },
     },
@@ -124,9 +122,7 @@ describe("detectWikiLinks", () => {
       content: "DFS 是一种重要的算法。",
     });
 
-    expect(result).toBe(
-      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 是一种重要的算法。',
-    );
+    expect(result).toBe('<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 是一种重要的算法。');
   });
 
   it("replaces wiki alias with anchor link using the main name", async () => {
@@ -190,16 +186,14 @@ describe("detectWikiLinks", () => {
   it("does not replace inside code blocks (```...```)", async () => {
     const result = await detectWikiLinks({
       lang: "zh",
-      content: '这是一段代码：\n```\nDFS 算法\n```\n正文中的 DFS。',
+      content: "这是一段代码：\n```\nDFS 算法\n```\n正文中的 DFS。",
     });
 
     expect(result).toContain("```\nDFS 算法\n```");
     // The DFS inside code block should NOT be replaced
     expect(result).toContain("```\nDFS 算法\n```");
     // But the one outside should
-    expect(result).toContain(
-      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。',
-    );
+    expect(result).toContain('<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。');
   });
 
   it("does not replace inside inline code", async () => {
@@ -209,9 +203,7 @@ describe("detectWikiLinks", () => {
     });
 
     expect(result).toContain("`DFS`");
-    expect(result).toContain(
-      '真正的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 算法。',
-    );
+    expect(result).toContain('真正的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 算法。');
   });
 
   it("does not replace inside math block ($$...$$)", async () => {
@@ -221,9 +213,7 @@ describe("detectWikiLinks", () => {
     });
 
     expect(result).toContain("$$\nDFS(x) = x^2\n$$");
-    expect(result).toContain(
-      '然后 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 是算法。',
-    );
+    expect(result).toContain('然后 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 是算法。');
   });
 
   it("does not replace inside inline math ($...$)", async () => {
@@ -233,9 +223,7 @@ describe("detectWikiLinks", () => {
     });
 
     expect(result).toContain("$DFS$");
-    expect(result).toContain(
-      '和 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 算法。',
-    );
+    expect(result).toContain('和 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a> 算法。');
   });
 
   it("does not replace inside existing Markdown links", async () => {
@@ -247,9 +235,7 @@ describe("detectWikiLinks", () => {
     // The link text should remain unchanged inside the markdown link
     expect(result).toContain("[DFS](https://example.com)");
     // But outside it should be replaced
-    expect(result).toContain(
-      '和本文的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。',
-    );
+    expect(result).toContain('和本文的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。');
   });
 
   it("does not replace inside existing HTML anchor tags", async () => {
@@ -261,9 +247,7 @@ describe("detectWikiLinks", () => {
     // Inside existing <a> tag, not replaced
     expect(result).toContain('<a href="/en/wiki/DFS">DFS</a>');
     // Outside, replaced
-    expect(result).toContain(
-      '和本文的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。',
-    );
+    expect(result).toContain('和本文的 <a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>。');
   });
 
   // --- Language filtering ---
@@ -277,9 +261,7 @@ describe("detectWikiLinks", () => {
     // "TypeScript" is an English entry, should NOT be replaced in zh
     expect(result).toContain("TypeScript");
     // "DFS" is both zh and en, should be replaced in zh
-    expect(result).toContain(
-      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>',
-    );
+    expect(result).toContain('<a href="/zh/wiki/DFS" data-wiki-name="DFS">DFS</a>');
   });
 
   it("matches English entries for English language content", async () => {
@@ -291,9 +273,7 @@ describe("detectWikiLinks", () => {
     expect(result).toContain(
       '<a href="/en/wiki/TypeScript" data-wiki-name="TypeScript">TypeScript</a>',
     );
-    expect(result).toContain(
-      '<a href="/en/wiki/DFS" data-wiki-name="DFS">DFS</a>',
-    );
+    expect(result).toContain('<a href="/en/wiki/DFS" data-wiki-name="DFS">DFS</a>');
   });
 
   // --- Edge cases ---
@@ -369,8 +349,6 @@ describe("detectWikiLinks", () => {
     });
 
     // "深度优先搜索" (DFS alias, 6 chars) should match as a whole
-    expect(result).toBe(
-      '<a href="/zh/wiki/DFS" data-wiki-name="DFS">深度优先搜索</a>遍历。',
-    );
+    expect(result).toBe('<a href="/zh/wiki/DFS" data-wiki-name="DFS">深度优先搜索</a>遍历。');
   });
 });

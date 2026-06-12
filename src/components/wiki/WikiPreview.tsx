@@ -44,10 +44,7 @@ const globalCache = new Map<string, CachedEntry>();
  * Fetches a wiki entry definition from the API.
  * Uses an in-memory cache to avoid repeated requests.
  */
-async function fetchDefinition(
-  wikiName: string,
-  lang: string,
-): Promise<string | null> {
+async function fetchDefinition(wikiName: string, lang: string): Promise<string | null> {
   const cacheKey = `${lang}/${wikiName}`;
   const cached = globalCache.get(cacheKey);
 
@@ -60,8 +57,7 @@ async function fetchDefinition(
     if (!res.ok) return null;
 
     const data = await res.json();
-    const definition: string =
-      data.entry?.blocks?.definition || data.entry?.definition || "";
+    const definition: string = data.entry?.blocks?.definition || data.entry?.definition || "";
 
     globalCache.set(cacheKey, {
       definition,
@@ -136,22 +132,19 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
    * Handles mouse leaving a wiki link.
    * Cancels the pending timer and hides the preview.
    */
-  const handleMouseLeave = useCallback(
-    (e: MouseEvent) => {
-      const target = (e.target as Element).closest("[data-wiki-name]");
+  const handleMouseLeave = useCallback((e: MouseEvent) => {
+    const target = (e.target as Element).closest("[data-wiki-name]");
 
-      // Only dismiss if leaving the link (not entering the card)
-      if (target && target === currentTargetRef.current) {
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
-          timerRef.current = null;
-        }
-        currentTargetRef.current = null;
-        setPreview(null);
+    // Only dismiss if leaving the link (not entering the card)
+    if (target && target === currentTargetRef.current) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
-    },
-    [],
-  );
+      currentTargetRef.current = null;
+      setPreview(null);
+    }
+  }, []);
 
   /**
    * Handles scroll events: hide preview when scrolling,
@@ -217,9 +210,7 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
           }}
         >
           {/* Definition text */}
-          <p className="text-sm leading-relaxed text-foreground">
-            {preview.definition}
-          </p>
+          <p className="text-sm leading-relaxed text-foreground">{preview.definition}</p>
 
           {/* "View full entry" link */}
           <a

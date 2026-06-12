@@ -26,12 +26,10 @@ interface ReviewsResponse {
 async function fetchData(page: number): Promise<ReviewsResponse> {
   try {
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/reviews?page=${page}&limit=${PAGE_SIZE}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok)
-      return { tasks: [], total: 0, page: 1, totalPages: 0 };
+    const res = await fetch(`${baseUrl}/api/admin/reviews?page=${page}&limit=${PAGE_SIZE}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { tasks: [], total: 0, page: 1, totalPages: 0 };
     return res.json();
   } catch {
     return { tasks: [], total: 0, page: 1, totalPages: 0 };
@@ -51,24 +49,18 @@ function formatDate(dateStr: string): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<
-    string,
-    { label: string; color: string }
-  > = {
+  const config: Record<string, { label: string; color: string }> = {
     pending: {
       label: "等待中",
-      color:
-        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+      color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
     },
     processing: {
       label: "处理中",
-      color:
-        "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+      color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
     },
     completed: {
       label: "已完成",
-      color:
-        "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+      color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
     },
     failed: {
       label: "失败",
@@ -78,8 +70,7 @@ function StatusBadge({ status }: { status: string }) {
 
   const c = config[status] ?? {
     label: status,
-    color:
-      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   };
 
   return (
@@ -113,9 +104,7 @@ export default async function AdminReviewsPage({
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI 审查历史</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            共 {total} 次审查任务
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">共 {total} 次审查任务</p>
         </div>
       </div>
 
@@ -123,9 +112,7 @@ export default async function AdminReviewsPage({
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <Bot className="size-12 opacity-40" />
           <p className="text-lg">暂无审查记录</p>
-          <p className="text-sm">
-            还没有执行过 AI 审查，请在文章编辑页面发起审查。
-          </p>
+          <p className="text-sm">还没有执行过 AI 审查，请在文章编辑页面发起审查。</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1">
@@ -148,17 +135,19 @@ export default async function AdminReviewsPage({
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>创建 {formatDate(task.createdAt)}</span>
-                    {task.completedAt && (
-                      <span>完成 {formatDate(task.completedAt)}</span>
-                    )}
+                    {task.completedAt && <span>完成 {formatDate(task.completedAt)}</span>}
                     {task.output != null && (
                       <span>
-                        {((task.output as Record<string, unknown>)?.summary as Record<string, unknown>)?.totalIssues as number ?? 0} 个问题
+                        {((
+                          (task.output as Record<string, unknown>)?.summary as Record<
+                            string,
+                            unknown
+                          >
+                        )?.totalIssues as number) ?? 0}{" "}
+                        个问题
                       </span>
                     )}
-                    {task.error && (
-                      <span className="text-destructive">错误: {task.error}</span>
-                    )}
+                    {task.error && <span className="text-destructive">错误: {task.error}</span>}
                   </div>
                 </div>
                 <ChevronRight className="size-4 text-muted-foreground shrink-0 ml-4" />

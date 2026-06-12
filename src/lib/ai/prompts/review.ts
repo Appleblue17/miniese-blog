@@ -103,10 +103,7 @@ export function buildReviewPrompt(content: string): string {
  * @param targetText - The target content to review (inside the markers)
  * @returns The filled prompt string
  */
-export function buildReviewPromptWithContext(
-  contextText: string,
-  targetText: string,
-): string {
+export function buildReviewPromptWithContext(contextText: string, targetText: string): string {
   const combined: string[] = [];
 
   if (contextText.trim()) {

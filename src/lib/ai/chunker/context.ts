@@ -40,9 +40,8 @@ export function buildContext(
 
   // Extend upward: collect until we hit targetSize or a heading
   const upwardStart = extendUpward(lines, diffBlock.startLine - 1, targetContext);
-  const upwardChars = upwardStart > 0
-    ? computeRangeSize(lines, upwardStart, diffBlock.startLine - 1)
-    : 0;
+  const upwardChars =
+    upwardStart > 0 ? computeRangeSize(lines, upwardStart, diffBlock.startLine - 1) : 0;
 
   // Extend downward: remaining budget
   const remainingBudget = contextBudget - upwardChars;
@@ -67,11 +66,7 @@ export function buildContext(
  * @param targetChars - Target number of characters to include
  * @returns The new start line (1-based, inclusive), or 0 if no context added
  */
-function extendUpward(
-  lines: string[],
-  fromLine: number,
-  targetChars: number,
-): number {
+function extendUpward(lines: string[], fromLine: number, targetChars: number): number {
   if (fromLine < 1 || targetChars <= 0) {
     return 0;
   }
@@ -113,11 +108,7 @@ function extendUpward(
  * @param targetChars - Target number of characters to include
  * @returns The new end line (1-based, inclusive), or 0 if no context added
  */
-function extendDownward(
-  lines: string[],
-  fromLine: number,
-  targetChars: number,
-): number {
+function extendDownward(lines: string[], fromLine: number, targetChars: number): number {
   const totalLines = lines.length;
   if (fromLine > totalLines || targetChars <= 0) {
     return 0;
@@ -151,11 +142,7 @@ function extendDownward(
 /**
  * Computes the total character size of a range of lines.
  */
-function computeRangeSize(
-  lines: string[],
-  startLine: number,
-  endLine: number,
-): number {
+function computeRangeSize(lines: string[], startLine: number, endLine: number): number {
   let size = 0;
   for (let i = startLine - 1; i < Math.min(endLine, lines.length); i++) {
     size += lines[i].length + 1;

@@ -157,7 +157,8 @@ function DeleteModal({
           <div className="flex-1">
             <h3 className="text-base font-semibold">确认删除{itemType}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              确定要删除{itemType} <strong className="text-foreground">{title}</strong> 吗？<br />
+              确定要删除{itemType} <strong className="text-foreground">{title}</strong> 吗？
+              <br />
               {loading ? "" : "此操作不可撤销。"}
             </p>
           </div>
@@ -358,9 +359,7 @@ function PublishedArticleRow({
             charCount={article.charCount}
             lineCount={article.lineCount}
           />
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
         <div className="flex items-center gap-0.5 shrink-0 ml-4">
           {/* Create/edit draft button */}
@@ -412,7 +411,9 @@ function PublishedArticleRow({
             className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title={hasPendingTranslate ? "已有翻译任务处理中" : "AI 翻译"}
           >
-            <Languages className={`size-3.5 ${translating ? "animate-pulse" : hasPendingTranslate ? "text-blue-400" : ""}`} />
+            <Languages
+              className={`size-3.5 ${translating ? "animate-pulse" : hasPendingTranslate ? "text-blue-400" : ""}`}
+            />
             <span>{hasPendingTranslate ? "翻译中" : "翻译"}</span>
           </button>
 
@@ -424,7 +425,9 @@ function PublishedArticleRow({
             className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title={hasPendingDiscover ? "词条发现任务处理中" : "扫描文章发现新词条"}
           >
-            <Sparkles className={`size-3.5 ${discovering ? "animate-pulse" : hasPendingDiscover ? "text-yellow-400" : ""}`} />
+            <Sparkles
+              className={`size-3.5 ${discovering ? "animate-pulse" : hasPendingDiscover ? "text-yellow-400" : ""}`}
+            />
             <span>{hasPendingDiscover ? "发现中" : "发现词条"}</span>
           </button>
 
@@ -449,7 +452,10 @@ function PublishedArticleRow({
           title={article.title}
           itemType="文章"
           onConfirm={handleDelete}
-          onCancel={() => { setShowDelete(false); setError(null); }}
+          onCancel={() => {
+            setShowDelete(false);
+            setError(null);
+          }}
           loading={deleting}
         />
       )}
@@ -571,13 +577,14 @@ function DeleteDraftButton({ draft }: { draft: DraftItem }) {
           title={draft.title}
           itemType="草稿"
           onConfirm={handleDelete}
-          onCancel={() => { setShowDelete(false); setError(null); }}
+          onCancel={() => {
+            setShowDelete(false);
+            setError(null);
+          }}
           loading={deleting}
         />
       )}
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </>
   );
 }
@@ -665,7 +672,10 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
           title={draft.title}
           itemType="草稿"
           onConfirm={handleDelete}
-          onCancel={() => { setShowDelete(false); setError(null); }}
+          onCancel={() => {
+            setShowDelete(false);
+            setError(null);
+          }}
           loading={deleting}
         />
       )}
@@ -685,12 +695,8 @@ export function ArticleRowActions({
   return (
     <>
       {articles.map((article) => {
-        const linkedDraft = drafts.find(
-          (d) => d.draftOfId === article.id,
-        );
-        const linkedTranslation = translations.find(
-          (t) => t.originalId === article.id,
-        );
+        const linkedDraft = drafts.find((d) => d.draftOfId === article.id);
+        const linkedTranslation = translations.find((t) => t.originalId === article.id);
         const activeTaskTypes = pendingTasks[article.id] || [];
 
         return (

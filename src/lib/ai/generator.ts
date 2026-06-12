@@ -7,10 +7,7 @@
  */
 
 import { callDeepSeek } from "./client";
-import {
-  buildGenerateSystemPrompt,
-  buildGenerateUserPrompt,
-} from "./prompts/generate";
+import { buildGenerateSystemPrompt, buildGenerateUserPrompt } from "./prompts/generate";
 
 /**
  * A generated wiki entry from AI.
@@ -58,9 +55,7 @@ export async function generateWikiEntry(
   const userPrompt = buildGenerateUserPrompt(term, definitionHint, context);
   const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-  console.log(
-    `[Generator] Generating wiki entry for term: "${term}"`,
-  );
+  console.log(`[Generator] Generating wiki entry for term: "${term}"`);
 
   try {
     const response = await callDeepSeek({
@@ -73,22 +68,16 @@ export async function generateWikiEntry(
     const parsed = parseGenerateResponse(response.content);
 
     if (!parsed) {
-      console.warn(
-        `[Generator] Failed to parse AI response for term: "${term}"`,
-      );
+      console.warn(`[Generator] Failed to parse AI response for term: "${term}"`);
       return { success: false, reason: "parse_error" };
     }
 
     if (parsed.unable) {
-      console.log(
-        `[Generator] AI unable to generate content for term: "${term}"`,
-      );
+      console.log(`[Generator] AI unable to generate content for term: "${term}"`);
       return { success: false, reason: "unable" };
     }
 
-    console.log(
-      `[Generator] Successfully generated wiki entry for term: "${term}"`,
-    );
+    console.log(`[Generator] Successfully generated wiki entry for term: "${term}"`);
 
     return {
       success: true,
@@ -124,9 +113,7 @@ export async function generateWikiEntry(
  * @param responseText - Raw AI response string.
  * @returns Parsed result or null.
  */
-function parseGenerateResponse(
-  responseText: string,
-): {
+function parseGenerateResponse(responseText: string): {
   aliases: string[];
   definition: string;
   content: string;

@@ -6,4 +6,4 @@
  * Kept as reference.
  */
 
-export {}
+export {};

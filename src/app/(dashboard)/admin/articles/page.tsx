@@ -74,19 +74,35 @@ interface AdminArticlesResponse {
   totalPages: number;
 }
 
-async function fetchData(
-  page: number,
-): Promise<AdminArticlesResponse> {
+async function fetchData(page: number): Promise<AdminArticlesResponse> {
   try {
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(
-      `${baseUrl}/api/admin/articles?page=${page}&limit=${PAGE_SIZE}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok) return { articles: [], translations: [], drafts: [], newDrafts: [], pendingTasks: {}, total: 0, page: 1, totalPages: 0 };
+    const res = await fetch(`${baseUrl}/api/admin/articles?page=${page}&limit=${PAGE_SIZE}`, {
+      cache: "no-store",
+    });
+    if (!res.ok)
+      return {
+        articles: [],
+        translations: [],
+        drafts: [],
+        newDrafts: [],
+        pendingTasks: {},
+        total: 0,
+        page: 1,
+        totalPages: 0,
+      };
     return res.json();
   } catch {
-    return { articles: [], translations: [], drafts: [], newDrafts: [], pendingTasks: {}, total: 0, page: 1, totalPages: 0 };
+    return {
+      articles: [],
+      translations: [],
+      drafts: [],
+      newDrafts: [],
+      pendingTasks: {},
+      total: 0,
+      page: 1,
+      totalPages: 0,
+    };
   }
 }
 
@@ -98,7 +114,8 @@ export default async function AdminArticlesPage({
   const params = await searchParams;
   const currentPage = Math.max(1, parseInt(params.page || "1", 10));
 
-  const { articles, translations, drafts, newDrafts, pendingTasks, total } = await fetchData(currentPage);
+  const { articles, translations, drafts, newDrafts, pendingTasks, total } =
+    await fetchData(currentPage);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)) || 1;
 
   const hasContent = articles.length > 0 || newDrafts.length > 0;
@@ -125,9 +142,7 @@ export default async function AdminArticlesPage({
       {!hasContent ? (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <p className="text-lg">暂无文章</p>
-          <p className="text-sm">
-            还没有发布任何文章，点击上方按钮开始发布。
-          </p>
+          <p className="text-sm">还没有发布任何文章，点击上方按钮开始发布。</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1">

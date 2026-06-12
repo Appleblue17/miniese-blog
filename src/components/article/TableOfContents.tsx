@@ -175,58 +175,50 @@ export function TableOfContents({ html }: TableOfContentsProps) {
       const btnRect = btn.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
 
-      if (
-        btnRect.top < containerRect.top ||
-        btnRect.bottom > containerRect.bottom
-      ) {
+      if (btnRect.top < containerRect.top || btnRect.bottom > containerRect.bottom) {
         btn.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
   }, [activeId]);
 
-  const handleClick = useCallback(
-    (id: string) => {
-      const el = document.getElementById(id);
-      if (!el) return;
+  const handleClick = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
 
-      setIsOpen(false);
+    setIsOpen(false);
 
-      const offset = 80;
-      const targetY = el.getBoundingClientRect().top + window.scrollY - offset;
-      const startY = window.scrollY;
-      const distance = targetY - startY;
-      const duration = Math.min(Math.abs(distance) * 0.3, 400);
-      const startTime = performance.now();
+    const offset = 80;
+    const targetY = el.getBoundingClientRect().top + window.scrollY - offset;
+    const startY = window.scrollY;
+    const distance = targetY - startY;
+    const duration = Math.min(Math.abs(distance) * 0.3, 400);
+    const startTime = performance.now();
 
-      isScrollingRef.current = true;
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    isScrollingRef.current = true;
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
 
-      function step(currentTime: number) {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const ease =
-          progress < 0.5
-            ? 2 * progress * progress
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    function step(currentTime: number) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease =
+        progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-        window.scrollTo(0, startY + distance * ease);
+      window.scrollTo(0, startY + distance * ease);
 
-        if (progress < 1) {
-          requestAnimationFrame(step);
-        } else {
-          // Immediately update active heading to the target after scroll
-          setActiveId(id);
-          // Release lock after a brief delay
-          scrollTimerRef.current = setTimeout(() => {
-            isScrollingRef.current = false;
-          }, 80);
-        }
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        // Immediately update active heading to the target after scroll
+        setActiveId(id);
+        // Release lock after a brief delay
+        scrollTimerRef.current = setTimeout(() => {
+          isScrollingRef.current = false;
+        }, 80);
       }
+    }
 
-      requestAnimationFrame(step);
-    },
-    [],
-  );
+    requestAnimationFrame(step);
+  }, []);
 
   if (headings.length === 0) return null;
 
@@ -282,11 +274,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 6h16M4 12h16M4 18h7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
           </svg>
           Contents
         </button>
@@ -295,10 +283,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
       {/* Mobile: dropdown overlay */}
       {isOpen && (
         <div className="xl:hidden fixed inset-0 z-40 flex items-end justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsOpen(false)} />
           <div className="relative w-full max-h-[60vh] overflow-y-auto rounded-t-2xl bg-background p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -309,7 +294,13 @@ export function TableOfContents({ html }: TableOfContentsProps) {
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground hover:text-foreground"
               >
-                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg
+                  className="size-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>

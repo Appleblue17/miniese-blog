@@ -49,10 +49,7 @@ export type ContentType = "markdown" | "notesaw";
  * // => '<div class="block-container ...">...</div>'
  * ```
  */
-export async function renderMarkdown(
-  content: string,
-  contentType: ContentType,
-): Promise<string> {
+export async function renderMarkdown(content: string, contentType: ContentType): Promise<string> {
   if (!content || !content.trim()) {
     return "";
   }

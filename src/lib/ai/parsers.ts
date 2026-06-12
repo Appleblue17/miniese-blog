@@ -7,12 +7,7 @@
 
 import type { ReviewReport, GenerateResult } from "../../types/ai";
 
-const VALID_SECTION_TYPES = new Set([
-  "factual",
-  "typo",
-  "clarity",
-  "other",
-] as const);
+const VALID_SECTION_TYPES = new Set(["factual", "typo", "clarity", "other"] as const);
 
 type SectionType = "factual" | "typo" | "clarity" | "other";
 type Severity = "error" | "warning" | "suggestion" | "ok";
@@ -80,9 +75,7 @@ export interface TranslateResponse {
  * @param responseText - The raw text response from DeepSeek.
  * @returns A parsed GenerateResult, or null if parsing failed.
  */
-export function parseGenerateResponse(
-  responseText: string,
-): GenerateResult | null {
+export function parseGenerateResponse(responseText: string): GenerateResult | null {
   try {
     const jsonStr = extractJson(responseText);
     if (!jsonStr) {
@@ -125,9 +118,7 @@ export function parseGenerateResponse(
   }
 }
 
-export function parseReviewReport(
-  responseText: string,
-): ReviewReport | null {
+export function parseReviewReport(responseText: string): ReviewReport | null {
   try {
     const jsonStr = extractJson(responseText);
     if (!jsonStr) {
@@ -170,9 +161,9 @@ export function parseReviewReport(
         type: s.type as SectionType,
         title: s.title || "",
         items: (s.items || []).map((item) => ({
-          severity: (
-            ["error", "warning", "suggestion", "ok"] as Severity[]
-          ).includes(item.severity as Severity)
+          severity: (["error", "warning", "suggestion", "ok"] as Severity[]).includes(
+            item.severity as Severity,
+          )
             ? (item.severity as Severity)
             : "warning",
           lineStart: item.lineStart ?? 0,

@@ -94,11 +94,16 @@ function TaskTypeIcon({ type }: { type: string }) {
 
 function TaskTypeLabel(type: string) {
   switch (type) {
-    case "review": return "审查";
-    case "translate": return "翻译";
-    case "generate": return "生成词条";
-    case "discover": return "词条发现";
-    default: return type;
+    case "review":
+      return "审查";
+    case "translate":
+      return "翻译";
+    case "generate":
+      return "生成词条";
+    case "discover":
+      return "词条发现";
+    default:
+      return type;
   }
 }
 
@@ -107,7 +112,9 @@ function getTaskSummary(task: AiTaskItem): string | null {
 
   switch (task.type) {
     case "review": {
-      const summary = (task.output as Record<string, unknown>)?.summary as Record<string, unknown> | undefined;
+      const summary = (task.output as Record<string, unknown>)?.summary as
+        | Record<string, unknown>
+        | undefined;
       if (summary && typeof summary.totalIssues === "number") {
         return `${summary.totalIssues} 个问题`;
       }
@@ -141,13 +148,7 @@ function getTaskSummary(task: AiTaskItem): string | null {
 
 // --- Type Tab Bar ---
 
-function TypeTabBar({
-  tabs,
-  activeKey,
-}: {
-  tabs: TypeTabDef[];
-  activeKey: string;
-}) {
+function TypeTabBar({ tabs, activeKey }: { tabs: TypeTabDef[]; activeKey: string }) {
   return (
     <div className="flex items-center gap-1 rounded-xl bg-muted p-1" role="tablist">
       {tabs.map((tab) => {
@@ -191,21 +192,15 @@ function TaskRow({ task }: { task: AiTaskItem }) {
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <TaskTypeIcon type={task.type} />
-          <span className="font-medium truncate text-sm">
-            {task.articleTitle ?? "未知文章"}
-          </span>
+          <span className="font-medium truncate text-sm">{task.articleTitle ?? "未知文章"}</span>
           <TaskStatusBadge status={task.status} />
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>{TaskTypeLabel(task.type)}</span>
           <span>创建 {formatDate(task.createdAt)}</span>
-          {task.completedAt && (
-            <span>完成 {formatDate(task.completedAt)}</span>
-          )}
+          {task.completedAt && <span>完成 {formatDate(task.completedAt)}</span>}
           {summary && <span>{summary}</span>}
-          {task.error && (
-            <span className="text-destructive">错误: {task.error}</span>
-          )}
+          {task.error && <span className="text-destructive">错误: {task.error}</span>}
         </div>
       </div>
       <ChevronRight className="size-4 text-muted-foreground shrink-0 ml-4" />
@@ -232,7 +227,11 @@ function Pagination({
   } else {
     pages.push(1);
     if (currentPage > 3) pages.push("...");
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
       pages.push(i);
     }
     if (currentPage < totalPages - 2) pages.push("...");
@@ -292,12 +291,7 @@ function Pagination({
 
 // --- Main Component ---
 
-export function AiTaskList({
-  tasks,
-  activeType,
-  currentPage,
-  totalPages,
-}: AiTaskListProps) {
+export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTaskListProps) {
   const baseParams = new URLSearchParams();
   if (activeType !== "all") baseParams.set("type", activeType);
 
@@ -319,11 +313,7 @@ export function AiTaskList({
         </div>
       )}
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        baseParams={baseParams}
-      />
+      <Pagination currentPage={currentPage} totalPages={totalPages} baseParams={baseParams} />
     </div>
   );
 }

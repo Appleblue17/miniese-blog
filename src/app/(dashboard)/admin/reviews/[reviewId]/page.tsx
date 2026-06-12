@@ -75,7 +75,9 @@ async function fetchReview(reviewId: string): Promise<ReviewDetail | null> {
   }
 }
 
-async function fetchSourceContent(articleId: string): Promise<{ content: string; fileName: string } | null> {
+async function fetchSourceContent(
+  articleId: string,
+): Promise<{ content: string; fileName: string } | null> {
   try {
     const article = await prisma.article.findUnique({
       where: { id: articleId },
@@ -105,14 +107,25 @@ function formatDate(dateStr: string): string {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string }> = {
-    pending: { label: "等待中", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-    processing: { label: "处理中", color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
-    completed: { label: "已完成", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
+    pending: {
+      label: "等待中",
+      color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    },
+    processing: {
+      label: "处理中",
+      color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    },
+    completed: {
+      label: "已完成",
+      color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    },
     failed: { label: "失败", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
   };
   const c = config[status] ?? { label: status, color: "bg-slate-100 text-slate-700" };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.color}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${c.color}`}
+    >
       {c.label}
     </span>
   );
@@ -194,8 +207,14 @@ export default async function ReviewDetailPage({
               {(() => {
                 if (review.status === "processing" && output) {
                   const rawOutput = output as unknown as Record<string, unknown>;
-                  const progress = rawOutput.progress as { totalChunks?: number; processedChunks?: number } | undefined;
-                  if (progress && typeof progress.totalChunks === "number" && typeof progress.processedChunks === "number") {
+                  const progress = rawOutput.progress as
+                    | { totalChunks?: number; processedChunks?: number }
+                    | undefined;
+                  if (
+                    progress &&
+                    typeof progress.totalChunks === "number" &&
+                    typeof progress.processedChunks === "number"
+                  ) {
                     const pct = Math.round((progress.processedChunks / progress.totalChunks) * 100);
                     return (
                       <>
@@ -219,9 +238,17 @@ export default async function ReviewDetailPage({
                       </>
                     );
                   }
-                  return <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">正在分析段落内容...</p>;
+                  return (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                      正在分析段落内容...
+                    </p>
+                  );
                 }
-                return <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">等待 Worker 处理，请稍后刷新页面查看最新结果。</p>;
+                return (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                    等待 Worker 处理，请稍后刷新页面查看最新结果。
+                  </p>
+                );
               })()}
             </div>
           </div>
@@ -236,24 +263,28 @@ export default async function ReviewDetailPage({
             <p className="text-xs text-muted-foreground mt-1">问题总数</p>
           </div>
           <div className="rounded-lg border border-red-200 dark:border-red-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{output.summary.errors}</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+              {output.summary.errors}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">错误</p>
           </div>
           <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{output.summary.warnings}</p>
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+              {output.summary.warnings}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">警告</p>
           </div>
           <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{output.summary.suggestions}</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {output.summary.suggestions}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">建议</p>
           </div>
         </div>
       )}
 
       {/* Chunk details — delegated to client component */}
-      {output?.chunks && output.chunks.length > 0 && (
-        <ReviewChunkList chunks={output.chunks} />
-      )}
+      {output?.chunks && output.chunks.length > 0 && <ReviewChunkList chunks={output.chunks} />}
 
       {/* Raw output link for debugging */}
       {output && (

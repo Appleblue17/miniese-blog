@@ -126,10 +126,7 @@ export interface ReviewResult {
  * Computes the complement of a set of ranges within [1, totalLines].
  * Returns the ranges that are NOT covered by any diff block.
  */
-function complementRanges(
-  totalLines: number,
-  blocks: DiffBlock[],
-): DiffBlock[] {
+function complementRanges(totalLines: number, blocks: DiffBlock[]): DiffBlock[] {
   if (blocks.length === 0) {
     return [{ startLine: 1, endLine: totalLines }];
   }
@@ -193,9 +190,7 @@ function computeSummary(chunks: ReviewChunk[]): ReviewSummary {
  * @param contentMap - Existing content map (original content → ReviewChunk)
  * @returns A map from individual source line → ReviewChunk
  */
-function buildLineToChunk(
-  contentMap: Record<string, ReviewChunk>,
-): Map<string, ReviewChunk> {
+function buildLineToChunk(contentMap: Record<string, ReviewChunk>): Map<string, ReviewChunk> {
   const map = new Map<string, ReviewChunk>();
 
   for (const [sourceText, chunk] of Object.entries(contentMap)) {
@@ -215,10 +210,7 @@ function buildLineToChunk(
  * Merges a ReviewChunk into an existing one, deduplicating sections/items.
  * If a section with the same type already exists, items are merged.
  */
-function mergeChunks(
-  existing: ReviewChunk,
-  incoming: ReviewChunk,
-): ReviewChunk {
+function mergeChunks(existing: ReviewChunk, incoming: ReviewChunk): ReviewChunk {
   // Merge sections by type
   const mergedSections: ReviewSection[] = [...existing.sections];
   const sectionByType = new Map<string, number>();
@@ -228,9 +220,7 @@ function mergeChunks(
     const existingIdx = sectionByType.get(section.type);
     if (existingIdx !== undefined) {
       // Merge items — deduplicate by issue text
-      const existingIssues = new Set(
-        mergedSections[existingIdx].items.map((i) => i.issue),
-      );
+      const existingIssues = new Set(mergedSections[existingIdx].items.map((i) => i.issue));
       for (const item of section.items) {
         if (!existingIssues.has(item.issue)) {
           mergedSections[existingIdx].items.push(item);
@@ -307,15 +297,19 @@ export async function incrementalReview(
   {
     const oldLines = oldBody ? oldBody.split("\n").length : 0;
     const newLineCount = newLines.length;
-    const diffRanges = diffBlocks.map(
-      (b) => `${b.startLine}-${b.endLine}`,
-    );
+    const diffRanges = diffBlocks.map((b) => `${b.startLine}-${b.endLine}`);
     console.log(
       `[Reviewer] DIAG: oldLines=${oldLines}, newLines=${newLineCount}, ` +
-      `diffBlocks=${diffBlocks.length}, ranges=[${diffRanges.join(", ")}]`,
+        `diffBlocks=${diffBlocks.length}, ranges=[${diffRanges.join(", ")}]`,
     );
-    if (diffBlocks.length > 0 && diffBlocks[0].startLine === 1 && diffBlocks[0].endLine === newLineCount) {
-      console.log(`[Reviewer] DIAG: *** FULL CONTENT diff detected! All ${newLineCount} lines changed.`);
+    if (
+      diffBlocks.length > 0 &&
+      diffBlocks[0].startLine === 1 &&
+      diffBlocks[0].endLine === newLineCount
+    ) {
+      console.log(
+        `[Reviewer] DIAG: *** FULL CONTENT diff detected! All ${newLineCount} lines changed.`,
+      );
     }
   }
 
@@ -398,7 +392,12 @@ export async function incrementalReview(
   const allChunks: ReviewChunk[] = [];
 
   // 3a. Pre-compute all sub-chunks from diff blocks
-  const allSubChunks: Array<{ startLine: number; endLine: number; content: string; title: string }> = [];
+  const allSubChunks: Array<{
+    startLine: number;
+    endLine: number;
+    content: string;
+    title: string;
+  }> = [];
   for (const block of diffBlocks) {
     const subChunks = splitRange(newLines, block.startLine, block.endLine);
     for (const sc of subChunks) {

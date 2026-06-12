@@ -56,7 +56,9 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
             </CardTitle>
             {/* Type badge */}
             {entry.type && (
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getTypeColor(entry.type)}`}>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getTypeColor(entry.type)}`}
+              >
                 {getTypeLabel(entry.type)}
               </span>
             )}
@@ -81,9 +83,7 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
 
           {/* Definition (truncated) */}
           {entry.definition && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {entry.definition}
-            </p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{entry.definition}</p>
           )}
 
           {/* Tags */}

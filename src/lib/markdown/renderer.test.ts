@@ -84,10 +84,7 @@ describe("renderMarkdown (standard markdown)", () => {
   });
 
   it("renders table (GFM)", async () => {
-    const html = await renderMarkdown(
-      "| A | B |\n| --- | --- |\n| 1 | 2 |",
-      "markdown",
-    );
+    const html = await renderMarkdown("| A | B |\n| --- | --- |\n| 1 | 2 |", "markdown");
     expect(html).toContain("<table>");
     expect(html).toContain("<th>A</th>");
     expect(html).toContain("<td>1</td>");
@@ -132,10 +129,7 @@ describe("renderMarkdown (KaTeX math)", () => {
 
 describe("renderMarkdown (Notesaw)", () => {
   it("renders a @def block with title", async () => {
-    const html = await renderMarkdown(
-      "@def Foo {\n    bar\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@def Foo {\n    bar\n}", "notesaw");
     expect(html).toContain('class="block-container');
     expect(html).toContain('class="block-label"');
     expect(html).toContain("Definition");
@@ -143,10 +137,7 @@ describe("renderMarkdown (Notesaw)", () => {
   });
 
   it("renders a @def block without title", async () => {
-    const html = await renderMarkdown(
-      "@def {\n    content\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@def {\n    content\n}", "notesaw");
     expect(html).toContain('class="block-container');
     expect(html).toContain("<p>content</p>");
   });
@@ -178,44 +169,29 @@ describe("renderMarkdown (Notesaw)", () => {
   });
 
   it("renders blocks with abbreviations (thm→theorem)", async () => {
-    const html = await renderMarkdown(
-      "@thm Test {\n    body\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@thm Test {\n    body\n}", "notesaw");
     expect(html).toContain("theorem-block-container");
     expect(html).toContain("Theorem");
   });
 
   it("renders blocks with abbreviations (def→definition)", async () => {
-    const html = await renderMarkdown(
-      "@def Test {\n    body\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@def Test {\n    body\n}", "notesaw");
     expect(html).toContain("definition-block-container");
     expect(html).toContain("Definition");
   });
 
   it("renders block with style modifier ?", async () => {
-    const html = await renderMarkdown(
-      "@note? unsure content\n",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@note? unsure content\n", "notesaw");
     expect(html).toContain("inline-block-container");
   });
 
   it("renders block with style modifier !", async () => {
-    const html = await renderMarkdown(
-      "@note! important\n",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@note! important\n", "notesaw");
     expect(html).toContain("inline-block-container");
   });
 
   it("renders multiple blocks", async () => {
-    const html = await renderMarkdown(
-      "@def A {\n    first\n}\n@def B {\n    second\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@def A {\n    first\n}\n@def B {\n    second\n}", "notesaw");
     expect(html).toContain("<p>first</p>");
     expect(html).toContain("<p>second</p>");
     // Should have two separate block containers
@@ -223,45 +199,30 @@ describe("renderMarkdown (Notesaw)", () => {
   });
 
   it("renders standard markdown inside Notesaw mode", async () => {
-    const html = await renderMarkdown(
-      "# Title\n\nJust a paragraph.",
-      "notesaw",
-    );
+    const html = await renderMarkdown("# Title\n\nJust a paragraph.", "notesaw");
     expect(html).toContain("<h1>Title</h1>");
     expect(html).toContain("<p>Just a paragraph.</p>");
   });
 
   it("renders math inside Notesaw mode", async () => {
-    const html = await renderMarkdown(
-      "@note Formula $E=mc^2$\n",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@note Formula $E=mc^2$\n", "notesaw");
     expect(html).toContain('class="katex"');
   });
 
   it("renders a @warn block (abbreviation)", async () => {
-    const html = await renderMarkdown(
-      "@warn Beware {\n    danger\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@warn Beware {\n    danger\n}", "notesaw");
     expect(html).toContain("warning-block-container");
     expect(html).toContain("Warning");
   });
 
   it("renders a @example block", async () => {
-    const html = await renderMarkdown(
-      "@example Code {\n    print('hello')\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@example Code {\n    print('hello')\n}", "notesaw");
     expect(html).toContain("example-block-container");
     expect(html).toContain("Example");
   });
 
   it("renders a @alg block (abbreviation for algorithm)", async () => {
-    const html = await renderMarkdown(
-      "@alg Sort {\n    O(n log n)\n}",
-      "notesaw",
-    );
+    const html = await renderMarkdown("@alg Sort {\n    O(n log n)\n}", "notesaw");
     expect(html).toContain("algorithm-block-container");
   });
 

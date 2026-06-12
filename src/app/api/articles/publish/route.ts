@@ -31,8 +31,7 @@ import type { ArticleMeta, ArticleFrontmatter } from "@/lib/articles/frontmatter
 import type { ContentType } from "@/lib/markdown/renderer";
 
 const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
-const PUBLISHED_DIR = (lang: string) =>
-  path.join(process.cwd(), "content", "articles", lang);
+const PUBLISHED_DIR = (lang: string) => path.join(process.cwd(), "content", "articles", lang);
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,17 +50,11 @@ export async function POST(request: NextRequest) {
     // --- Validation ---
 
     if (!directContent && !_fileName) {
-      return NextResponse.json(
-        { error: "fileContent or fileName is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "fileContent or fileName is required." }, { status: 400 });
     }
 
     if (language !== "zh" && language !== "en") {
-      return NextResponse.json(
-        { error: "language must be 'zh' or 'en'." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
     }
 
     // --- Read content (from direct input or filesystem) ---
@@ -105,10 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!frontmatter.title) {
-      return NextResponse.json(
-        { error: "title is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "title is required." }, { status: 400 });
     }
 
     // --- Guard: draft must not be published via the wrong flow ---
@@ -122,7 +112,10 @@ export async function POST(request: NextRequest) {
       });
       if (draftRecord?.draftOfId) {
         return NextResponse.json(
-          { error: "This draft is already linked to a published article. Please use the draft editor to publish." },
+          {
+            error:
+              "This draft is already linked to a published article. Please use the draft editor to publish.",
+          },
           { status: 400 },
         );
       }
@@ -338,10 +331,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Publish error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
 

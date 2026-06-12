@@ -56,10 +56,7 @@ Return ONLY valid JSON. No markdown, no extra text.`;
  * @param lang - The language of the term ("zh" | "en").
  * @returns Refined metadata, or default values if the API call fails.
  */
-export async function refineTerm(
-  term: string,
-  lang: string,
-): Promise<RefinedTerm> {
+export async function refineTerm(term: string, lang: string): Promise<RefinedTerm> {
   try {
     const prompt = REFINE_PROMPT_TEMPLATE.replace("{{TERM}}", term).replace(
       "{{LANG}}",
@@ -86,9 +83,7 @@ export async function refineTerm(
       type: parsed.type && validTypes.includes(parsed.type) ? parsed.type : "other",
       definition: parsed.definition?.trim() ?? "",
       importance:
-        typeof parsed.importance === "number" &&
-        parsed.importance >= 0 &&
-        parsed.importance <= 1
+        typeof parsed.importance === "number" && parsed.importance >= 0 && parsed.importance <= 1
           ? parsed.importance
           : 0.5,
     };

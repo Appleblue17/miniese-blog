@@ -16,10 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { lang } = await params;
   return {
     title: lang === "zh" ? "知识库" : "Wiki",
-    description:
-      lang === "zh"
-        ? "浏览所有知识库词条"
-        : "Browse all wiki entries",
+    description: lang === "zh" ? "浏览所有知识库词条" : "Browse all wiki entries",
   };
 }
 
@@ -31,9 +28,7 @@ export default async function WikiListPage({ params }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
         <h1 className="text-2xl font-bold">404</h1>
-        <p className="mt-2">
-          {lang === "zh" ? "页面未找到" : "Page not found"}
-        </p>
+        <p className="mt-2">{lang === "zh" ? "页面未找到" : "Page not found"}</p>
       </div>
     );
   }

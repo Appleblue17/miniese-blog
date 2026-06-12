@@ -11,10 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addJob } from "@/lib/queue/producer";
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
 
@@ -23,10 +20,7 @@ export async function POST(
     });
 
     if (!record) {
-      return NextResponse.json(
-        { error: "Discovery record not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Discovery record not found." }, { status: 404 });
     }
 
     if (record.status !== "failed") {
@@ -63,9 +57,6 @@ export async function POST(
     return NextResponse.json({ success: true, generateTaskId: taskId });
   } catch (error) {
     console.error("Admin discovery retry error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

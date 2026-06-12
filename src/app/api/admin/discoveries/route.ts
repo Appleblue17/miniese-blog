@@ -58,14 +58,14 @@ export async function GET(request: NextRequest) {
     const typeFilter = searchParams.get("type");
     const langFilter = searchParams.get("lang");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(searchParams.get("limit") || "20", 10)),
-    );
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Build where clause
     const where: Record<string, unknown> = {};
-    if (statusFilter && ["pending", "approved", "rejected", "generated", "failed"].includes(statusFilter)) {
+    if (
+      statusFilter &&
+      ["pending", "approved", "rejected", "generated", "failed"].includes(statusFilter)
+    ) {
       where.status = statusFilter;
     }
     if (articleIdFilter) {
@@ -84,10 +84,7 @@ export async function GET(request: NextRequest) {
     // Get paginated results
     const items = await prisma.wikiDiscovery.findMany({
       where,
-      orderBy: [
-        { importance: "desc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ importance: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -116,10 +113,7 @@ export async function GET(request: NextRequest) {
     } satisfies DiscoveriesResponse);
   } catch (error) {
     console.error("Admin discoveries list error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
 
@@ -143,10 +137,7 @@ export async function POST(request: NextRequest) {
     const action = body.action || "approve";
 
     if (!["approve", "reject"].includes(action)) {
-      return NextResponse.json(
-        { error: "action must be 'approve' or 'reject'." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "action must be 'approve' or 'reject'." }, { status: 400 });
     }
 
     let targetIds: string[] = [];
@@ -298,9 +289,7 @@ export async function POST(request: NextRequest) {
           );
         }
       } catch (err) {
-        errors.push(
-          `"${record.term}": ${err instanceof Error ? err.message : String(err)}`,
-        );
+        errors.push(`"${record.term}": ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -318,9 +307,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Admin discoveries batch operation error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

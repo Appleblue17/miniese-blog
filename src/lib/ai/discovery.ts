@@ -19,10 +19,7 @@
 import { prisma } from "../db";
 import { callDeepSeek } from "./client";
 import { splitArticle, stripFrontmatter } from "./chunker/chunker";
-import {
-  buildDiscoverySystemPrompt,
-  buildDiscoveryUserPrompt,
-} from "./prompts/discovery";
+import { buildDiscoverySystemPrompt, buildDiscoveryUserPrompt } from "./prompts/discovery";
 
 /**
  * A candidate term discovered by the AI.
@@ -185,13 +182,9 @@ async function filterExistingWikiEntries(
 
   if (existingEntries.length === 0) return candidates;
 
-  const existingSet = new Set(
-    existingEntries.map((e) => e.name.toLowerCase().trim()),
-  );
+  const existingSet = new Set(existingEntries.map((e) => e.name.toLowerCase().trim()));
 
-  return candidates.filter(
-    (c) => !existingSet.has(c.term.toLowerCase().trim()),
-  );
+  return candidates.filter((c) => !existingSet.has(c.term.toLowerCase().trim()));
 }
 
 /**
@@ -220,11 +213,7 @@ async function filterPendingProposals(
 
   if (existingProposals.length === 0) return candidates;
 
-  const existingSet = new Set(
-    existingProposals.map((p) => p.term.toLowerCase().trim()),
-  );
+  const existingSet = new Set(existingProposals.map((p) => p.term.toLowerCase().trim()));
 
-  return candidates.filter(
-    (c) => !existingSet.has(c.term.toLowerCase().trim()),
-  );
+  return candidates.filter((c) => !existingSet.has(c.term.toLowerCase().trim()));
 }

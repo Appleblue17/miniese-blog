@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  AlertCircle,
-  AlertTriangle,
-  Info,
-  Check,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, AlertCircle, AlertTriangle, Info, Check } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -55,10 +48,7 @@ const SEVERITY_LABELS: Record<string, string> = {
   ok: "已确认",
 };
 
-const SEVERITY_COLORS: Record<
-  string,
-  { bg: string; text: string; border: string; dot: string }
-> = {
+const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   error: {
     bg: "bg-red-50 dark:bg-red-950/30",
     text: "text-red-700 dark:text-red-300",
@@ -85,35 +75,33 @@ const SEVERITY_COLORS: Record<
   },
 };
 
-const SECTION_COLORS: Record<
-  string,
-  { label: string; bg: string; text: string; border: string }
-> = {
-  factual: {
-    label: "事实性错误",
-    bg: "bg-red-50 dark:bg-red-950/30",
-    text: "text-red-700 dark:text-red-300",
-    border: "border-red-200 dark:border-red-800",
-  },
-  typo: {
-    label: "拼写与语法",
-    bg: "bg-yellow-50 dark:bg-yellow-950/30",
-    text: "text-yellow-700 dark:text-yellow-300",
-    border: "border-yellow-200 dark:border-yellow-800",
-  },
-  clarity: {
-    label: "表达歧义与通顺性",
-    bg: "bg-purple-50 dark:bg-purple-950/30",
-    text: "text-purple-700 dark:text-purple-300",
-    border: "border-purple-200 dark:border-purple-800",
-  },
-  other: {
-    label: "其他建议",
-    bg: "bg-slate-50 dark:bg-slate-950/30",
-    text: "text-slate-700 dark:text-slate-300",
-    border: "border-slate-200 dark:border-slate-800",
-  },
-};
+const SECTION_COLORS: Record<string, { label: string; bg: string; text: string; border: string }> =
+  {
+    factual: {
+      label: "事实性错误",
+      bg: "bg-red-50 dark:bg-red-950/30",
+      text: "text-red-700 dark:text-red-300",
+      border: "border-red-200 dark:border-red-800",
+    },
+    typo: {
+      label: "拼写与语法",
+      bg: "bg-yellow-50 dark:bg-yellow-950/30",
+      text: "text-yellow-700 dark:text-yellow-300",
+      border: "border-yellow-200 dark:border-yellow-800",
+    },
+    clarity: {
+      label: "表达歧义与通顺性",
+      bg: "bg-purple-50 dark:bg-purple-950/30",
+      text: "text-purple-700 dark:text-purple-300",
+      border: "border-purple-200 dark:border-purple-800",
+    },
+    other: {
+      label: "其他建议",
+      bg: "bg-slate-50 dark:bg-slate-950/30",
+      text: "text-slate-700 dark:text-slate-300",
+      border: "border-slate-200 dark:border-slate-800",
+    },
+  };
 
 function severitySort(a: { severity: string }, b: { severity: string }): number {
   return (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
@@ -189,8 +177,7 @@ function FilterMenu({
 }) {
   const [open, setOpen] = useState(false);
 
-  const currentLabel =
-    SEVERITY_THRESHOLDS.find((t) => t.value === minSeverity)?.label ?? ">= 错误";
+  const currentLabel = SEVERITY_THRESHOLDS.find((t) => t.value === minSeverity)?.label ?? ">= 错误";
 
   return (
     <div className="relative">
@@ -206,10 +193,7 @@ function FilterMenu({
       {open && (
         <>
           {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
 
           {/* Menu */}
           <div className="absolute right-0 top-full mt-1 z-50 min-w-36 rounded-lg border border-border bg-card p-1.5 shadow-lg">
@@ -239,13 +223,7 @@ function FilterMenu({
 
 // ─── Collapsible chunk ───────────────────────────────────────────────────
 
-function ChunkCard({
-  chunk,
-  maxOrder,
-}: {
-  chunk: ReviewChunk;
-  maxOrder: number;
-}) {
+function ChunkCard({ chunk, maxOrder }: { chunk: ReviewChunk; maxOrder: number }) {
   const [collapsed, setCollapsed] = useState(true);
 
   // Flatten all items, sort, and filter by severity threshold
@@ -325,21 +303,12 @@ function ChunkCard({
             });
             if (visibleItems.length === 0) return null;
             const sectionColor = SECTION_COLORS[section.type];
-            const sectionIssueCount = visibleItems.filter(
-              (i) => i.severity !== "ok",
-            ).length;
-            const sectionOkCount = visibleItems.filter(
-              (i) => i.severity === "ok",
-            ).length;
+            const sectionIssueCount = visibleItems.filter((i) => i.severity !== "ok").length;
+            const sectionOkCount = visibleItems.filter((i) => i.severity === "ok").length;
             return (
-              <div
-                key={section.type}
-                className="border-b border-border last:border-b-0"
-              >
+              <div key={section.type} className="border-b border-border last:border-b-0">
                 {/* Section header */}
-                <div
-                  className={`flex items-center gap-3 px-4 py-2.5 ${sectionColor?.bg ?? ""}`}
-                >
+                <div className={`flex items-center gap-3 px-4 py-2.5 ${sectionColor?.bg ?? ""}`}>
                   <SectionBadge type={section.type} />
                   <span className="text-sm font-medium text-muted-foreground">
                     {sectionIssueCount > 0 && `${sectionIssueCount} 个问题`}
@@ -360,15 +329,11 @@ function ChunkCard({
                               行 {item.lineStart}–{item.lineEnd}
                             </span>
                           </div>
-                          <p className="text-sm font-medium mb-0.5">
-                            {item.issue}
-                          </p>
+                          <p className="text-sm font-medium mb-0.5">{item.issue}</p>
                           <pre className="text-xs bg-muted rounded px-2 py-1 overflow-x-auto mb-1 font-mono">
                             {item.snippet}
                           </pre>
-                          <p className="text-xs text-muted-foreground">
-                            建议: {item.suggestion}
-                          </p>
+                          <p className="text-xs text-muted-foreground">建议: {item.suggestion}</p>
                         </div>
                       </div>
                     </div>
@@ -413,9 +378,7 @@ export default function ReviewChunkList({ chunks }: ReviewChunkListProps) {
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {visibleChunks.length} 个段落
-        </span>
+        <span className="text-sm text-muted-foreground">{visibleChunks.length} 个段落</span>
         <FilterMenu minSeverity={minSeverity} onChange={setMinSeverity} />
       </div>
 

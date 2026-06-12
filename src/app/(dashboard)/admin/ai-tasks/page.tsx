@@ -24,10 +24,7 @@ interface AiTasksResponse {
   totalPages: number;
 }
 
-async function fetchData(
-  type: string,
-  page: number,
-): Promise<AiTasksResponse> {
+async function fetchData(type: string, page: number): Promise<AiTasksResponse> {
   try {
     const baseUrl = process.env.SITE_URL || "http://localhost:3000";
     const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
@@ -65,9 +62,7 @@ export default async function AdminAiTasksPage({
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">助手任务</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            共 {total} 个任务
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">共 {total} 个任务</p>
         </div>
       </div>
 

@@ -42,8 +42,12 @@ async function fetchEntry(id: string): Promise<WikiApiResponse["entry"] | null> 
 
     for (const status of allStatuses) {
       const [zhRes, enRes] = await Promise.all([
-        fetch(`${baseUrl}/api/wiki?lang=zh&page=1&limit=1000&status=${status}`, { cache: "no-store" }),
-        fetch(`${baseUrl}/api/wiki?lang=en&page=1&limit=1000&status=${status}`, { cache: "no-store" }),
+        fetch(`${baseUrl}/api/wiki?lang=zh&page=1&limit=1000&status=${status}`, {
+          cache: "no-store",
+        }),
+        fetch(`${baseUrl}/api/wiki?lang=en&page=1&limit=1000&status=${status}`, {
+          cache: "no-store",
+        }),
       ]);
 
       if (zhRes.ok) {
@@ -94,9 +98,7 @@ export default async function EditWikiEntryPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="text-3xl font-bold tracking-tight mb-8">
-        编辑词条: {entry.name}
-      </h1>
+      <h1 className="text-3xl font-bold tracking-tight mb-8">编辑词条: {entry.name}</h1>
       <WikiEntryForm mode="edit" initialData={entry} />
     </div>
   );

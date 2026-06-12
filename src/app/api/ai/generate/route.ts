@@ -23,10 +23,7 @@ export async function POST(request: NextRequest) {
     // --- Validation ---
 
     if (!articleId || typeof articleId !== "string" || !articleId.trim()) {
-      return NextResponse.json(
-        { error: "articleId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "articleId is required." }, { status: 400 });
     }
 
     const article = await prisma.article.findUnique({
@@ -35,10 +32,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!article) {
-      return NextResponse.json(
-        { error: `Article not found: ${articleId}` },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: `Article not found: ${articleId}` }, { status: 404 });
     }
 
     // --- Create task ---
@@ -50,9 +44,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ taskId }, { status: 201 });
   } catch (error) {
     console.error("Term generation trigger error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

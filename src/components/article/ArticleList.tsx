@@ -74,9 +74,7 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
       <div>
         <h1 className="text-2xl font-bold">{lang === "zh" ? "文章" : "Articles"}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {data && !loading
-            ? `共 ${data.total} 篇文章`
-            : "加载中..."}
+          {data && !loading ? `共 ${data.total} 篇文章` : "加载中..."}
         </p>
       </div>
 
@@ -100,11 +98,7 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
         <>
           <div className="flex flex-col gap-4">
             {data.articles.map((article) => (
-              <ArticleCard
-                key={article.id}
-                article={article}
-                lang={lang}
-              />
+              <ArticleCard key={article.id} article={article} lang={lang} />
             ))}
           </div>
 

@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Check,
-  Sparkles,
-  Languages,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Check, Sparkles, Languages, Eye, EyeOff } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -59,7 +51,9 @@ const LANG_COLORS: Record<string, { bg: string; text: string }> = {
 function LangBadge({ lang }: { lang: string }) {
   const c = LANG_COLORS[lang] ?? { bg: "bg-slate-100", text: "text-slate-700" };
   return (
-    <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${c.bg} ${c.text}`}>
+    <span
+      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${c.bg} ${c.text}`}
+    >
       {LANG_LABELS[lang] ?? lang}
     </span>
   );
@@ -124,7 +118,9 @@ function ChunkCard({
           {hasContext && showContext && chunk.aboveContext && (
             <div className="border-b border-border bg-muted/20 px-4 py-2.5">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">上文</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  上文
+                </span>
               </div>
               <pre className="text-[9px] leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-2 overflow-x-auto font-mono whitespace-pre-wrap">
                 {chunk.aboveContext}
@@ -166,7 +162,9 @@ function ChunkCard({
           {hasContext && showContext && chunk.belowContext && (
             <div className="border-t border-border bg-muted/20 px-4 py-2.5">
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">下文</span>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  下文
+                </span>
               </div>
               <pre className="text-[9px] leading-relaxed text-muted-foreground bg-muted/30 rounded-md p-2 overflow-x-auto font-mono whitespace-pre-wrap">
                 {chunk.belowContext}
@@ -200,9 +198,15 @@ export default function TranslateChunkList({
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
             {showContext ? (
-              <><Eye className="size-3.5" />显示上下文</>
+              <>
+                <Eye className="size-3.5" />
+                显示上下文
+              </>
             ) : (
-              <><EyeOff className="size-3.5" />隐藏上下文</>
+              <>
+                <EyeOff className="size-3.5" />
+                隐藏上下文
+              </>
             )}
           </button>
         </div>

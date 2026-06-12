@@ -43,9 +43,7 @@ export function ActionBar() {
         title={lang === "zh" ? "English" : "中文"}
       >
         <Globe className="size-5" />
-        <span className="text-[10px] font-medium ml-0.5">
-          {lang === "zh" ? "中" : "EN"}
-        </span>
+        <span className="text-[10px] font-medium ml-0.5">{lang === "zh" ? "中" : "EN"}</span>
       </Button>
 
       {/* Separator */}

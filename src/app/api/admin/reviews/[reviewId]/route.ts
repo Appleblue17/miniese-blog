@@ -33,10 +33,7 @@ export async function GET(
     });
 
     if (!task) {
-      return NextResponse.json(
-        { error: "Review task not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Review task not found." }, { status: 404 });
     }
 
     const detail: ReviewTaskDetail = {
@@ -54,9 +51,6 @@ export async function GET(
     return NextResponse.json({ task: detail });
   } catch (error) {
     console.error("Admin review detail error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

@@ -41,10 +41,7 @@ export default async function EditDraftPage({ params }: Props) {
   // Read file content
   let content = "";
   try {
-    content = await readFile(
-      path.join(process.cwd(), draft.contentPath),
-      "utf-8",
-    );
+    content = await readFile(path.join(process.cwd(), draft.contentPath), "utf-8");
   } catch {
     // File may not exist
   }
@@ -52,14 +49,16 @@ export default async function EditDraftPage({ params }: Props) {
   const fileName = draft.contentPath.split("/").pop() || "draft.md";
 
   // Parse frontmatter to build initialMeta
-  let initialMeta: {
-    title: string;
-    language: "zh" | "en";
-    fileType: "markdown" | "notesaw";
-    tags: string[];
-    author: string;
-    summary: string;
-  } | undefined;
+  let initialMeta:
+    | {
+        title: string;
+        language: "zh" | "en";
+        fileType: "markdown" | "notesaw";
+        tags: string[];
+        author: string;
+        summary: string;
+      }
+    | undefined;
 
   let initialExtraFrontmatter: Record<string, unknown> | undefined;
 
@@ -69,14 +68,22 @@ export default async function EditDraftPage({ params }: Props) {
       const data = parsed.data as Record<string, unknown>;
 
       const managedKeys = new Set([
-        "title", "language", "fileType", "contentType",
-        "tags", "author", "summary", "slug", "accessGroup", "changelog",
+        "title",
+        "language",
+        "fileType",
+        "contentType",
+        "tags",
+        "author",
+        "summary",
+        "slug",
+        "accessGroup",
+        "changelog",
       ]);
 
       initialMeta = {
         title: (data.title as string) || "",
         language: (data.language === "en" ? "en" : "zh") as "zh" | "en",
-        fileType: ((data.fileType || data.contentType || "markdown") as "markdown" | "notesaw"),
+        fileType: (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw",
         tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
         author: (data.author as string) || "博主",
         summary: (data.summary as string) || "",

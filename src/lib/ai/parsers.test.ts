@@ -70,14 +70,14 @@ describe("parseReviewReport", () => {
   });
 
   it("handles JSON wrapped in markdown code blocks", () => {
-    const wrapped = "```json\n{\n  \"sections\": []\n}\n```";
+    const wrapped = '```json\n{\n  "sections": []\n}\n```';
     const result = parseReviewReport(wrapped);
     expect(result).not.toBeNull();
     expect(result!.sections).toEqual([]);
   });
 
   it("handles JSON wrapped in plain code blocks", () => {
-    const wrapped = "```\n{\"sections\": []}\n```";
+    const wrapped = '```\n{"sections": []}\n```';
     const result = parseReviewReport(wrapped);
     expect(result).not.toBeNull();
     expect(result!.sections).toEqual([]);
@@ -193,9 +193,7 @@ describe("parseGenerateResponse", () => {
 
   it("filters out entries with only whitespace name", () => {
     const json = JSON.stringify({
-      terms: [
-        { name: "   ", definition: "Whitespace", tags: [], aliases: [] },
-      ],
+      terms: [{ name: "   ", definition: "Whitespace", tags: [], aliases: [] }],
     });
 
     const result = parseGenerateResponse(json);
@@ -219,7 +217,7 @@ describe("parseGenerateResponse", () => {
 
   it("handles JSON wrapped in markdown code blocks", () => {
     const wrapped =
-      "```json\n{\n  \"terms\": [\n    {\n      \"name\": \"TypeScript\",\n      \"definition\": \"A typed superset of JavaScript.\",\n      \"tags\": [\"language\"],\n      \"aliases\": []\n    }\n  ]\n}\n```";
+      '```json\n{\n  "terms": [\n    {\n      "name": "TypeScript",\n      "definition": "A typed superset of JavaScript.",\n      "tags": ["language"],\n      "aliases": []\n    }\n  ]\n}\n```';
     const result = parseGenerateResponse(wrapped);
     expect(result).not.toBeNull();
     expect(result!.terms).toHaveLength(1);

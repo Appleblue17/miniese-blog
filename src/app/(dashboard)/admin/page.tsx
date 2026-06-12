@@ -25,9 +25,7 @@ export default function AdminDashboardPage() {
           <PlusCircle className="size-10 text-primary" />
           <div>
             <h2 className="font-medium text-lg">发布文章</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              上传 Markdown 文件并发布为文章
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">上传 Markdown 文件并发布为文章</p>
           </div>
         </Link>
 
@@ -38,9 +36,7 @@ export default function AdminDashboardPage() {
           <FileText className="size-10 text-primary" />
           <div>
             <h2 className="font-medium text-lg">文章管理</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              查看文章列表、编辑或删除
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">查看文章列表、编辑或删除</p>
           </div>
         </Link>
 
@@ -64,9 +60,7 @@ export default function AdminDashboardPage() {
           <BookOpen className="size-10 text-primary" />
           <div>
             <h2 className="font-medium text-lg">知识库管理</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              管理 Wiki 词条和术语
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">管理 Wiki 词条和术语</p>
           </div>
         </Link>
 
@@ -77,9 +71,7 @@ export default function AdminDashboardPage() {
           <Settings className="size-10 text-primary" />
           <div>
             <h2 className="font-medium text-lg">站点设置</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              配置站点名称、主题色等
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">配置站点名称、主题色等</p>
           </div>
         </Link>
       </div>

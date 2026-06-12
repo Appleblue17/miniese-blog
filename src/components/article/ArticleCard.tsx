@@ -61,9 +61,7 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
 
           {/* Summary */}
           {article.summary && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {article.summary}
-            </p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{article.summary}</p>
           )}
 
           {/* Metadata row */}

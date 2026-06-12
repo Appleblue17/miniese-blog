@@ -45,17 +45,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const targetLanguage = body.targetLanguage || "en";
 
     if (!["zh", "en"].includes(sourceLanguage)) {
-      return NextResponse.json(
-        { error: "sourceLanguage must be 'zh' or 'en'" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "sourceLanguage must be 'zh' or 'en'" }, { status: 400 });
     }
 
     if (!["zh", "en"].includes(targetLanguage)) {
-      return NextResponse.json(
-        { error: "targetLanguage must be 'zh' or 'en'" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "targetLanguage must be 'zh' or 'en'" }, { status: 400 });
     }
 
     if (sourceLanguage === targetLanguage) {
@@ -77,10 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!sourceArticle) {
-      return NextResponse.json(
-        { error: `Article not found: ${body.articleId}` },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: `Article not found: ${body.articleId}` }, { status: 404 });
     }
 
     // --- Look up target article (sibling with same slug) ---
@@ -111,10 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       currentSourceContent = await readFile(sourcePath, "utf-8");
     } catch {
-      return NextResponse.json(
-        { error: "Could not read source article file" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Could not read source article file" }, { status: 500 });
     }
 
     // --- Get the previous (old) content for diff ---
@@ -141,9 +129,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ taskId }, { status: 201 });
   } catch (error) {
     console.error("Error submitting translate task:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

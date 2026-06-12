@@ -91,11 +91,7 @@ describe("incrementalTranslate", () => {
   });
 
   it("reuses existing translation when content unchanged (no diff blocks)", async () => {
-    const content = [
-      "# Stable",
-      "",
-      "Short content.",
-    ].join("\n");
+    const content = ["# Stable", "", "Short content."].join("\n");
 
     // existingTranslations maps each LINE's content to its translation
     const existing = {
@@ -114,11 +110,7 @@ describe("incrementalTranslate", () => {
   });
 
   it("full translate: all content is new, calls AI once", async () => {
-    const content = [
-      "# Intro",
-      "",
-      "Short content.",
-    ].join("\n");
+    const content = ["# Intro", "", "Short content."].join("\n");
 
     // When old is empty, detectChanges returns 1 block covering all lines.
     // splitRange produces 1 sub-chunk with the whole body.
@@ -167,13 +159,7 @@ describe("incrementalTranslate", () => {
 
     mockTranslateResponse("New text (translated).");
 
-    const result = await incrementalTranslate(
-      oldContent,
-      newContent,
-      {},
-      "Chinese",
-      "English",
-    );
+    const result = await incrementalTranslate(oldContent, newContent, {}, "Chinese", "English");
 
     expect(callDeepSeek).toHaveBeenCalledTimes(1);
     expect(result.translatedCount).toBe(1);
@@ -234,11 +220,7 @@ describe("incrementalTranslate", () => {
   });
 
   it("handles added content at the end", async () => {
-    const oldContent = [
-      "# Intro",
-      "",
-      "Intro text.",
-    ].join("\n");
+    const oldContent = ["# Intro", "", "Intro text."].join("\n");
 
     const newContent = [
       "# Intro",
@@ -269,13 +251,7 @@ describe("incrementalTranslate", () => {
 
     mockTranslateResponse("\n## Added Section (translated)\n\nNew content (translated).");
 
-    const result = await incrementalTranslate(
-      oldContent,
-      newContent,
-      {},
-      "Chinese",
-      "English",
-    );
+    const result = await incrementalTranslate(oldContent, newContent, {}, "Chinese", "English");
 
     expect(callDeepSeek).toHaveBeenCalledTimes(1);
     expect(result.translatedCount).toBe(1);
@@ -296,11 +272,7 @@ describe("incrementalTranslate", () => {
       "Content to remove.",
     ].join("\n");
 
-    const newContent = [
-      "# Keep",
-      "",
-      "Content to keep.",
-    ].join("\n");
+    const newContent = ["# Keep", "", "Content to keep."].join("\n");
 
     // newContent only has 3 lines. oldContent had 7.
     // detectChanges: lines 1-3 match, lines 4-7 removed from old (no mapping to new).
@@ -330,17 +302,13 @@ describe("incrementalTranslate", () => {
   });
 
   it("translates entire content when old is empty (full translate via incremental)", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-      "",
-      "# Section 2",
-      "",
-      "Content 2.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1.", "", "# Section 2", "", "Content 2."].join(
+      "\n",
+    );
 
-    mockTranslateResponse("# Section 1 (translated)\n\nContent 1.\n\n# Section 2 (translated)\n\nContent 2.");
+    mockTranslateResponse(
+      "# Section 1 (translated)\n\nContent 1.\n\n# Section 2 (translated)\n\nContent 2.",
+    );
 
     const result = await incrementalTranslate("", content, {}, "Chinese", "English");
 
@@ -351,11 +319,7 @@ describe("incrementalTranslate", () => {
   });
 
   it("fallback when translated chunk returns empty content", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1."].join("\n");
 
     mockTranslateResponse("");
 
@@ -395,19 +359,11 @@ describe("incrementalTranslate", () => {
   });
 
   it("handles content with code blocks", async () => {
-    const content = [
-      "# Code",
-      "",
-      '```python',
-      'print("hello")',
-      '```',
-      "",
-      "Some text.",
-    ].join("\n");
-
-    mockTranslateResponse(
-      "# Code (translated)\n\n```python\nprint(\"hello\")\n```\n\nSome text.",
+    const content = ["# Code", "", "```python", 'print("hello")', "```", "", "Some text."].join(
+      "\n",
     );
+
+    mockTranslateResponse('# Code (translated)\n\n```python\nprint("hello")\n```\n\nSome text.');
 
     const result = await incrementalTranslate("", content, {}, "Chinese", "English");
 
@@ -420,21 +376,9 @@ describe("incrementalTranslate", () => {
   it("reuses lines from existing translations even when content is not chunk-aligned", async () => {
     // This tests the core fix: previously, unchanged lines could be lost
     // because assembly used chunk-level keys. Now assembly is line-level.
-    const oldContent = [
-      "# A",
-      "",
-      "A content.",
-    ].join("\n");
+    const oldContent = ["# A", "", "A content."].join("\n");
 
-    const newContent = [
-      "# A",
-      "",
-      "A content.",
-      "",
-      "# B",
-      "",
-      "B content.",
-    ].join("\n");
+    const newContent = ["# A", "", "A content.", "", "# B", "", "B content."].join("\n");
 
     // Line-by-line existing translations
     const existing = {
@@ -465,15 +409,9 @@ describe("incrementalTranslate", () => {
   });
 
   it("preserves document order in translated output", async () => {
-    const content = [
-      "# Z Section",
-      "",
-      "Content Z.",
-      "",
-      "# A Section",
-      "",
-      "Content A.",
-    ].join("\n");
+    const content = ["# Z Section", "", "Content Z.", "", "# A Section", "", "Content A."].join(
+      "\n",
+    );
 
     mockTranslateResponse(
       "# Z Section (translated)\n\nContent Z.\n\n# A Section (translated)\n\nContent A.",
@@ -494,11 +432,7 @@ describe("incrementalTranslate", () => {
 
 describe("translateFull", () => {
   it("translates all content as new", async () => {
-    const content = [
-      "# Hello",
-      "",
-      "Hello world.",
-    ].join("\n");
+    const content = ["# Hello", "", "Hello world."].join("\n");
 
     mockTranslateResponse("# Hello (translated)\n\nHello world.");
 
@@ -526,15 +460,7 @@ describe("translateFull", () => {
   });
 
   it("preserves frontmatter in full translation", async () => {
-    const content = [
-      "---",
-      "title: Hello",
-      "---",
-      "",
-      "# Content",
-      "",
-      "Body text.",
-    ].join("\n");
+    const content = ["---", "title: Hello", "---", "", "# Content", "", "Body text."].join("\n");
 
     mockTranslateResponse("# Content (translated)\n\nBody text.");
 
@@ -545,11 +471,7 @@ describe("translateFull", () => {
   });
 
   it("provides correct translatedGroups for full translation", async () => {
-    const content = [
-      "# Section 1",
-      "",
-      "Content 1.",
-    ].join("\n");
+    const content = ["# Section 1", "", "Content 1."].join("\n");
 
     mockTranslateResponse("# Section 1 (translated)\n\nContent 1.");
 
@@ -578,11 +500,7 @@ describe("edge cases", () => {
   });
 
   it("does not call API when all content is unchanged and has translations", async () => {
-    const content = [
-      "# A",
-      "",
-      "A content.",
-    ].join("\n");
+    const content = ["# A", "", "A content."].join("\n");
 
     const existing = {
       "# A": "# A (translated)",
@@ -674,7 +592,9 @@ describe("edge cases", () => {
     expect(result.translatedContent).toContain("Final content here (translated).");
 
     // Verify the edited part was translated
-    expect(result.translatedContent).toContain("This is the second section (translated and edited).");
+    expect(result.translatedContent).toContain(
+      "This is the second section (translated and edited).",
+    );
     expect(result.translatedContent).not.toContain("This is the second section (edited)."); // original
   });
 });

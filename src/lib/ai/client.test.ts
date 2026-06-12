@@ -118,9 +118,7 @@ describe("callDeepSeek", () => {
 
     const { callDeepSeek } = await import("./client");
 
-    await expect(callDeepSeek({ prompt: "Fail" })).rejects.toThrow(
-      /Persistent failure/i,
-    );
+    await expect(callDeepSeek({ prompt: "Fail" })).rejects.toThrow(/Persistent failure/i);
     // Initial + 3 retries = 4 total attempts
     expect(mockFetch.mock.calls.length).toBe(4);
   });
@@ -139,9 +137,7 @@ describe("callDeepSeek", () => {
     const { callDeepSeek } = await import("./client");
     await callDeepSeek({ prompt: "Test" });
 
-    expect(mockFetch.mock.calls[0][0]).toBe(
-      "https://custom.api.com/v2/v1/chat/completions",
-    );
+    expect(mockFetch.mock.calls[0][0]).toBe("https://custom.api.com/v2/v1/chat/completions");
   });
 
   it("uses default temperature when not specified", async () => {
@@ -189,8 +185,6 @@ describe("callDeepSeek", () => {
 
     const { callDeepSeek } = await import("./client");
 
-    await expect(callDeepSeek({ prompt: "Test" })).rejects.toThrow(
-      /DEEPSEEK_API_KEY/i,
-    );
+    await expect(callDeepSeek({ prompt: "Test" })).rejects.toThrow(/DEEPSEEK_API_KEY/i);
   });
 });

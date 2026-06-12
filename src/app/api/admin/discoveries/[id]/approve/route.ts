@@ -21,10 +21,7 @@ import { buildWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
 import { addJob } from "@/lib/queue/producer";
 import type { WikiBlocks } from "@/lib/wiki/parser";
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
 
@@ -35,10 +32,7 @@ export async function POST(
     });
 
     if (!record) {
-      return NextResponse.json(
-        { error: "Discovery record not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Discovery record not found." }, { status: 404 });
     }
 
     if (record.status !== "pending") {
@@ -93,12 +87,7 @@ export async function POST(
       blocks,
     );
 
-    const targetDir = path.join(
-      process.cwd(),
-      "content",
-      "wiki",
-      record.articleLang,
-    );
+    const targetDir = path.join(process.cwd(), "content", "wiki", record.articleLang);
     await mkdir(targetDir, { recursive: true });
     const fileName = `${slug}.md`;
     const contentPath = `content/wiki/${record.articleLang}/${fileName}`;
@@ -139,9 +128,7 @@ export async function POST(
       taskId = await addJob("generate", {
         discoveryId: id,
       });
-      console.log(
-        `[Admin] Enqueued generate job (${taskId}) for discovery ${id}`,
-      );
+      console.log(`[Admin] Enqueued generate job (${taskId}) for discovery ${id}`);
     } catch (err) {
       // If queue enqueue fails, the WikiEntry is still created as "creating"
       // Admin can manually trigger generation later
@@ -168,9 +155,6 @@ export async function POST(
     });
   } catch (error) {
     console.error("Admin discovery approve error:", error);
-    return NextResponse.json(
-      { error: "Internal server error." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

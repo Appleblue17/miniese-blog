@@ -4,11 +4,9 @@
 
 export function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
-    published:
-      "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    published: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
     draft: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    review:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    review: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   };
 
   const labels: Record<string, string> = {

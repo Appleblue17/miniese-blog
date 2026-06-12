@@ -277,13 +277,9 @@ describe("parseWikiFileWithMeta", () => {
   });
 
   it("uses defaults when frontmatter lacks fields", () => {
-    const content = [
-      "---",
-      "name: Test",
-      "---",
-      "",
-      "<!-- DEF_START -->Def<!-- DEF_END -->",
-    ].join("\n");
+    const content = ["---", "name: Test", "---", "", "<!-- DEF_START -->Def<!-- DEF_END -->"].join(
+      "\n",
+    );
 
     const parsed = parseWikiFileWithMeta(content);
 

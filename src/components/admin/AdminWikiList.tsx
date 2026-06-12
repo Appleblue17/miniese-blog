@@ -105,10 +105,7 @@ function formatDate(dateStr: string): string {
 
 // --- Status Badge ---
 
-const STATUS_CONFIG: Record<
-  WikiStatus,
-  { label: string; color: string; icon: React.ReactNode }
-> = {
+const STATUS_CONFIG: Record<WikiStatus, { label: string; color: string; icon: React.ReactNode }> = {
   creating: {
     label: "生成中",
     color: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
@@ -167,7 +164,8 @@ function DeleteModal({
           <div className="flex-1">
             <h3 className="text-base font-semibold">确认删除词条</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              确定要将词条 <strong className="text-foreground">{name}</strong> 移至已删除吗？<br />
+              确定要将词条 <strong className="text-foreground">{name}</strong> 移至已删除吗？
+              <br />
               {loading ? "" : "词条不会从知识库中永久移除。"}
             </p>
           </div>
@@ -212,7 +210,6 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
   const [deleting, setDeleting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [undoing, setUndoing] = useState(false);
-  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleDelete = useCallback(async () => {
@@ -279,27 +276,6 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
     }
   }, [entry.name, entry.language, onRefresh]);
 
-  const handleRetry = useCallback(async () => {
-    setRetrying(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/wiki/${encodeURIComponent(entry.name)}/retry?lang=${entry.language}`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "重新生成失败");
-        setRetrying(false);
-        return;
-      }
-      onRefresh();
-    } catch {
-      setError("重新生成请求失败");
-      setRetrying(false);
-    }
-  }, [entry.name, entry.language, onRefresh]);
-
   const canEdit = entry.status === "unreviewed" || entry.status === "reviewed";
   const canReview = entry.status === "unreviewed";
   const canDelete = entry.status !== "deleted";
@@ -317,9 +293,7 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {entry.aliases.length > 0 && (
-              <span>别名: {entry.aliases.join(", ")}</span>
-            )}
+            {entry.aliases.length > 0 && <span>别名: {entry.aliases.join(", ")}</span>}
             <span>更新 {formatDate(entry.updatedAt)}</span>
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
@@ -327,41 +301,7 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
         <div className="flex items-center gap-2 shrink-0 ml-4">
           <StatusBadge status={entry.status} />
 
-          {entry.status === "creating" && (
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={undoing}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
-              title="撤销（移至申请中）"
-            >
-              {undoing ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              撤销
-            </button>
-          )}
-
           {entry.status === "unreviewed" && (
-            <button
-              type="button"
-              onClick={handleRetry}
-              disabled={retrying}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors disabled:opacity-50"
-              title="重新生成"
-            >
-              {retrying ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              重生成
-            </button>
-          )}
-
-          {canReview && (
             <button
               type="button"
               onClick={handleReview}
@@ -375,6 +315,40 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
                 <CheckCircle2 className="size-3.5" />
               )}
               通过
+            </button>
+          )}
+
+          {(entry.status === "unreviewed" || entry.status === "creating") && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={undoing}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
+              title={entry.status === "creating" ? "撤销（移至申请中）" : "撤销（移至申请中）"}
+            >
+              {undoing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              撤销
+            </button>
+          )}
+
+          {entry.status === "reviewed" && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={undoing}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
+              title="撤销审查（移至待审查）"
+            >
+              {undoing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              撤销审查
             </button>
           )}
 
@@ -405,7 +379,10 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
         <DeleteModal
           name={entry.name}
           onConfirm={handleDelete}
-          onCancel={() => { setShowDelete(false); setError(null); }}
+          onCancel={() => {
+            setShowDelete(false);
+            setError(null);
+          }}
           loading={deleting}
         />
       )}
@@ -432,7 +409,11 @@ function Pagination({
   } else {
     pages.push(1);
     if (currentPage > 3) pages.push("...");
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
       pages.push(i);
     }
     if (currentPage < totalPages - 2) pages.push("...");
@@ -554,7 +535,9 @@ function CircularImportance({ value }: { value: number }) {
       <svg className="size-9 -rotate-90" viewBox="0 0 32 32">
         {/* Background circle */}
         <circle
-          cx="16" cy="16" r="14"
+          cx="16"
+          cy="16"
+          r="14"
           fill="none"
           stroke="currentColor"
           strokeWidth="3"
@@ -562,7 +545,9 @@ function CircularImportance({ value }: { value: number }) {
         />
         {/* Progress arc */}
         <circle
-          cx="16" cy="16" r="14"
+          cx="16"
+          cy="16"
+          r="14"
           fill="none"
           strokeWidth="3"
           strokeLinecap="round"
@@ -684,7 +669,8 @@ function DiscoveryCard({
             {discovery.status !== "pending" && discovery.approvedAt && (
               <span>
                 {discovery.status === "approved" ? "已同意" : "已删除"}
-                {" · "}{formatDate(discovery.approvedAt)}
+                {" · "}
+                {formatDate(discovery.approvedAt)}
               </span>
             )}
             {/* Link to generated wiki entry */}
@@ -699,7 +685,10 @@ function DiscoveryCard({
             )}
             {discovery.status === "failed" && discovery.failedReason && (
               <span className="text-red-500" title={discovery.failedReason}>
-                原因: {discovery.failedReason.length > 30 ? discovery.failedReason.slice(0, 30) + "..." : discovery.failedReason}
+                原因:{" "}
+                {discovery.failedReason.length > 30
+                  ? discovery.failedReason.slice(0, 30) + "..."
+                  : discovery.failedReason}
               </span>
             )}
           </div>
@@ -745,17 +734,28 @@ function DiscoveryCard({
             </button>
           )}
 
-          {/* Retry button for failed items */}
+          {/* Retry and undo buttons for failed items */}
           {discovery.status === "failed" && (
-            <button
-              onClick={() => onRetry(discovery.id)}
-              disabled={processing}
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50 cursor-pointer"
-              title="重新生成"
-            >
-              <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
-              重新生成
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onUndoGenerated(discovery.id)}
+                disabled={processing}
+                className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+                title="撤销（回到申请中）"
+              >
+                <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
+                撤销
+              </button>
+              <button
+                onClick={() => onRetry(discovery.id)}
+                disabled={processing}
+                className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+                title="重新生成"
+              >
+                <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
+                重试
+              </button>
+            </div>
           )}
 
           {/* Undo generated button */}
@@ -778,10 +778,7 @@ function DiscoveryCard({
 
 // --- Main Component ---
 
-export function AdminWikiList({
-  activeStatus,
-  currentPage,
-}: AdminWikiListProps) {
+export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps) {
   const basePath = "/admin/wiki";
 
   // -----------------------------------------------------------------------
@@ -819,9 +816,7 @@ export function AdminWikiList({
     setError(null);
     try {
       const statuses =
-        activeStatus === "all"
-          ? ["unreviewed", "reviewed", "deleted"]
-          : [activeStatus];
+        activeStatus === "all" ? ["unreviewed", "reviewed", "deleted"] : [activeStatus];
 
       const results: WikiEntryMeta[] = [];
       let total = 0;
@@ -842,9 +837,7 @@ export function AdminWikiList({
 
       setEntries(results);
       setEntryTotal(total);
-      setEntryTotalPages(
-        activeStatus === "all" ? 1 : Math.ceil(total / (PAGE_SIZE * 2)),
-      );
+      setEntryTotalPages(activeStatus === "all" ? 1 : Math.ceil(total / (PAGE_SIZE * 2)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch entries");
     } finally {
@@ -1056,9 +1049,7 @@ export function AdminWikiList({
 
   const isEntryTab = ENTRY_TABS.has(activeStatus);
   const isDiscoveryTab = DISCOVERY_TABS.has(activeStatus);
-  const isEmpty = isEntryTab
-    ? entries.length === 0
-    : discoveries.length === 0;
+  const isEmpty = isEntryTab ? entries.length === 0 : discoveries.length === 0;
   const listTotal = isEntryTab ? entryTotal : discoveryTotal;
   const listTotalPages = isEntryTab ? entryTotalPages : discoveryTotalPages;
 
@@ -1068,18 +1059,12 @@ export function AdminWikiList({
 
   return (
     <div className="flex flex-col gap-4">
-      <StatusTabBar
-        tabs={STATUS_TABS}
-        activeKey={activeStatus}
-        basePath={basePath}
-      />
+      <StatusTabBar tabs={STATUS_TABS} activeKey={activeStatus} basePath={basePath} />
 
       {/* Batch operation toolbar (pending discoveries only) */}
       {activeStatus === "pending" && discoveries.length > 0 && !loading && (
         <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
-          <span className="text-xs font-medium text-muted-foreground mr-2">
-            批量操作:
-          </span>
+          <span className="text-xs font-medium text-muted-foreground mr-2">批量操作:</span>
           <button
             onClick={approveAll}
             disabled={processing}
@@ -1203,7 +1188,8 @@ export function AdminWikiList({
               <div className="flex-1">
                 <h3 className="text-base font-semibold">确认批量操作</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  确定要执行 <strong className="text-foreground">{batchConfirm.label}</strong> 操作吗？
+                  确定要执行 <strong className="text-foreground">{batchConfirm.label}</strong>{" "}
+                  操作吗？
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   此操作将直接修改 {discoveries.length} 条候选词条记录。
@@ -1243,7 +1229,9 @@ export function AdminWikiList({
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">关闭</button>
+          <button onClick={() => setError(null)} className="ml-2 underline">
+            关闭
+          </button>
         </div>
       )}
 
@@ -1300,11 +1288,7 @@ export function AdminWikiList({
 
       {/* Pagination */}
       {listTotalPages > 1 && !loading && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={listTotalPages}
-          baseParams={baseParams}
-        />
+        <Pagination currentPage={currentPage} totalPages={listTotalPages} baseParams={baseParams} />
       )}
     </div>
   );

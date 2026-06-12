@@ -36,9 +36,7 @@ export default async function AdminWikiPage({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">知识库管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理词条和候选术语
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">管理词条和候选术语</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -51,10 +49,7 @@ export default async function AdminWikiPage({
         </div>
       </div>
 
-      <AdminWikiList
-        activeStatus={activeStatus}
-        currentPage={currentPage}
-      />
+      <AdminWikiList activeStatus={activeStatus} currentPage={currentPage} />
     </div>
   );
 }
