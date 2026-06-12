@@ -320,14 +320,16 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   // 6. Store initial progress so detail page can show 0/total immediately
   const { taskId: translateTaskId } = job.data as { taskId: string };
 
-  await prisma.aiTask.update({
-    where: { id: translateTaskId },
-    data: {
-      output: {
-        progress: { totalChunks: 0, processedChunks: 0 },
-      } as JsonInput,
-    },
-  });
+  // Store initial progress using jsonb_set to avoid overwriting
+  // any existing output fields.
+  await prisma.$executeRawUnsafe(
+    `UPDATE "AiTask" SET output = jsonb_set(
+      COALESCE(output, '{}'::jsonb),
+      '{progress}',
+      '{"totalChunks": 0, "processedChunks": 0}'::jsonb
+    ) WHERE id = $1`,
+    translateTaskId,
+  );
 
   // 7. Perform incremental translation with progress callback
   const result = await incrementalTranslate(
@@ -338,14 +340,15 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     targetLangName,
     // Report progress after each sub-chunk (fire-and-forget, don't block)
     (processed, total) => {
-      prisma.aiTask.update({
-        where: { id: translateTaskId },
-        data: {
-          output: {
-            progress: { totalChunks: total, processedChunks: processed },
-          } as JsonInput,
-        },
-      }).catch((err) => {
+      prisma.$executeRawUnsafe(
+        `UPDATE "AiTask" SET output = jsonb_set(
+          COALESCE(output, '{}'::jsonb),
+          '{progress}',
+          $2::jsonb
+        ) WHERE id = $1`,
+        translateTaskId,
+        JSON.stringify({ totalChunks: total, processedChunks: processed }),
+      ).catch((err) => {
         console.warn(`[Worker] Failed to update translate progress: ${err instanceof Error ? err.message : String(err)}`);
       });
     },
