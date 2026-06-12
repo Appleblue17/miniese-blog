@@ -149,6 +149,8 @@ export function PublishForm({
         const latest = tasks[0];
         setReviewTaskId(latest.id);
         setReviewStatus(latest.status);
+        // Restore the "已提交审查" state so the button shows correctly on refresh
+        setReviewSubmitted(true);
 
         if (latest.status === "completed" && latest.output) {
           const summary = (latest.output as Record<string, unknown>).summary as {
@@ -335,6 +337,10 @@ export function PublishForm({
         }
         currentDraftId = draftData.draft.id;
         setDraftId(currentDraftId);
+
+        // Redirect to draft editor — the review will be visible there
+        window.location.href = `/admin/articles/${currentDraftId}/edit?review_triggered=1`;
+        return;
       }
 
       // Mark as submitted — prevent re-trigger until file re-upload
@@ -721,13 +727,12 @@ export function PublishForm({
               )}
             </Card>
 
-            {/* Action buttons */}
+            {/* Action buttons — only save as draft or go to confirm, no review here */}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
                 onClick={handleSaveDraft}
                 disabled={savingDraft}
-                className="sm:order-1"
               >
                 {savingDraft ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -738,25 +743,8 @@ export function PublishForm({
               </Button>
 
               <Button
-                variant="secondary"
-                onClick={() => {
-                  if (reviewSubmitted) {
-                    setShowReviewConfirm(true);
-                  } else {
-                    handleSubmitReview();
-                  }
-                }}
-                disabled={savingDraft || (reviewSubmitted && reviewStatus === "processing")}
-                className="sm:order-2"
-              >
-                <Sparkles className="size-4" />
-                {reviewSubmitted ? "已提交审查" : "交给助手审查"}
-              </Button>
-
-              <Button
                 onClick={handleGoToConfirm}
                 disabled={!fileContent}
-                className="sm:order-3"
               >
                 <Send className="size-4" />
                 下一步 · 确认发布

@@ -12,11 +12,10 @@ import path from "path";
 import fs from "fs/promises";
 import Queue from "bull";
 import { prisma } from "./lib/db";
-import { splitArticle } from "./lib/ai/chunker/chunker";
-import { buildReviewPrompt } from "./lib/ai/prompts/review";
 import { callDeepSeek } from "./lib/ai/client";
-import { parseReviewReport, parseGenerateResponse } from "./lib/ai/parsers";
+import { parseGenerateResponse } from "./lib/ai/parsers";
 import { incrementalTranslate, type TranslationMap } from "./lib/ai/translator2";
+import { incrementalReview } from "./lib/ai/reviewer";
 import { buildGenerateSystemPrompt, buildGenerateUserPrompt } from "./lib/ai/prompts/generate";
 import { renderMarkdown } from "./lib/markdown/renderer";
 import { detectWikiLinks } from "./lib/markdown/linkDetector";
@@ -42,189 +41,126 @@ if (!REDIS_URL) {
  *
  * Flow:
  * 1. Read article content from file system
- * 2. Split content into chunks (by headings/paragraphs)
- * 3. Review each chunk serially via DeepSeek API
- * 4. Merge chunk reports into a single output
- * 5. Return merged report (stored in AiTask.output)
+ * 2. Load the previous review's content snapshot as old source (for incremental diff)
+ * 3. Call incrementalReview with the shared pipeline (detectChanges + splitRange + buildContext)
+ * 4. Return merged report including contentMap + contentSnapshot for next incremental run
+ *
+ * Payload required fields:
+ * - `articleId`: ID of the article to review
  */
 async function processReview(job: Job): Promise<Record<string, unknown>> {
-  const { articleId, version } = (job.data.payload ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const payload = (job.data.payload ?? {}) as Record<string, unknown>;
+  const { articleId } = payload;
 
-  console.log(
-    `[Worker] Processing review for article ${String(articleId)} (version ${String(version ?? "latest")})`,
-  );
+  const articleIdStr = String(articleId ?? "");
+
+  console.log(`[Worker] Processing review for article ${articleIdStr}`);
+
+  if (!articleIdStr) {
+    throw new Error("Missing required payload field: articleId");
+  }
 
   // 1. Read article content from DB + file system
   const article = await prisma.article.findUnique({
-    where: { id: String(articleId) },
-    select: { contentPath: true, slug: true, title: true },
+    where: { id: articleIdStr },
+    select: { contentPath: true, slug: true, title: true, draftOfId: true },
   });
 
   if (!article) {
-    throw new Error(`Article not found: ${articleId}`);
+    throw new Error(`Article not found: ${articleIdStr}`);
   }
 
   const filePath = path.join(process.cwd(), article.contentPath);
-  let content: string;
+  let currentContent: string;
   try {
-    content = await fs.readFile(filePath, "utf-8");
+    currentContent = await fs.readFile(filePath, "utf-8");
   } catch (err) {
     throw new Error(
       `Could not read article file: ${article.contentPath} (${err instanceof Error ? err.message : String(err)})`,
     );
   }
 
-  // 2. Split content into chunks
-  const chunks = splitArticle(content);
-  console.log(
-    `[Worker] Article split into ${chunks.length} chunks for review`,
-  );
-
-  if (chunks.length === 0) {
-    return {
-      articleId,
-      version: version ?? "latest",
-      reviewedAt: new Date().toISOString(),
-      chunks: [],
-      summary: { totalIssues: 0, errors: 0, warnings: 0, suggestions: 0 },
-    };
-  }
-
-  // 3. Review each chunk serially, updating progress after each
-  const chunkReports: Array<{
-    chunkId: number;
-    chunkTitle: string;
-    startLine: number;
-    endLine: number;
-    sections: Array<Record<string, unknown>>;
-  }> = [];
-
-  let chunkFailures = 0;
-
-  // Store total chunk count immediately so the UI can show it
+  // 2. Load old source content from the latest completed review task's
+  //    contentSnapshot (for incremental diff). If none exists, pass empty string
+  //    which triggers a full review.
+  //
+  //    If this article is a draft (has draftOfId), use the published article's
+  //    review history. This ensures that editing a published article and then
+  //    re-reviewing can do incremental diff against the last review.
   const { taskId } = job.data as { taskId: string };
-  await prisma.aiTask.update({
-    where: { id: taskId },
-    data: {
-      output: {
-        progress: { totalChunks: chunks.length, processedChunks: 0 },
-      } as JsonInput,
+
+  // Resolve to the published article's ID when reviewing a draft
+  const reviewArticleId = article.draftOfId || articleIdStr;
+
+  const latestReview = await prisma.aiTask.findFirst({
+    where: {
+      articleId: reviewArticleId,
+      type: "review",
+      status: "completed",
     },
+    orderBy: { completedAt: "desc" },
+    select: { output: true },
   });
 
-  for (const chunk of chunks) {
-    console.log(
-      `[Worker] Reviewing chunk ${chunk.id + 1}/${chunks.length}: "${chunk.title}"`,
-    );
+  let oldSourceContent = "";
+  let existingContentMap: Record<string, unknown> = {};
 
-    const prompt = buildReviewPrompt(chunk.content);
-
-    try {
-      const response = await callDeepSeek({
-        prompt,
-        responseFormat: "json",
-        temperature: 0.3,
-        maxTokens: 4096,
-      });
-
-      const report = parseReviewReport(response.content);
-
-      if (report) {
-        chunkReports.push({
-          chunkId: chunk.id,
-          chunkTitle: chunk.title,
-          startLine: chunk.startLine,
-          endLine: chunk.endLine,
-          sections: report.sections as unknown as Array<Record<string, unknown>>,
-        });
-      } else {
-        console.warn(
-          `[Worker] Chunk ${chunk.id} review returned unparseable response`,
-        );
-        chunkReports.push({
-          chunkId: chunk.id,
-          chunkTitle: chunk.title,
-          startLine: chunk.startLine,
-          endLine: chunk.endLine,
-          sections: [],
-        });
-      }
-    } catch (err) {
-      chunkFailures++;
-      console.error(
-        `[Worker] Chunk ${chunk.id} review failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      // Continue with next chunk even if one fails
-      chunkReports.push({
-        chunkId: chunk.id,
-        chunkTitle: chunk.title,
-        startLine: chunk.startLine,
-        endLine: chunk.endLine,
-        sections: [],
-      });
+  if (latestReview?.output && typeof latestReview.output === "object") {
+    const output = latestReview.output as Record<string, unknown>;
+    if (typeof output.contentSnapshot === "string") {
+      oldSourceContent = output.contentSnapshot;
     }
-
-    // Update progress after each chunk (fire-and-forget, don't block on failure)
-    prisma.aiTask.update({
-      where: { id: taskId },
-      data: {
-        output: {
-          progress: { totalChunks: chunks.length, processedChunks: chunkReports.length },
-        } as JsonInput,
-      },
-    }).catch((err) => {
-      console.warn(`[Worker] Failed to update progress: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  }
-
-  // If ALL chunks failed, propagate the error to mark the task as failed
-  if (chunkFailures === chunks.length) {
-    throw new Error(
-      `All ${chunks.length} chunk(s) failed during AI review. Check API key and network connectivity.`,
-    );
-  }
-
-  // If some chunks failed, warn but continue with partial results
-  if (chunkFailures > 0) {
-    console.warn(
-      `[Worker] ${chunkFailures}/${chunks.length} chunk(s) failed. Returning partial results.`,
-    );
-  }
-
-  // 4. Compute summary stats (exclude "ok" items — they're not issues)
-  let totalIssues = 0;
-  let errors = 0;
-  let warnings = 0;
-  let suggestions = 0;
-
-  for (const cr of chunkReports) {
-    for (const section of cr.sections) {
-      const items = (section as { items?: Array<{ severity?: string }> }).items ?? [];
-      for (const item of items) {
-        if (item.severity === "ok") continue;
-        totalIssues++;
-        if (item.severity === "error") errors++;
-        else if (item.severity === "warning") warnings++;
-        else if (item.severity === "suggestion") suggestions++;
-      }
+    if (
+      output.contentMap &&
+      typeof output.contentMap === "object" &&
+      !Array.isArray(output.contentMap)
+    ) {
+      existingContentMap = output.contentMap as Record<string, unknown>;
     }
   }
 
-  console.log(
-    `[Worker] Review complete: ${totalIssues} issues found (${errors} errors, ${warnings} warnings, ${suggestions} suggestions)`,
+  // 3. Store initial progress so detail page can show 0/total immediately
+  await prisma.$executeRawUnsafe(
+    `UPDATE "AiTask" SET output = jsonb_set(
+      COALESCE(output, '{}'::jsonb),
+      '{progress}',
+      '{"totalChunks": 0, "processedChunks": 0}'::jsonb
+    ) WHERE id = $1`,
+    taskId,
   );
 
-  // 5. Return merged report
-  return {
-    articleId,
-    version: version ?? "latest",
-    reviewedAt: new Date().toISOString(),
-    chunks: chunkReports,
-    summary: { totalIssues, errors, warnings, suggestions },
-  };
+  // 4. Perform incremental review with progress callback
+  const result = await incrementalReview(
+    oldSourceContent,
+    currentContent,
+    existingContentMap as Record<string, import("./lib/ai/reviewer").ReviewChunk>,
+    articleIdStr,
+    "latest",
+    // Report progress after each sub-chunk (fire-and-forget, don't block)
+    (processed, total) => {
+      prisma.$executeRawUnsafe(
+        `UPDATE "AiTask" SET output = jsonb_set(
+          COALESCE(output, '{}'::jsonb),
+          '{progress}',
+          $2::jsonb
+        ) WHERE id = $1`,
+        taskId,
+        JSON.stringify({ totalChunks: total, processedChunks: processed }),
+      ).catch((err) => {
+        console.warn(`[Worker] Failed to update review progress: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    },
+  );
+
+  console.log(
+    `[Worker] Review complete: ${result.summary.totalIssues} issues found ` +
+      `(${result.summary.errors} errors, ${result.summary.warnings} warnings, ` +
+      `${result.summary.suggestions} suggestions), ` +
+      `${result.reviewedCount} reviewed, ${result.reusedCount} reused`,
+  );
+
+  // 5. Return the full result (stored as AiTask.output)
+  return result as unknown as Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------

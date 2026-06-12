@@ -40,6 +40,13 @@ import { callDeepSeek } from "./client";
  */
 export type TranslationMap = Record<string, string>;
 
+/**
+ * Progress callback for reporting translation/review progress.
+ * @param processed - Number of sub-chunks processed so far
+ * @param total - Total number of sub-chunks
+ */
+export type ProgressCallback = (processed: number, total: number) => void;
+
 // ---------------------------------------------------------------------------
 // Type definitions
 // ---------------------------------------------------------------------------

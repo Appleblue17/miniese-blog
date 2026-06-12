@@ -230,3 +230,37 @@
     - 修复：使用跨 key 子串搜索（滑动窗口匹配）
   - `stripFrontmatter` 和 `matter(content).content` 输出不一致：前者保留 frontmatter 后的首个换行，后者去除
     - 修复：统一使用 `stripFrontmatter`
+
+### 任务 阶段5.2：Review 管道迁移到统一增量架构
+- **时间**：2026-06-12
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **reviewer.ts**：将 `processReview` 迁移到共享的 diff-based pipeline，与 translator2 架构一致。
+    - `incrementalReview()` 复用 `detectChanges` + `splitRange` + `buildContext`
+    - 复用策略：unchanged 范围复用 `existingChunks`，changed 范围通过 pipeline 发送给 AI
+    - 返回 `contentSnapshot` + `contentMap` 供下次增量
+  - **单元测试**：21 个 reviewer 单元测试 + 2 个 review_roundtrip 测试全部通过
+- **测试结果**：266/272 通过（6 个预存在的集成测试因外部服务不可用跳过）
+- **遇到的问题**：
+  - review 和 translate 使用相同的标记约定（`[TRANSLATE_START]/[TRANSLATE_END]`），但 instruction 不同
+  - Worker 需要区分 review 和 translate 任务的 output 格式
+
+### 任务 阶段5.2：修复增量审查与发布流程
+- **时间**：2026-06-12
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 1 — 增量审查不工作**：草稿的 `AiTask` 记录关联的是草稿的 articleId，但发布后创建了新的 article 记录
+    - 根因：第二次审查（在已发布文章上）找不到第一次审查的 `contentSnapshot`
+    - 修复（worker.ts）：在 `processReview` 中，如果文章有 `draftOfId`，使用已发布文章的 ID 查找上次审查记录
+  - **Bug 2 — 草稿记录未删除**：发布 API 的 `draftId` 分支使用了 `update`（设置 `draftOfId`）而非 `delete`
+    - 修复（publish/route.ts）：两个分支都使用 `prisma.article.delete({ where: { id: draftId } })`，在迁移 AiTask 记录后删除草稿
+  - **Bug 3 — 新文章流程导致孤立草稿**：点击审查 → 自动创建草稿 → 用户留在上传页 → 点击发布 → 草稿被孤立
+    - 修复前端：审查按钮从上传页移除，仅出现在草稿编辑页（步骤二）
+    - 修复前端：上传页的审查按钮改为"创建草稿并审查"，重定向到草稿编辑页
+    - 修复后端：`publish/route.ts` 新增守卫检查，如果 draft 已有 `draftOfId` 则拒绝（"请使用草稿编辑器发布"）
+  - **Bug 4 — 刷新后审查状态丢失**：页面刷新后 `reviewSubmitted` 未恢复，按钮显示"交给助手审查"而非"已提交审查"
+    - 修复（PublishForm.tsx）：在 `useEffect` 恢复审查状态时添加 `setReviewSubmitted(true)`
+- **测试结果**：266/272 通过（6 个预存在的集成测试因外部服务不可用跳过）
+- **遇到的问题**：
+  - `draftOfId` 解析需要在 worker 中进行，因为 worker 不感知文章是否已被发布
+  - 发布时迁移 AiTask 记录需要处理两种场景：draftOfId（更新已有文章）和 draftId only（首次发布）

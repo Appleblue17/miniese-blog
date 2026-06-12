@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Added
+- **审查引擎重构 (reviewer.ts)**: 迁移到统一增量 pipeline，与 translator2 架构一致。
+  - `incrementalReview()` 复用 `detectChanges` + `splitRange` + `buildContext`
+  - 21 个 reviewer 单元测试 + 2 个 roundtrip 测试
 - **翻译引擎重构 (translator2.ts)**: 纯行级 diff 管道的增量翻译引擎。
   - `detectChanges()` — 基于 Myers diff 的行级变化检测，支持相邻合并
   - `splitRange()` — 按标题边界拆分 diff 块为子 chunk
@@ -23,6 +26,10 @@
   - 译文写入目标语言文件 + 更新 DB 记录 + HTML 重新渲染
 
 ### Fixed
+- **增量审查不工作**: 草稿的 `AiTask` 记录关联草稿 articleId，发布后创建新文章导致找不到 `contentSnapshot`。修复：`processReview` 中使用 `draftOfId` 解析查找已发布文章的审查记录
+- **草稿记录未删除**: 发布后使用 `update` 而非 `delete`，导致孤立草稿记录。修复：迁移 AiTask 后执行 `prisma.article.delete()`
+- **新文章流程孤立草稿**: 审查自动创建草稿后用户留在上传页，点击发布导致草稿被孤立。修复：审查按钮移至草稿编辑页（步骤二），上传页仅保留存草稿和下一步按钮
+- **刷新后审查状态丢失**: 页面刷新后 `reviewSubmitted` 未恢复，按钮显示"交给助手审查"而非"已提交审查"。修复：在 `useEffect` 恢复状态时添加 `setReviewSubmitted(true)`
 - **translator2.ts Bug 修复**:
   - `reusedCount = 0` → 增加 `lineToTranslation` 映射，支持跨 key 子串搜索
   - 详情页 `buildTranslatedText` 找不到翻译 → 跨 key 子串搜索 fallback

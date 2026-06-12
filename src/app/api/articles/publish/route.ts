@@ -111,6 +111,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // --- Guard: draft must not be published via the wrong flow ---
+    // If a draft is already linked to a published article (draftOfId is set),
+    // it must be published with draftOfId (not from the "new article" flow).
+    // This prevents orphaned draft records after publishing.
+    if (draftId && !draftOfId) {
+      const draftRecord = await prisma.article.findUnique({
+        where: { id: draftId },
+        select: { draftOfId: true },
+      });
+      if (draftRecord?.draftOfId) {
+        return NextResponse.json(
+          { error: "This draft is already linked to a published article. Please use the draft editor to publish." },
+          { status: 400 },
+        );
+      }
+    }
+
     // --- Generate/validate slug ---
 
     const slug = generateSlug(frontmatter.title, customSlug || frontmatter.slug);
@@ -123,15 +140,27 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Check slug+language uniqueness ---
-    if (!draftOfId) {
+    // When draftOfId is provided, the existing published article is being updated,
+    // so exclude it from the uniqueness check.
+    // When only draftId is provided (new article from draft), check against
+    // existing published articles.
+    if (draftOfId) {
+      const existing = await prisma.article.findFirst({
+        where: { slug, language, id: { not: draftOfId } },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: `Article with slug "${slug}" and language "${language}" already exists.` },
+          { status: 409 },
+        );
+      }
+    } else {
       const existing = await prisma.article.findUnique({
         where: { slug_language: { slug, language } },
       });
       if (existing) {
         return NextResponse.json(
-          {
-            error: `Article with slug "${slug}" and language "${language}" already exists.`,
-          },
+          { error: `Article with slug "${slug}" and language "${language}" already exists.` },
           { status: 409 },
         );
       }
@@ -186,6 +215,9 @@ export async function POST(request: NextRequest) {
 
     if (draftOfId) {
       // --- Update existing published article ---
+      // The published article's ID stays the same. Any AiTask records
+      // from the draft (e.g., review results) are migrated to the
+      // published article, so incremental review can find them later.
       article = await prisma.article.update({
         where: { id: draftOfId },
         data: {
@@ -202,12 +234,22 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Delete the draft record after publishing
-      await prisma.article.deleteMany({
-        where: { draftOfId, id: { not: article.id } },
-      });
-    } else {
-      // --- Create new published article ---
+      // Migrate AiTask records from draft to the published article
+      if (draftId) {
+        await prisma.aiTask.updateMany({
+          where: { articleId: draftId },
+          data: { articleId: article.id },
+        });
+
+        // Delete the draft record
+        await prisma.article.delete({
+          where: { id: draftId },
+        });
+      }
+    } else if (draftId) {
+      // --- Create new published article from a draft (first-time publish) ---
+      // The published article gets a new ID. Migrate draft's AiTask records
+      // (e.g., review results) so incremental review works on subsequent runs.
       article = await prisma.article.create({
         data: {
           slug,
@@ -225,27 +267,48 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Link the draft to the newly published article
-      if (draftId) {
-        // Clean up draft file
-        const draftRecord = await prisma.article.findUnique({
-          where: { id: draftId },
-          select: { contentPath: true },
-        });
-        if (draftRecord?.contentPath) {
-          const draftFilePath = path.join(process.cwd(), draftRecord.contentPath);
-          try {
-            await unlink(draftFilePath);
-          } catch {
-            // Draft file may not exist
-          }
-        }
+      // Migrate AiTask records from draft to the new published article
+      await prisma.aiTask.updateMany({
+        where: { articleId: draftId },
+        data: { articleId: article.id },
+      });
 
-        await prisma.article.update({
-          where: { id: draftId },
-          data: { draftOfId: article.id },
-        });
+      // Clean up draft file
+      const draftRecord = await prisma.article.findUnique({
+        where: { id: draftId },
+        select: { contentPath: true },
+      });
+      if (draftRecord?.contentPath) {
+        const draftFilePath = path.join(process.cwd(), draftRecord.contentPath);
+        try {
+          await unlink(draftFilePath);
+        } catch {
+          // Draft file may not exist
+        }
       }
+
+      // Delete the draft record
+      await prisma.article.delete({
+        where: { id: draftId },
+      });
+    } else {
+      // --- Create new published article (no draft, direct publish) ---
+      article = await prisma.article.create({
+        data: {
+          slug,
+          title: frontmatter.title,
+          language,
+          contentPath: `content/articles/${language}/${slug}.md`,
+          renderedContent: html,
+          summary: frontmatter.summary || null,
+          tags: frontmatter.tags || [],
+          status: "published",
+          accessGroup: frontmatter.accessGroup || [],
+          changelog: changelog || null,
+          author: frontmatter.author || "博主",
+          publishedAt: new Date(),
+        },
+      });
     }
 
     // --- Trigger auto-translation if sibling article exists ---

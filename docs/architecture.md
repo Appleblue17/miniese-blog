@@ -6,6 +6,12 @@
 
 **最后更新**：2026-06-12
 
+### v0.8.3 2026-06-12
+
+- §6.4.10：新增 reviewer.ts 文件引用（reviewer roundtrip 测试），目录结构补充 `src/lib/ai/reviewer.ts`
+- §6.5：新增审查器实现说明——`incrementalReview` 函数复用通用 pipeline，`processReview` 在 worker 中调用，`draftOfId` 解析逻辑
+- §11.2 仪表盘路由：PublishForm 三步骤拆分正式文档化（上传页 → 草稿页 → 确认页），审查按钮仅出现在步骤二草稿页
+
 ### v0.8.2 2026-06-12
 
 - §6.4.9：详情页展示更新——上下文嵌入到 card 内部、全局上下文显示/隐藏按钮、移除统计提示和 filter 下拉菜单
@@ -823,13 +829,85 @@ src/lib/ai/chunker/
 
 src/lib/ai/
 ├── translator2.ts       # 行级增量翻译引擎
-└── translator2.test.ts  # 25 个单元测试
+├── translator2.test.ts  # 25 个单元测试
+├── reviewer.ts          # 增量审查引擎（复用通用 pipeline）
+├── reviewer.test.ts     # 21 个单元测试
+└── review_roundtrip.test.ts  # 2 个 roundtrip 集成测试
 
 src/components/admin/
-└── TranslateChunkList.tsx  # 翻译详情页组件（上下文嵌入 + 全局控制）
+├── TranslateChunkList.tsx  # 翻译详情页组件（上下文嵌入 + 全局控制）
+└── ReviewChunkList.tsx     # 审查详情页组件
 ```
 
----
+### 6.5 审查器实现（reviewer.ts）
+
+审查器（`src/lib/ai/reviewer.ts`）复用第 6.4 节的通用 pipeline，进行增量 AI 内容审查。
+
+#### 6.5.1 核心函数
+
+```typescript
+/**
+ * 增量审查文章内容。
+ *
+ * 复用通用 pipeline：
+ * - detectChanges() — 行级 diff
+ * - splitRange() — 按标题结构拆分
+ * - buildContext() — 上下文窗口
+ *
+ * @param oldSourceContent - 旧版本内容（空字符串 = 全量审查）
+ * @param newSourceContent - 新版本内容
+ * @param existingChunks - 已有审查结果（ReviewChunk 映射，用于增量复用）
+ * @param articleId - 文章 ID（用于 prompt 上下文）
+ * @param version - 版本标识
+ * @param onProgress - 进度回调
+ * @returns ReviewResult - 审查结果（含 contentSnapshot 供下次增量）
+ */
+export async function incrementalReview(
+  oldSourceContent: string,
+  newSourceContent: string,
+  existingChunks: Record<string, ReviewChunk>,
+  articleId: string,
+  version: string,
+  onProgress?: (processed: number, total: number) => void,
+): Promise<ReviewResult>
+```
+
+#### 6.5.2 复用策略
+
+审查器的增量复用逻辑与翻译器类似：
+
+- **未变化范围**：复用 `existingChunks` 中的审查结果（按行号区间查找匹配的 chunk）
+- **变化范围**：通过 pipeline 拆分为 sub-chunks，每个 sub-chunk 走完整的 prompt → AI 调用流程
+- **contentSnapshot**：返回完整的全文快照，供下次增量审查使用
+
+#### 6.5.3 Worker 调用（processReview）
+
+`src/worker.ts` 中的 `processReview` 函数负责接收队列任务并调用 `incrementalReview`：
+
+1. 从 DB 读取文章内容和文件系统
+2. 加载上次审查的 contentSnapshot（用于 diff 对比）
+3. **draftOfId 解析**：如果文章是草稿（有 draftOfId），使用已发布文章的 ID 查找上次审查记录。这确保了编辑已发布文章后重新审查时，能够正确找到增量对比的基准版本
+4. 调用 `incrementalReview()` 并报告进度
+5. 更新 DB 中的 AiTask 记录（含完整的 contentMap 和 contentSnapshot）
+
+#### 6.5.4 Prompt 结构
+
+审查器使用与翻译器相同的标记约定（`[TRANSLATE_START]/[TRANSLATE_END]`），但 instruction 部分要求 AI 检查内容正确性、拼写、结构等。
+
+#### 6.5.5 发布流程中的审查集成
+
+审查按钮仅出现在**步骤二（草稿编辑页）**，不在步骤一（上传页）显示。流程如下：
+
+1. 步骤一（上传页）：用户上传文件 → 填写元信息 → 存草稿
+2. 跳转到步骤二（草稿编辑页 `/admin/articles/[id]/edit`）
+3. 步骤二：用户可编辑元信息 → 点击"交给助手审查"触发审查任务
+4. 审查结果通过轮询显示在草稿页的 AI 审查卡片中
+5. 用户确认后进入步骤三（确认发布页）
+
+发布时：
+- 草稿的 AiTask 记录（包括审查结果）迁移到已发布文章的 ID
+- 草稿记录被删除
+- 如果草稿关联了已发布文章（draftOfId），则更新已有文章
 
 ## 7. Markdown 渲染设计
 
