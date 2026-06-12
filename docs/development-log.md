@@ -286,3 +286,27 @@
 - **遇到的问题**：
   - Worker 代码更新后需重启 Worker 进程才能生效，旧进程继续使用旧代码导致翻译后自动发现未触发
   - WikiDiscovery 唯一约束：初始有重复数据，迁移前需手动清理（`DELETE FROM "WikiDiscovery" WHERE id NOT IN (SELECT DISTINCT ON ("articleId", term) id FROM "WikiDiscovery")`）
+
+### 任务 阶段5.5：Wiki 管理界面按钮统一与撤销回退链路
+- **时间**：2026-06-12
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **UI 重构**: 将零散的 `/admin/wiki/discoveries/` 词条发现页与 `/admin/wiki/` 词条管理页合并为统一的 `AdminWikiList` 组件，新增状态标签栏（全部 / 申请中 / 生成中 / 待审查 / 已审查 / 生成失败 / 已删除）
+  - **按钮行为统一**（按状态区分）：
+    - `EntryRow`:
+      - `creating` — 仅显示「撤销」（移至申请中）
+      - `unreviewed` — 显示「通过」+「撤销」（移至申请中）+「编辑」+「删除」
+      - `reviewed` — 显示「撤销审查」（移至待审查）+「编辑」+「删除」
+      - `deleted` — 无操作按钮
+    - `DiscoveryCard`:
+      - `pending` — 显示「同意」+「删除」
+      - `generated` — 显示「撤销」（回到申请中）
+      - `failed` — 显示「撤销」（回到申请中）+「重试」
+      - `rejected` — 显示「撤销删除」（回到申请中）
+  - **后端撤销链路**：
+    - `/api/wiki/[name]/undo` — 支持 `creating`（删除词条记录+文件，将 discovery 移回 pending）、`unreviewed`（同上）、`reviewed`（移回 `unreviewed`，更新文件 frontmatter）
+    - `/api/admin/discoveries/[id]/undo` — 支持 `failed` discoveries（删除 WikiEntry 记录如存在，移回 pending）
+  - **清理**：移除 `EntryRow` 中未使用的 `handleRetry` 死代码
+- **测试结果**：301 测试，296/301 通过（5 个预存在的集成测试因外部服务不可用跳过），`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - 无新增问题
