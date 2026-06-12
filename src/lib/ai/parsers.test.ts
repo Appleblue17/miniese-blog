@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseReviewReport } from "./parsers";
-import type { ReviewReport } from "../../types/ai";
+import { parseReviewReport, parseGenerateResponse } from "./parsers";
+import type { ReviewReport, GenerateResult } from "../../types/ai";
 
 describe("parseReviewReport", () => {
   it("parses a valid review report JSON", () => {
@@ -118,5 +118,137 @@ describe("parseReviewReport", () => {
     const result = parseReviewReport(aiResponse.content);
     expect(result).not.toBeNull();
     expect(result!.sections).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseGenerateResponse
+// ---------------------------------------------------------------------------
+
+describe("parseGenerateResponse", () => {
+  it("parses a valid generate response with multiple terms", () => {
+    const json = JSON.stringify({
+      terms: [
+        {
+          name: "DFS",
+          definition: "Depth-First Search, a graph traversal algorithm.",
+          tags: ["algorithm", "graph"],
+          aliases: ["深度优先搜索"],
+        },
+        {
+          name: "BFS",
+          definition: "Breadth-First Search, a graph traversal algorithm.",
+          tags: ["algorithm", "graph"],
+          aliases: ["广度优先搜索"],
+        },
+      ],
+    });
+
+    const result = parseGenerateResponse(json);
+    expect(result).not.toBeNull();
+    expect(result!.terms).toHaveLength(2);
+    expect(result!.terms[0].name).toBe("DFS");
+    expect(result!.terms[0].definition).toContain("Depth-First Search");
+    expect(result!.terms[0].tags).toEqual(["algorithm", "graph"]);
+    expect(result!.terms[0].aliases).toEqual(["深度优先搜索"]);
+  });
+
+  it("parses a response with no aliases or tags", () => {
+    const json = JSON.stringify({
+      terms: [
+        {
+          name: "React",
+          definition: "A JavaScript UI library.",
+          tags: [],
+          aliases: [],
+        },
+      ],
+    });
+
+    const result = parseGenerateResponse(json);
+    expect(result).not.toBeNull();
+    expect(result!.terms).toHaveLength(1);
+    expect(result!.terms[0].tags).toEqual([]);
+    expect(result!.terms[0].aliases).toEqual([]);
+  });
+
+  it("filters out terms without a name", () => {
+    const json = JSON.stringify({
+      terms: [
+        { name: "", definition: "Empty name", tags: [], aliases: [] },
+        {
+          name: "Valid",
+          definition: "A valid term",
+          tags: [],
+          aliases: [],
+        },
+      ],
+    });
+
+    const result = parseGenerateResponse(json);
+    expect(result).not.toBeNull();
+    expect(result!.terms).toHaveLength(1);
+    expect(result!.terms[0].name).toBe("Valid");
+  });
+
+  it("filters out entries with only whitespace name", () => {
+    const json = JSON.stringify({
+      terms: [
+        { name: "   ", definition: "Whitespace", tags: [], aliases: [] },
+      ],
+    });
+
+    const result = parseGenerateResponse(json);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for missing terms array", () => {
+    const result = parseGenerateResponse(JSON.stringify({ foo: "bar" }));
+    expect(result).toBeNull();
+  });
+
+  it("returns null for invalid JSON", () => {
+    const result = parseGenerateResponse("not json");
+    expect(result).toBeNull();
+  });
+
+  it("returns null for empty terms array", () => {
+    const result = parseGenerateResponse(JSON.stringify({ terms: [] }));
+    expect(result).toBeNull();
+  });
+
+  it("handles JSON wrapped in markdown code blocks", () => {
+    const wrapped =
+      "```json\n{\n  \"terms\": [\n    {\n      \"name\": \"TypeScript\",\n      \"definition\": \"A typed superset of JavaScript.\",\n      \"tags\": [\"language\"],\n      \"aliases\": []\n    }\n  ]\n}\n```";
+    const result = parseGenerateResponse(wrapped);
+    expect(result).not.toBeNull();
+    expect(result!.terms).toHaveLength(1);
+    expect(result!.terms[0].name).toBe("TypeScript");
+  });
+
+  it("handles JSON with extra text before/after", () => {
+    const wrapped =
+      'I found these terms:\n\n{"terms": [{"name": "Next.js", "definition": "A React framework.", "tags": ["framework"], "aliases": []}]}\n\nThat is all.';
+    const result = parseGenerateResponse(wrapped);
+    expect(result).not.toBeNull();
+    expect(result!.terms).toHaveLength(1);
+    expect(result!.terms[0].name).toBe("Next.js");
+  });
+
+  it("strips extra whitespace from names", () => {
+    const json = JSON.stringify({
+      terms: [
+        {
+          name: "  Tailwind CSS  ",
+          definition: "A utility-first CSS framework.",
+          tags: [],
+          aliases: [],
+        },
+      ],
+    });
+
+    const result = parseGenerateResponse(json);
+    expect(result).not.toBeNull();
+    expect(result!.terms[0].name).toBe("Tailwind CSS");
   });
 });

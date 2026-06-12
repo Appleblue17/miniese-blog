@@ -45,14 +45,14 @@ export default function AdminDashboardPage() {
         </Link>
 
         <Link
-          href="/admin/reviews"
+          href="/admin/ai-tasks"
           className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
         >
           <Bot className="size-10 text-primary" />
           <div>
-            <h2 className="font-medium text-lg">AI 审查历史</h2>
+            <h2 className="font-medium text-lg">助手任务</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              查看 AI 文章审查记录和报告详情
+              查看 AI 审查、翻译和词条生成任务记录
             </p>
           </div>
         </Link>

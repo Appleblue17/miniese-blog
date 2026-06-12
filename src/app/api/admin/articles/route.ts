@@ -1,10 +1,12 @@
 /**
  * @file GET /api/admin/articles
  *
- * Returns paginated published articles with their linked drafts.
+ * Returns paginated published articles with their linked drafts and translations.
+ * Also includes active AI tasks (pending/processing) for each article to prevent
+ * duplicate submissions.
  * Query params: page (default 1), limit (default 15)
  *
- * Response: { articles: [...], drafts: [...], newDrafts: [...], total, page, totalPages }
+ * Response: { articles: [...], translations: [...], drafts: [...], newDrafts: [...], pendingTasks: Record<string, string[]>, total, page, totalPages }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -33,17 +35,26 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(searchParams.get("limit") || "15", 10)),
     );
 
-    // Get total count of published articles
+    // Get total count of published ORIGINAL articles (exclude translations)
     const total = await prisma.article.count({
-      where: { status: "published" },
+      where: { status: "published", originalId: null },
     });
 
-    // Get paginated published articles
+    // Get paginated published ORIGINAL articles (exclude translations)
     const publishedArticles = await prisma.article.findMany({
-      where: { status: "published" },
+      where: { status: "published", originalId: null },
       orderBy: { publishedAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
+    });
+
+    const linkedArticleIds = publishedArticles.map((a) => a.id);
+
+    // Get all translation versions linked to the current page's articles
+    const allTranslations = await prisma.article.findMany({
+      where: {
+        originalId: { in: linkedArticleIds },
+      },
     });
 
     // Get ALL drafts (not paginated — they're linked to the current page's articles)
@@ -51,11 +62,33 @@ export async function GET(request: NextRequest) {
       where: { status: { in: ["draft", "review"] } },
     });
 
-    const linkedArticleIds = publishedArticles.map((a) => a.id);
     const drafts = allDrafts.filter(
       (d) => d.draftOfId !== null && linkedArticleIds.includes(d.draftOfId),
     );
     const newDrafts = allDrafts.filter((d) => d.draftOfId === null);
+
+    // Get active AI tasks (pending or processing) for all linked articles
+    // to enable anti-duplicate protection on translate/generate buttons
+    const allArticleIds = [
+      ...linkedArticleIds,
+      ...allTranslations.map((t) => t.id),
+    ];
+    const activeTasks = await prisma.aiTask.findMany({
+      where: {
+        articleId: { in: allArticleIds },
+        status: { in: ["pending", "processing"] },
+      },
+      select: { articleId: true, type: true },
+    });
+
+    // Build a lookup map: articleId -> array of active task types
+    const pendingTasks: Record<string, string[]> = {};
+    for (const task of activeTasks) {
+      if (!pendingTasks[task.articleId!]) {
+        pendingTasks[task.articleId!] = [];
+      }
+      pendingTasks[task.articleId!].push(task.type);
+    }
 
     // Gather file stats
     const articlesWithStats = await Promise.all(
@@ -75,6 +108,25 @@ export async function GET(request: NextRequest) {
           updatedAt: a.updatedAt.toISOString(),
           changelog: a.changelog,
           viewCount: a.viewCount,
+          isAITranslated: a.isAITranslated,
+          ...stats,
+        };
+      }),
+    );
+
+    const translationsWithStats = await Promise.all(
+      allTranslations.map(async (t) => {
+        const stats = await getFileStats(t.contentPath);
+        return {
+          id: t.id,
+          slug: t.slug,
+          title: t.title,
+          language: t.language,
+          status: t.status,
+          contentPath: t.contentPath,
+          updatedAt: t.updatedAt.toISOString(),
+          originalId: t.originalId,
+          isAITranslated: t.isAITranslated,
           ...stats,
         };
       }),
@@ -115,8 +167,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       articles: articlesWithStats,
+      translations: translationsWithStats,
       drafts: draftsWithStats,
       newDrafts: newDraftsWithStats,
+      pendingTasks,
       total,
       page,
       totalPages: Math.ceil(total / limit),

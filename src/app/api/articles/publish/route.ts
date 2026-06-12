@@ -26,6 +26,7 @@ import { prisma } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown/renderer";
 import { detectWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter, buildFrontmatter, generateSlug } from "@/lib/articles/frontmatter";
+import { addJob } from "@/lib/queue/producer";
 import type { ArticleMeta, ArticleFrontmatter } from "@/lib/articles/frontmatter";
 import type { ContentType } from "@/lib/markdown/renderer";
 
@@ -149,11 +150,23 @@ export async function POST(request: NextRequest) {
     const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
     const html = await renderMarkdown(linkedContent, pipeline);
 
+    let oldSourceContent = "";
+
     // --- Write file to published directory ---
 
     const targetDir = PUBLISHED_DIR(language);
     await mkdir(targetDir, { recursive: true });
     const targetPath = path.join(targetDir, `${slug}.md`);
+
+    // --- Capture old content BEFORE overwriting (for update case) ---
+    if (draftOfId) {
+      try {
+        oldSourceContent = await readFile(targetPath, "utf-8");
+      } catch {
+        // File may not exist yet (first publish), that's fine
+        oldSourceContent = "";
+      }
+    }
 
     if (fromFileSystem) {
       // If reading from filesystem, we need to write the new content
@@ -235,6 +248,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // --- Trigger auto-translation if sibling article exists ---
+
+    // Fire-and-forget: don't block the publish response on translation job creation
+    triggerAutoTranslate({
+      sourceArticleId: article.id,
+      sourceLanguage: language,
+      slug: article.slug,
+      oldSourceContent,
+    }).catch((err) => {
+      console.error("Auto-translate trigger failed (non-fatal):", err);
+    });
+
+    // // --- Trigger auto term generation (always runs on publish) ---
+    // // Disabled for now
+    // triggerAutoGenerate(article.id).catch((err) => {
+    //   console.error("Auto-generate trigger failed (non-fatal):", err);
+    // });
+
     return NextResponse.json({
       success: true,
       article: {
@@ -250,4 +281,129 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+/**
+ * Attempts to auto-trigger translation for a published article.
+ *
+ * If no translation version exists in the target language, creates one
+ * automatically (empty placeholder) linked to the source article via originalId.
+ * Then submits a translate job.
+ *
+ * Translation versions:
+ * - Are bound to the original article via originalId
+ * - Cannot be manually edited (isAITranslated=true)
+ * - Do not appear as independent articles in listings
+ * - Share the same slug as the original article
+ *
+ * This function is fire-and-forget — errors are logged but not propagated.
+ *
+ * @param params - The source article info and old content
+ */
+async function triggerAutoTranslate(params: {
+  sourceArticleId: string;
+  sourceLanguage: string;
+  slug: string;
+  oldSourceContent: string;
+}): Promise<void> {
+  const { sourceArticleId, sourceLanguage, slug, oldSourceContent } = params;
+
+  // Determine target language
+  const targetLanguage = sourceLanguage === "zh" ? "en" : "zh";
+  const targetLang = targetLanguage as "zh" | "en";
+  const targetDir = path.join(process.cwd(), "content", "articles", targetLanguage);
+
+  // Look up translation version by originalId + language
+  // (translation versions are bound to the original article)
+  let translationArticle = await prisma.article.findFirst({
+    where: {
+      originalId: sourceArticleId,
+      language: targetLang,
+    },
+    select: { id: true, isAITranslated: true },
+  });
+
+  if (translationArticle) {
+    // Translation already exists — guard against overwriting manual modifications
+    if (!translationArticle.isAITranslated) {
+      console.log(
+        `[Publish] Skipping auto-translate: translation for article "${slug}" ` +
+          `(${targetLanguage}) has been manually modified.`,
+      );
+      return;
+    }
+  } else {
+    // No translation exists — create one linked to the source article
+    const sourceArticle = await prisma.article.findUnique({
+      where: { id: sourceArticleId },
+      select: { title: true, tags: true, summary: true, author: true, accessGroup: true },
+    });
+
+    if (!sourceArticle) {
+      console.error(`[Publish] Cannot create translation: source ${sourceArticleId} not found`);
+      return;
+    }
+
+    // Create the target directory
+    await mkdir(targetDir, { recursive: true });
+
+    // Create an empty placeholder file (will be overwritten by the worker)
+    const targetFilePath = `content/articles/${targetLanguage}/${slug}.md`;
+    const targetFullPath = path.join(process.cwd(), targetFilePath);
+    await writeFile(targetFullPath, "", "utf-8");
+
+    // Create the DB record with originalId pointing to source article
+    translationArticle = await prisma.article.create({
+      data: {
+        slug,
+        title: `${sourceArticle.title} (${targetLanguage === "en" ? "English" : "中文版"})`,
+        language: targetLang,
+        status: "published",
+        contentPath: targetFilePath,
+        tags: sourceArticle.tags || [],
+        author: sourceArticle.author || "博主",
+        accessGroup: sourceArticle.accessGroup || [],
+        summary: sourceArticle.summary,
+        isAITranslated: true,
+        originalId: sourceArticleId,
+        publishedAt: new Date(),
+      },
+      select: { id: true, isAITranslated: true },
+    });
+
+    console.log(
+      `[Publish] Created translation "${slug}" (${targetLanguage}) ` +
+        `with id ${translationArticle.id}, linked to original ${sourceArticleId}`,
+    );
+  }
+
+  console.log(
+    `[Publish] Triggering auto-translate for article ${sourceArticleId} ` +
+      `(${sourceLanguage} → ${targetLanguage})`,
+  );
+
+  // Submit the translation job
+  await addJob("translate", {
+    articleId: sourceArticleId,
+    targetArticleId: translationArticle.id,
+    sourceLanguage,
+    targetLanguage,
+    oldSourceContent,
+  });
+}
+
+/**
+ * Triggers AI term generation for a newly published article.
+ *
+ * Creates a "generate" task that will scan the article content and
+ * discover potential wiki terms, creating proposed wiki entries.
+ *
+ * This function is fire-and-forget.
+ *
+ * @param articleId - The ID of the published article
+ */
+async function triggerAutoGenerate(articleId: string): Promise<void> {
+  await addJob("generate", {
+    articleId,
+  });
 }

@@ -31,6 +31,7 @@ interface ArticleItem {
   updatedAt: string;
   changelog: string | null;
   viewCount: number;
+  isAITranslated: boolean;
   charCount: number;
   lineCount: number;
 }
@@ -48,10 +49,26 @@ interface DraftItem {
   lineCount: number;
 }
 
+interface TranslationItem {
+  id: string;
+  slug: string;
+  title: string;
+  language: string;
+  status: string;
+  contentPath: string;
+  updatedAt: string;
+  originalId: string;
+  isAITranslated: boolean;
+  charCount: number;
+  lineCount: number;
+}
+
 interface AdminArticlesResponse {
   articles: ArticleItem[];
+  translations: TranslationItem[];
   drafts: DraftItem[];
   newDrafts: DraftItem[];
+  pendingTasks: Record<string, string[]>;
   total: number;
   page: number;
   totalPages: number;
@@ -66,10 +83,10 @@ async function fetchData(
       `${baseUrl}/api/admin/articles?page=${page}&limit=${PAGE_SIZE}`,
       { cache: "no-store" },
     );
-    if (!res.ok) return { articles: [], drafts: [], newDrafts: [], total: 0, page: 1, totalPages: 0 };
+    if (!res.ok) return { articles: [], translations: [], drafts: [], newDrafts: [], pendingTasks: {}, total: 0, page: 1, totalPages: 0 };
     return res.json();
   } catch {
-    return { articles: [], drafts: [], newDrafts: [], total: 0, page: 1, totalPages: 0 };
+    return { articles: [], translations: [], drafts: [], newDrafts: [], pendingTasks: {}, total: 0, page: 1, totalPages: 0 };
   }
 }
 
@@ -81,7 +98,7 @@ export default async function AdminArticlesPage({
   const params = await searchParams;
   const currentPage = Math.max(1, parseInt(params.page || "1", 10));
 
-  const { articles, drafts, newDrafts, total } = await fetchData(currentPage);
+  const { articles, translations, drafts, newDrafts, pendingTasks, total } = await fetchData(currentPage);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)) || 1;
 
   const hasContent = articles.length > 0 || newDrafts.length > 0;
@@ -116,8 +133,10 @@ export default async function AdminArticlesPage({
         <div className="flex flex-col gap-1">
           <ArticleRowActions
             articles={articles}
+            translations={translations}
             drafts={drafts}
             newDrafts={newDrafts}
+            pendingTasks={pendingTasks}
           />
         </div>
       )}

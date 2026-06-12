@@ -103,9 +103,11 @@ export async function callDeepSeek(options: CallOptions): Promise<CallResult> {
     max_tokens: maxTokens ?? 4096,
   };
 
-  if (responseFormat === "json") {
-    body.response_format = { type: "json_object" };
-  }
+  // Note: We intentionally do NOT set response_format to { type: "json_object" }
+  // despite asking the model to return JSON. DeepSeek's json_object mode has
+  // a known issue where it can truncate responses mid-output for longer content,
+  // producing invalid JSON. Instead, we rely on the system prompt to instruct
+  // the model to output valid JSON.
 
   let lastError: Error | null = null;
 
@@ -122,6 +124,10 @@ export async function callDeepSeek(options: CallOptions): Promise<CallResult> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      // Debug logging: print request body (without API key)
+      const debugBody = { ...body };
+      console.log(`[DeepSeek] Request to ${url}:\n${JSON.stringify(debugBody, null, 2)}`);
 
       const response = await fetch(url, {
         method: "POST",
@@ -154,10 +160,16 @@ export async function callDeepSeek(options: CallOptions): Promise<CallResult> {
         total_tokens: 0,
       };
 
+      // Debug logging
+      const rawChoices = (data as Record<string, unknown>)?.choices as Array<Record<string, unknown>> | undefined;
+      const finishReason = rawChoices?.[0]?.finish_reason as string | undefined;
       console.log(
         `[DeepSeek] Success: ${usage.total_tokens} tokens used ` +
-          `(${usage.prompt_tokens} prompt + ${usage.completion_tokens} completion)`,
+          `(${usage.prompt_tokens} prompt + ${usage.completion_tokens} completion), ` +
+          `finish_reason: ${finishReason ?? "unknown"}`,
       );
+      // Log the raw content received for debugging
+      console.log(`[DeepSeek] Raw response content:\n${content}`);
 
       return { content, usage };
     } catch (err) {

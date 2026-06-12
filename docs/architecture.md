@@ -4,7 +4,20 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-11
+**最后更新**：2026-06-12
+
+### v0.8.2 2026-06-12
+
+- §6.4.9：详情页展示更新——上下文嵌入到 card 内部、全局上下文显示/隐藏按钮、移除统计提示和 filter 下拉菜单
+- §6.4.10：文件结构新增 `translator2.ts`（行级增量翻译引擎）和 `translator2.test.ts`
+- §3 目录结构：补充 `src/lib/ai/translator2.ts`、`src/components/admin/TranslateChunkList.tsx`
+- §5.1 队列任务类型：补充 translate 任务实际输出格式（含 translations + translatedGroups）
+- §6.4.7：补充 translator2 实际实现说明——全文委托 + existingTranslations 复用策略 + lineToTranslation 映射
+
+### v0.8.0 2026-06-12
+
+- 新增第 6.4 节：统一增量内容处理架构——通用 chunker 提取、基于行级 diff 的增量流程、全量=增量特殊情况、上下文策略
+- 第 3 节：目录结构新增 `src/lib/ai/chunker/` 目录
 
 ### v0.7.0 2026-06-11
 
@@ -204,7 +217,17 @@ miniese-blog/
 │   │   ├── markdown/
 │   │   │   ├── renderer.ts     # Notesaw/Remark 渲染
 │   │   │   └── linkDetector.ts # 词条链接检测
-│   │   └── mail.ts             # Resend 封装
+│   │   ├── ai/
+│   │   │   ├── client.ts       # DeepSeek API 封装
+│   │   │   ├── chunker/        # 通用内容切分（chunker, differ, context）
+│   │   │   │   ├── types.ts
+│   │   │   │   ├── chunker.ts
+│   │   │   │   ├── differ.ts
+│   │   │   │   └── context.ts
+│   │   │   ├── translator2.ts  # 行级增量翻译引擎
+│   │   │   ├── prompts/        # 提示词模板
+│   │   │   └── parsers.ts      # 响应解析
+│   │   ├── mail.ts             # Resend 封装
 │   ├── types/                  # TypeScript 类型
 │   │   ├── article.ts
 │   │   ├── wiki.ts
@@ -339,9 +362,16 @@ proposed → creating → unreviewed → reviewed
 | 类型 | 输入 | 输出 |
 |------|------|------|
 | review | articleId, 文章内容 | 审查报告（结构化 JSON） |
-| translate | articleId, 源语言, 目标语言 | 译文 Markdown 文件路径 |
+| translate | articleId, sourceLanguage, targetLanguage, targetArticleId, oldSourceContent | 译文 Markdown + translations 映射 + translatedGroups |
 | generate | wikiEntryProposalId | 中英文词条内容 |
 | scan | （可选）文章范围 | 新词条提议列表 |
+
+translate 任务的 output 字段包含：
+- `translatedCount` / `reusedCount` — 翻译/复用统计
+- `totalTokensUsed` — token 消耗
+- `translations` — `Record<string, string>` 映射（原文内容 → 译文），用于下次增量复用
+- `translatedGroups` — `ChangeGroupDetail[]` 数组，记录每个发送单元的行号区间，供详情页渲染
+- `translatedContent` — 完整译文内容（含 frontmatter）
 
 ### 5.2 任务生命周期
 
@@ -395,6 +425,408 @@ interface ReviewReport {
     }[];
   }[];
 }
+```
+
+### 6.4 统一增量内容处理架构
+
+AI 审查、翻译、词条发现三个功能都涉及"将文章内容切分后发送给 AI"的过程。为了避免重复实现，设计一套统一的增量内容处理架构，位于 `src/lib/ai/chunker/` 目录下。
+
+#### 6.4.1 设计原则
+
+1. **全量 = 增量（无旧内容）**：全量处理是增量处理的特殊情况——旧内容为空字符串，diff 结果为全文一个 diff 块，按 chunker 切分后全量发送
+2. **chunker 统一**：所有 AI 功能共用同一套文章切分算法（按标题结构、目标长度约束）
+3. **增量以行为单位**：diff 以源文件中的文本行（`\n` 分隔）为最小操作单元
+4. **上下文策略**：每个 diff 块发送给 AI 时附带上下文段落。上下文文本不加标记，目标内容用 `[TRANSLATE_START]/[TRANSLATE_END]` 包裹
+
+#### 6.4.2 核心类型定义
+
+```typescript
+// types.ts
+
+/** 一个内容块，对应文章中的一段连续内容 */
+export interface Chunk {
+  /** 从 0 开始的序号 */
+  id: number;
+  /** 块标题（如 "# Introduction"） */
+  title: string;
+  /** 完整内容 */
+  content: string;
+  /** 在原始文件中的起始行号（1-based） */
+  startLine: number;
+  /** 在原始文件中的结束行号（1-based，包含） */
+  endLine: number;
+}
+
+/** 行级 diff 块 */
+export interface DiffBlock {
+  /** 在新内容中的起始行号（1-based） */
+  startLine: number;
+  /** 在新内容中的结束行号（1-based，包含） */
+  endLine: number;
+}
+
+/** 带上下文的发送单元 */
+export interface SendUnit {
+  /** 目标行区间 */
+  target: { startLine: number; endLine: number };
+  /** 上下文窗口区间（含目标行） */
+  context: { startLine: number; endLine: number };
+  /** 当 diff 块过长时，按 chunker 拆分后的子块 */
+  subChunks?: Chunk[];
+}
+
+/** 增量处理结果中记录的已发送单元（给详情页渲染用） */
+export interface SentGroup {
+  /** 目标行区间 */
+  targetLines: [number, number];
+  /** 上下文窗口区间 */
+  contextLines: [number, number];
+  /** 如果被 chunker 拆分，记录每个子块 */
+  subChunks?: {
+    content: string;
+    lines: [number, number];
+    isContext: boolean;
+  }[];
+}
+```
+
+#### 6.4.3 通用 chun ker（chunker.ts）
+
+从现有 `splitArticle()` 重构而来，新增一个核心接口：
+
+```typescript
+/**
+ * 给定完整内容（不含 frontmatter），拆分为 chunk。
+ * @param body - 正文内容
+ * @returns Chunk[]
+ */
+export function splitArticle(body: string): Chunk[];
+
+/**
+ * 给定行号区间和完整行数组，返回该区间内的子 chunks。
+ * 用于 diff 块过大时按标题结构进一步拆分。
+ * @param lines - 完整行数组
+ * @param startLine - 区间起始行（1-based，包含）
+ * @param endLine - 区间结束行（1-based，包含）
+ * @param offsetId - 返回的 chunks 的 id 起始值
+ * @returns Chunk[]
+ */
+export function splitRange(
+  lines: string[],
+  startLine: number,
+  endLine: number,
+  offsetId?: number,
+): Chunk[];
+```
+
+`splitRange` 与 `splitArticle` 使用相同的算法逻辑（按标题结构、TARGET_CHUNK_SIZE / MIN_CHUNK_SIZE / MAX_CHUNK_SIZE 约束），区别在于它只处理指定的行区间而非全文。
+
+**算法要点**（与现有实现一致）：
+- 剥离 frontmatter
+- 按 h1/h2/h3/h4 边界识别节
+- 节合并：目标 5000 字符，最小 1000，最大 8000
+- 超过最大长度的节按段（double-newline）或固定长度拆分
+- 无标题时按空行段落拆分
+
+#### 6.4.4 行级 diff 引擎（differ.ts）
+
+```typescript
+/**
+ * 比较新旧两版内容，返回变化行区间列表。
+ *
+ * 实现策略：
+ * 1. 将内容按行分割
+ * 2. 使用最长公共子序列(LCS)或 Myers diff 算法找出变化
+ * 3. 合并相邻的变化行为连续的 diff block
+ * 4. 返回 DiffBlock[]（每块是一个行号区间）
+ *
+ * 相邻合并规则：两个变化块之间间隔 ≤ N 行（默认 3 行）时合并为一个块，
+ * 避免过于零碎的 diff 块导致大量小请求。
+ */
+export function detectChanges(
+  oldContent: string,
+  newContent: string,
+  mergeGap?: number,
+): DiffBlock[];
+```
+
+#### 6.4.5 上下文窗口构建（con text.ts）
+
+```typescript
+/** 上下文配置 */
+export interface ContextConfig {
+  /** 上下文目标字符数（向最近的标题边界靠拢） */
+  targetSize: number;
+  /** 上下文最大字符数（超出则截断，同样向标题边界靠拢） */
+  maxSize: number;
+}
+
+/** 默认上下文配置 */
+export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
+  targetSize: 1000,  // 约 200-300 字
+  maxSize: 2000,     // 约 400-600 字
+};
+
+/**
+ * 为给定的 diff block 构建上下文窗口。
+ *
+ * 策略：
+ * 1. 从 diff block 向上/下扩展行，累积字符数
+ * 2. 优先向最近的标题边界靠拢（保证上下文从一个节的起始开始）
+ * 3. 不超过 maxSize
+ * 4. 返回扩展后的行区间
+ *
+ * @param diffBlock - 原始 diff block
+ * @param lines - 完整行数组
+ * @param config - 上下文配置
+ * @returns 扩展后的行区间
+ */
+export function buildContext(
+  diffBlock: DiffBlock,
+  lines: string[],
+  config?: ContextConfig,
+): { startLine: number; endLine: number };
+```
+
+#### 6.4.6 统一处理流程
+
+```
+diff 引擎 (differ.ts)
+    ↓ 输出：DiffBlock[]（行号区间列表）
+为每个 DiffBlock：
+    ↓ chunker.splitRange() 按 heading 切分 → 子 Chunk[]
+    ↓ 对每个子 Chunk：
+        ↓ context.ts 构建上下文窗口（行区间）
+        ↓ 构建 prompt：
+            instruction 部分说明标记规则
+            上下文文本（不加标记）
+            [TRANSLATE_START] 目标内容 [TRANSLATE_END]
+        ↓ 调用 AI API
+        ↓ parseTranslatedChunk() 提取 [TRANSLATE_START]/[TRANSLATE_END] 内容
+```
+
+**处理流程示意图（翻译场景）**：
+
+```
+旧内容: "# Intro\n\nHello world\n\n## Section 1\n\nFoo bar"
+新内容: "# Intro\n\nHello world\n\n## Section 1\n\nBaz qux\n\n## Section 2\n\nNew stuff"
+
+                  ┌─────────────────────┐
+                  │   differ.ts          │
+                  │   行级 diff          │
+                  └────────┬────────────┘
+                           │
+              DiffBlock 1: lines 8-8 (Baz qux)
+              DiffBlock 2: lines 10-11 (## Section 2 / New stuff)
+                           │
+                           ▼
+              ┌─────────────────────────────┐
+              │  chunker.splitRange()       │
+              │  每个 DiffBlock 按 heading   │
+              │  切分为子 Chunk[]            │
+              └────────┬────────────────────┘
+            ┌──────────┴──────────┐
+            ▼                     ▼
+    Block 1:                   Block 2:
+    → 子 Chunk 1 个            → 子 Chunk 2 个
+    (## Section 1 的 Baz qux)   (## Section 1 下半 +
+                                ## Section 2 整个)
+            │                     │
+            ▼                     ▼
+    ┌──────────────────┐  ┌──────────────────┐
+    │ context.ts       │  │ context.ts       │
+    │ 构建上下文窗口     │  │ 构建上下文窗口     │
+    │ 含相邻上下文行     │  │ 含相邻上下文行     │
+    └──────┬───────────┘  └──────┬───────────┘
+           │                     │
+           ▼                     ▼
+    Prompt:                    Prompt:
+    (instruction)              (instruction)
+    上下文文本(无标记)          上下文文本(无标记)
+    [TRANSLATE_START]          [TRANSLATE_START]
+    Baz qux                    ## Section 2
+    [TRANSLATE_END]            New stuff
+                               [TRANSLATE_END]
+           │                     │
+           ▼                     ▼
+    parseTranslatedChunk()    parseTranslatedChunk()
+    提取 [TRANSLATE_START]/   提取 [TRANSLATE_START]/
+    [TRANSLATE_END] 内容       [TRANSLATE_END] 内容
+```
+
+**全量 = 增量特殊情况**（oldContent = ""）：
+diff 引擎输出一个 DiffBlock（全文），然后走同样的 splitRange → context → prompt 流程。
+
+#### 6.4.7 translator2.ts 实现（翻译场景）
+
+实际实现位于 `src/lib/ai/translator2.ts`，使用纯行级 diff pipeline 进行增量翻译。
+
+**核心函数**：
+
+```typescript
+/**
+ * 主入口：增量翻译
+ * @param oldSourceContent - 旧版本源内容（空字符串 = 全量翻译）
+ * @param newSourceContent - 新版本源内容
+ * @param existingTranslations - 已有翻译映射（原文内容 → 译文）
+ * @returns TranslateResult
+ */
+export async function incrementalTranslate(
+  oldSourceContent: string,
+  newSourceContent: string,
+  existingTranslations: TranslationMap,
+  sourceLang: string,
+  targetLang: string,
+): Promise<TranslateResult>
+```
+
+**关键设计决策**：
+
+1. **全量 = 增量特殊情况**：`translateFull()` 直接委托给 `incrementalTranslate("", content, {}, ...)`
+   - 旧内容为空 → `detectChanges` 输出一个全文 diff block
+   - 走同样的 splitRange → context → prompt 流程
+   - 不需要单独的 `splitArticle()` 调用
+
+2. **行级组装（replaceLines）**：将所有翻译结果通过行级替换组装，而非 chunk 级拼接
+   - `outputLines = [...newLines]`
+   - 未变化范围：从 `lineToTranslation` 映射逐行查找翻译
+   - 变化范围：AI 返回结果通过 `replaceLines()` 替换
+
+3. **复用策略**：
+   - `existingTranslations` 是 `Record<string, string>`（原文内容 → 译文）
+   - key 可以是多行（整个 sub-chunk 的内容），value 是对应译文
+   - 构建 `lineToTranslation` 映射：将 multi-line key 拆解为单行映射
+   - 未变化范围使用单行映射查找，兼容 full-translate 产生的 multi-line key
+
+4. **辅助函数**：
+   - `complementRanges(totalLines, diffBlocks)`：返回未变化的行区间
+   - `replaceLines(lines, startLine, endLine, newContent)`：行级替换（可能增减行数）
+   - `extractContent(lines, startLine, endLine)`：提取行区间内容
+   - `buildChunkPrompt(sourceLang, targetLang, contextText, targetText)`：构建 Prompt
+   - `parseTranslatedChunk(response)`：提取 `[TRANSLATE_START]/[TRANSLATE_END]` 内容
+
+**处理流程**：
+
+```typescript
+async function incrementalTranslate(...) {
+  // 1. 剥离 frontmatter
+  const newFrontmatter = extractFrontmatterBlock(newSourceContent);
+  const newBody = stripFrontmatter(newSourceContent);
+  const newLines = newBody.split("\n");
+
+  // 2. 行级 diff
+  const diffBlocks = detectChanges(oldBody, newBody);
+
+  // 3. 无变化 → 全部复用
+  if (diffBlocks.length === 0) {
+    // 逐行从 existingTranslations 查找翻译
+    // 返回复用结果
+  }
+
+  // 4. 构建 lineToTranslation 映射（multi-line key → 单行映射）
+  const lineToTranslation = new Map<string, string>();
+  for (const [sourceText, translatedText] of Object.entries(existingTranslations)) {
+    const sourceLines = sourceText.split("\n");
+    const translatedLines = translatedText.split("\n");
+    for (let i = 0; i < Math.min(sourceLines.length, translatedLines.length); i++) {
+      if (!lineToTranslation.has(sourceLines[i])) {
+        lineToTranslation.set(sourceLines[i], translatedLines[i]);
+      }
+    }
+  }
+
+  // 5. 处理未变化范围（复用在先）
+  const unchangedRanges = complementRanges(newLines.length, diffBlocks);
+  for (const range of unchangedRanges) {
+    for (let lineNum = range.startLine; lineNum <= range.endLine; lineNum++) {
+      const line = newLines[lineNum - 1];
+      const t = lineToTranslation.get(line);
+      if (t !== undefined) {
+        outputLines[lineNum - 1] = t;
+        reusedCount++;
+      }
+    }
+  }
+
+  // 6. 处理每个 DiffBlock
+  for (const block of diffBlocks) {
+    const subChunks = splitRange(newLines, block.startLine, block.endLine);
+    for (const subChunk of subChunks) {
+      // 检查已有翻译 → 复用
+      // 否则：buildContext → callDeepSeek → parseTranslatedChunk → replaceLines
+    }
+  }
+
+  // 7. 组装最终内容
+  return {
+    translatedContent: newFrontmatter + "\n\n" + outputLines.join("\n"),
+    translatedCount,
+    reusedCount,
+    totalTokensUsed,
+    translations: newTranslations,     // 含本次新增的翻译
+    translatedGroups,                   // 用于详情页展示
+  };
+}
+```
+
+#### 6.4.8 Prompt 构建约定
+
+每个发送单元的 prompt 结构如下：
+
+```
+Translate the following content from Chinese to English.
+Requirements:
+1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的（目标内容）
+2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改
+3. ...其他要求...
+
+（上下文文本，不加任何标记）
+
+[TRANSLATE_START]
+这是实际需要翻译的目标内容。
+[TRANSLATE_END]
+```
+
+标记约定：
+- **上下文部分**：不加任何标记，作为普通文本放在 prompt 中
+- **目标部分**：用 `[TRANSLATE_START]/[TRANSLATE_END]` 包裹
+- **每个 prompt 只有一对 `[TRANSLATE_START]/[TRANSLATE_END]`**（因为每个发送单元只有一个目标子 Chunk）
+- AI 返回时保留 `[TRANSLATE_START]/[TRANSLATE_END]` 标记，`parseTranslatedChunk()` 提取标记内的内容
+
+`buildChunkPrompt` 和 `parseTranslatedChunk` 统一使用这个约定，没有"无标记模式"的 fallback。
+
+#### 6.4.9 详情页面展示
+
+详情页（`/admin/ai-tasks/[taskId]`）根据 `ChangeGroupDetail[]` 展示每个发送单元：
+
+增量模式下，每个 `ChangeGroupDetail` 显示为一个卡片块：
+- **折叠/展开 header**：段落标题（取自 target 区域首个非空行）+ 复用/翻译徽章 + 行号
+- **展开后**：原文列（源语言）和译文列（目标语言）并排展示
+- **上下文**（`aboveContext` / `belowContext`）嵌入到 card 内部，字号 `text-[11px]`，灰色背景
+- **右上角全局按钮**（Eye/EyeOff 图标）：控制所有 card 的上下文显示/隐藏
+
+全量模式下，整个文章作为一个 chunk 显示（无上下文区域）。
+
+筛选：移除统计提示和 filter 下拉菜单，仅保留上下文显示/隐藏控制。使用 `hasContext` 字段判断是否显示控制按钮。
+
+#### 6.4.10 文件结构
+
+```
+src/lib/ai/chunker/
+├── types.ts         # 共享类型定义 (Chunk, DiffBlock, SendUnit, SentGroup 等)
+├── chunker.ts       # 通用文章切分 (splitArticle, splitRange)
+├── chunker.test.ts  # 切分算法单元测试
+├── differ.ts        # 行级 diff 引擎 (detectChanges)
+├── differ.test.ts   # diff 引擎单元测试
+├── context.ts       # 上下文窗口构建 (buildContext)
+└── context.test.ts  # 上下文单元测试
+
+src/lib/ai/
+├── translator2.ts       # 行级增量翻译引擎
+└── translator2.test.ts  # 25 个单元测试
+
+src/components/admin/
+└── TranslateChunkList.tsx  # 翻译详情页组件（上下文嵌入 + 全局控制）
 ```
 
 ---

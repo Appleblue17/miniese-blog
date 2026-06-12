@@ -36,8 +36,9 @@ Short content.`;
     expect(chunks[0].content).not.toContain("title:");
   });
 
-  it("merges adjacent small sections into one chunk", () => {
-    // Build content with 3 h1 sections, each small (< 1000 chars)
+  it("returns single chunk for short content with multiple headings", () => {
+    // When total content ≤ MAX_CHUNK_SIZE, the whole article is returned
+    // as a single chunk regardless of heading boundaries
     const content = `# Section 1
 Small content here.
 
@@ -49,11 +50,12 @@ Yet another small bit.`;
 
     const chunks = splitArticle(content);
 
-    // All 3 sections are small → merged into 1 chunk (total < 8000)
     expect(chunks).toHaveLength(1);
     expect(chunks[0].content).toContain("Section 1");
     expect(chunks[0].content).toContain("Section 2");
     expect(chunks[0].content).toContain("Section 3");
+    expect(chunks[0].startLine).toBe(1);
+    expect(chunks[0].endLine).toBe(8);
   });
 
   it("splits at heading boundaries when sections are large enough", () => {

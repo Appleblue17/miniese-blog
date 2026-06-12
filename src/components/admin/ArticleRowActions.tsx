@@ -19,6 +19,9 @@ import {
   AlertTriangle,
   X,
   RefreshCw,
+  Languages,
+  Sparkles,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from "./StatusBadge";
@@ -56,10 +59,26 @@ interface DraftItem {
   lineCount: number;
 }
 
+interface TranslationItem {
+  id: string;
+  slug: string;
+  title: string;
+  language: string;
+  status: string;
+  contentPath: string;
+  updatedAt: string;
+  originalId: string;
+  isAITranslated: boolean;
+  charCount: number;
+  lineCount: number;
+}
+
 interface ArticleRowActionsProps {
   articles: ArticleItem[];
+  translations: TranslationItem[];
   drafts: DraftItem[];
   newDrafts: DraftItem[];
+  pendingTasks: Record<string, string[]>;
 }
 
 // --- Helpers ---
@@ -180,16 +199,21 @@ function DeleteModal({
 function PublishedArticleRow({
   article,
   hasDraft,
+  activeTaskTypes = [],
 }: {
   article: ArticleItem;
   hasDraft: boolean;
+  activeTaskTypes?: string[];
 }) {
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
   const [refreshingLinks, setRefreshingLinks] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const hasPendingTranslate = activeTaskTypes.includes("translate");
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -264,6 +288,34 @@ function PublishedArticleRow({
     }
   }, [article.id, article.language, router]);
 
+  const handleTranslate = useCallback(async () => {
+    setTranslating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId: article.id,
+          sourceLanguage: article.language,
+          targetLanguage: article.language === "zh" ? "en" : "zh",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "翻译任务提交失败");
+        setTranslating(false);
+        return;
+      }
+      setTranslating(false);
+      // Redirect to ai-tasks page showing task detail
+      router.push(`/admin/ai-tasks/${data.taskId}`);
+    } catch {
+      setError("翻译请求失败");
+      setTranslating(false);
+    }
+  }, [article.id, article.language, router]);
+
   return (
     <>
       <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
@@ -324,6 +376,29 @@ function PublishedArticleRow({
             <RefreshCw className={`size-3.5 ${refreshingLinks ? "animate-spin" : ""}`} />
           </button>
 
+          {/* Translate button */}
+          <button
+            type="button"
+            onClick={handleTranslate}
+            disabled={translating || hasPendingTranslate}
+            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={hasPendingTranslate ? "已有翻译任务处理中" : "AI 翻译"}
+          >
+            <Languages className={`size-3.5 ${translating ? "animate-pulse" : hasPendingTranslate ? "text-blue-400" : ""}`} />
+            <span className="hidden sm:inline ml-1">{hasPendingTranslate ? "翻译中" : "翻译"}</span>
+          </button>
+
+          {/* Generate terms button (disabled — feature temporarily unavailable) */}
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground/40 cursor-not-allowed"
+            title="词条生成功能暂时不可用"
+          >
+            <Sparkles className="size-3.5 text-muted-foreground/40" />
+            <span className="hidden sm:inline ml-1">生成词条</span>
+          </button>
+
           {/* Delete button */}
           <button
             type="button"
@@ -375,6 +450,43 @@ function LinkedDraftRow({ draft }: { draft: DraftItem }) {
           编辑草稿
         </Link>
         <DeleteDraftButton draft={draft} />
+      </div>
+    </div>
+  );
+}
+
+// --- Translation Row (bound to original article) ---
+
+function TranslationRow({ translation }: { translation: TranslationItem }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-dashed border-blue-300 dark:border-blue-700 bg-card/50 px-4 py-2.5 ml-6 border-l-2 border-l-blue-400">
+      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <Globe className="size-3.5 text-blue-500 shrink-0" />
+          <span className="text-sm truncate">{translation.title}</span>
+          <StatusBadge status={translation.status} />
+          {translation.isAITranslated && (
+            <span className="text-[10px] text-blue-500 font-medium">AI 翻译</span>
+          )}
+        </div>
+        <ArticleMetaRow
+          language={translation.language}
+          updatedAt={translation.updatedAt}
+          charCount={translation.charCount}
+          lineCount={translation.lineCount}
+        />
+      </div>
+      <div className="flex items-center gap-1 shrink-0 ml-4">
+        <Link
+          href={`/${translation.language}/articles/${translation.slug}`}
+          className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          target="_blank"
+          title="查看翻译"
+        >
+          <Eye className="size-3.5" />
+          <span className="hidden sm:inline ml-1">查看</span>
+        </Link>
+        {/* Translations cannot be edited or deleted from here */}
       </div>
     </div>
   );
@@ -532,8 +644,10 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
 
 export function ArticleRowActions({
   articles,
+  translations,
   drafts,
   newDrafts,
+  pendingTasks,
 }: ArticleRowActionsProps) {
   return (
     <>
@@ -541,13 +655,20 @@ export function ArticleRowActions({
         const linkedDraft = drafts.find(
           (d) => d.draftOfId === article.id,
         );
+        const linkedTranslation = translations.find(
+          (t) => t.originalId === article.id,
+        );
+        const activeTaskTypes = pendingTasks[article.id] || [];
 
         return (
           <div key={article.id} className="flex flex-col gap-1">
             <PublishedArticleRow
               article={article}
               hasDraft={!!linkedDraft}
+              activeTaskTypes={activeTaskTypes}
             />
+            {/* Translation version appears above draft */}
+            {linkedTranslation && <TranslationRow translation={linkedTranslation} />}
             {linkedDraft && <LinkedDraftRow draft={linkedDraft} />}
           </div>
         );

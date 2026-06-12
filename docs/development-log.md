@@ -192,3 +192,41 @@
 - **遇到的问题**：
   - URL 编码问题：Next.js 16 Turbopack 的 `params.name` 在不同 API（page vs generateMetadata）中行为不一致
   - `slugifyName` 对非 ASCII 字符的处理导致 URL 编码后查询失败
+
+### 任务 阶段5.3：AI 翻译引擎重构 — translator2.ts + 详情页适配
+- **时间**：2026-06-12
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **translator2.ts**：纯行级 diff 管道的增量翻译引擎，替代旧的 chunk-content-comparison 方案。
+    - `detectChanges(oldBody, newBody)` → `DiffBlock[]`：基于行级 diff 检测变化范围
+    - `splitRange(lines, startLine, endLine)` → `Chunk[]`：按标题边界拆分 diff 块
+    - `buildContext(diffBlock, lines)` → `{startLine, endLine}`：上下文窗口构建
+    - `incrementalTranslate(...)` → `TranslateResult`：完整增量翻译流程
+    - `translateFull(...)` 委托给 `incrementalTranslate("", ...)`（全量 = 增量的特殊情况）
+    - `complementRanges()` / `replaceLines()` / `extractContent()` 辅助函数
+    - `buildChunkPrompt()` / `parseTranslatedChunk()` Prompt 构建和解析
+  - **单元测试**：25 个测试，覆盖全量翻译、增量翻译、部分变更、复用、空内容、frontmatter 保留、代码块、单行、文档顺序、边缘情况、多行 key 还原
+  - **详情页重写**（`page.tsx` + `TranslateChunkList.tsx`）：
+    - 增量模式：直接使用 `translatedGroups[i].targetLines` 按行号从源文件提取内容
+    - 上下文（aboveContext/belowContext）嵌入到每个 target chunk card 内部
+    - 全局按钮显示/隐藏上下文（右上角 Eye/EyeOff 图标）
+    - 全量模式：整个文章作为一个 chunk 显示
+    - 移除统计提示和 filter 下拉菜单
+  - **Worker 翻译处理**（`processTranslate`）：
+    - 从最新已完成任务加载 `existingTranslations`
+    - Frontmatter 元数据翻译（title, summary 字段）
+    - 译文写入目标语言文件 + 更新 DB 记录 + HTML 重新渲染
+  - **Bug 修复**：
+    - `reusedCount = 0` → 增加 `lineToTranslation` 映射，支持跨 key 子串搜索
+    - 详情页 `buildTranslatedText` 找不到翻译 → 跨 key 子串搜索 fallback
+    - 所有非 target chunks 标记为 context → 移除 context 标记逻辑
+    - `stripFrontmatter` vs `matter(content).content` 前导换行不一致 → 统一用 `stripFrontmatter`
+- **测试结果**：242/249 通过（7 个集成测试因外部服务不可用跳过）
+- **遇到的问题**：
+  - 行级还原问题：仅用 `existingTranslations`（multi-line key → translated text）做 line-level assembly 时，unchanged lines 找不到翻译
+    - 根因：`existingTranslations` 的 key 是整个 sub-chunk 的内容（多行），而 unchanged 范围是单行
+    - 修复：构建 `lineToTranslation` 映射，将每个 multi-line key 拆解为单行映射（source line → translated line）
+  - 详情页 `findTranslationByContent` 精确匹配失败：target 内容可能是 larger key 的子串
+    - 修复：使用跨 key 子串搜索（滑动窗口匹配）
+  - `stripFrontmatter` 和 `matter(content).content` 输出不一致：前者保留 frontmatter 后的首个换行，后者去除
+    - 修复：统一使用 `stripFrontmatter`

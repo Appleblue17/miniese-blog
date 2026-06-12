@@ -12,6 +12,18 @@ export interface AiTaskMeta {
   completedAt?: string;
 }
 
+/**
+ * Result from AI term generation.
+ */
+export interface GenerateResult {
+  terms: Array<{
+    name: string;
+    definition: string;
+    tags: string[];
+    aliases: string[];
+  }>;
+}
+
 export interface ReviewReport {
   sections: {
     type: "factual" | "typo" | "clarity" | "other";

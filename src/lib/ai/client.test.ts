@@ -49,7 +49,7 @@ describe("callDeepSeek", () => {
     });
   });
 
-  it("sends correct request with JSON mode", async () => {
+  it("sends correct request with JSON mode (no response_format to avoid truncation bug)", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -67,7 +67,8 @@ describe("callDeepSeek", () => {
     expect(result.content).toBe('{"key": "value"}');
 
     const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(requestBody.response_format).toEqual({ type: "json_object" });
+    // response_format is intentionally NOT set to avoid DeepSeek's truncation bug
+    expect(requestBody.response_format).toBeUndefined();
     expect(requestBody.messages[0].content).toContain("JSON");
   });
 

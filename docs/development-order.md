@@ -4,7 +4,12 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-11
+**最后更新**：2026-06-12
+
+### v1.4.0 2026-06-12
+
+- 阶段 5.3：AI 翻译功能完整实现——translator2.ts 行级增量翻译引擎 + 详情页适配 + Worker 处理
+- 验收标准更新（阶段5）：翻译、词条提议、词条生成已标记完成状态
 
 ### v1.3.0 2026-06-11
 
@@ -315,18 +320,27 @@ isReviewed: true
 
 ### 模块 5.3：AI 翻译功能
 
-| 任务 | 说明 |
-|------|------|
-| 段落变更检测 | 复用审查的段落对比逻辑 |
-| 翻译 Prompt | 保持 Markdown 结构，只翻译文本内容 |
-| Worker 处理 | `processTranslate` 增量翻译，生成译文文件 |
-| 手动触发 API | `POST /api/ai/translate` |
-| 仪表盘入口 | 文章管理页增加"翻译"按钮 |
+| 任务 | 说明 | 状态 |
+|------|------|------|
+| 行级 diff 引擎 | `differ.ts` — Myers diff + 相邻合并 | ✅ |
+| 增量翻译引擎 | `translator2.ts` — diff → splitRange → context → AI call → line-level assembly | ✅ |
+| 全量翻译 | `translateFull()` 委托给 `incrementalTranslate("", ...)` | ✅ |
+| 上下文字段构建 | `context.ts` — 向最近标题边界靠拢 | ✅ |
+| 复用策略 | `lineToTranslation` 映射，兼容 multi-line key | ✅ |
+| 翻译 Prompt | 使用 `[TRANSLATE_START]/[TRANSLATE_END]` 标记约定 | ✅ |
+| Worker 处理 | `processTranslate` — 增量翻译 + frontmatter 翻译 + 文件写入 + DB 更新 + HTML 重新渲染 | ✅ |
+| 手动触发 API | `POST /api/ai/translate` — 接收 articleId, sourceLanguage, targetLanguage | ✅ |
+| 翻译详情页 | `/admin/ai-tasks/[taskId]` — 增量/全量双模式 + 上下文嵌入 card + 全局控制 | ✅ |
+| 单元测试 | 25 个，覆盖全量/增量/复用/边缘情况 | ✅ |
 
-**增量翻译策略**：
-- 对比原文新旧版本，找出变更段落
-- 只翻译变更段落，其他从已有译文复用
-- 首次翻译时全量翻译
+**增量翻译策略**（已实现）：
+- 对比原文新旧版本，`detectChanges()` 输出行级 diff block
+- 每个 diff block 按标题边界切分（`splitRange()`）
+- 上下文窗口构建（`buildContext()`）后调用 AI 翻译
+- 未变化行从 `lineToTranslation` 映射复用已有翻译
+- 首次翻译（全量）委托给 `incrementalTranslate("", ...)`
+
+**完成状态**: ✅
 
 ---
 
@@ -373,9 +387,11 @@ isReviewed: true
 - [x] 长文章自动按标题/段落拆分处理
 - [x] 审查报告可存档、可追溯历史版本
 - [x] 仪表盘可查看审查历史详情（块导航 + 问题列表）
-- [ ] 能对文章进行增量翻译，生成译文
-- [ ] 发布文章时自动扫描词条提议
-- [ ] 仪表盘可审批词条提议，AI 自动生成词条
+- [x] 能对文章进行增量翻译，生成译文（行级 diff + 上下文 + 复用 + frontmatter 翻译）
+- [x] 翻译详情页展示增量/全量双模式、上下文嵌入、复用统计
+- [x] Worker 翻译处理完整：读文件 → 加载已有翻译 → 增量翻译 → frontmatter 翻译 → 写文件 → DB 更新 → HTML 重新渲染
+- [ ] 发布文章时自动扫描词条提议（概念扫描器未实现）
+- [ ] 仪表盘可审批词条提议，AI 自动生成词条（部分实现，worker handler 存在但入口禁用）
 
 ---
 

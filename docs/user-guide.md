@@ -179,11 +179,11 @@ npm run worker
 | 类型 | 说明 | 路由端点 |
 |------|------|---------|
 | `review` | AI 文章审查 | `POST /api/ai/review` | ✅ 已完成 |
-| `translate` | AI 翻译 | `POST /api/ai/translate` | 🔘 待实现 |
-| `generate` | AI 词条生成 | `POST /api/ai/generate` | 🔘 待实现 |
+| `translate` | AI 增量翻译 | `POST /api/ai/translate` | ✅ 已完成 |
+| `generate` | AI 词条生成 | `POST /api/ai/generate` | 🟡 部分实现（worker handler 完整，词条发现禁用） |
 | `scan` | AI 文章扫描 | `POST /api/ai/scan` | 🔘 待实现 |
 
-> **当前状态**：`review` 类型已完整实现（基于 DeepSeek API，分段处理+进度更新）。其余类型为模拟 handler（2s 延迟 + 返回固定结果），将在后续阶段实现。
+> **当前状态**：`review` 和 `translate` 类型已完整实现。`generate` 的 worker handler 已实现但前端入口禁用。`scan` 仅模拟。
 
 ### API 使用示例
 
@@ -304,4 +304,113 @@ curl -X POST http://localhost:3000/api/ai/review \
 
 # 轮询状态
 curl http://localhost:3000/api/ai/status/<TASK_ID>
+```
+
+---
+
+## AI 翻译系统
+
+> 阶段 5.3 实现的 AI 增量翻译功能，基于 translator2.ts（行级增量翻译引擎）。
+
+### 架构概览
+
+```
+POST /api/ai/translate → addJob() → Bull Queue → Worker
+                                                ↓
+                      incrementalTranslate() ← diff + splitRange + context
+                                                ↓
+               译文写入目标文件 + DB 更新 + HTML 重新渲染
+```
+
+### 增量翻译原理
+
+翻译引擎（`src/lib/ai/translator2.ts`）使用纯行级 diff pipeline：
+
+```
+旧内容 + 新内容 → detectChanges() → DiffBlock[]（行号区间列表）
+                                              ↓
+每个 DiffBlock → splitRange() → sub-Chunk[]（按标题边界拆分）
+                                              ↓
+每个 sub-Chunk → buildContext() → 上下文窗口 + AI 调用
+                                              ↓
+                           replaceLines() 行级组装
+```
+
+关键设计点：
+- **全量 = 增量（无旧内容）**：`translateFull()` 委托给 `incrementalTranslate("", ...)`
+- **行级 diff**：使用 Myers diff 算法检测变化行
+- **上下文策略**：上下文文本不加标记，目标内容用 `[TRANSLATE_START]/[TRANSLATE_END]` 包裹
+- **复用策略**：已有翻译按原文内容（sub-chunk 级别）缓存，增量的未变化行拆解为单行映射逐行复用
+
+### 手动触发翻译
+
+```bash
+# 先创建目标语言版本的文章（同 slug，不同语言）
+# 然后获取源文章 ID
+npx prisma db execute --stdin <<< "SELECT id, title, slug FROM \"Article\" WHERE language = 'zh' LIMIT 5;"
+
+# 提交翻译任务
+curl -X POST http://localhost:3000/api/ai/translate \
+  -H "Content-Type: application/json" \
+  -d '{"articleId": "<SOURCE_ARTICLE_ID>", "sourceLanguage": "zh", "targetLanguage": "en"}'
+# 响应: {"taskId": "uuid-string"}
+
+# 轮询状态（同审查）
+curl http://localhost:3000/api/ai/status/<TASK_ID>
+```
+
+### 翻译详情页
+
+**详情页** `/admin/ai-tasks/[taskId]` 支持翻译类型任务的输出展示：
+
+| 模式 | 展示方式 |
+|------|----------|
+| **增量翻译** | 每个 `translatedGroup` 显示为独立的 target chunk card |
+| **全量翻译** | 整个文章作为一个 chunk 显示 |
+
+每个 chunk card 包含：
+- 折叠/展开 header（标题 + 复用/翻译徽章 + 行号）
+- 展开后：原文列（源语言）和译文列（目标语言）并排展示
+- 上下文文本（above/below）嵌入在 card 内部，字号 `text-[11px]`
+- 右上角全局按钮控制上下文显示/隐藏（Eye/EyeOff 图标）
+
+### Prompt 约定
+
+```
+Translate the following content from Chinese to English.
+Requirements:
+1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。
+2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改。
+3. Keep all formatting, syntax markers, and code blocks unchanged.
+...
+
+（上下文文本，不加任何标记）
+
+[TRANSLATE_START]
+这是实际需要翻译的目标内容。
+[TRANSLATE_END]
+```
+
+### Worker 翻译处理
+
+`processTranslate` handler 在 Worker 中执行：
+
+1. 从最新已完成翻译任务加载 `existingTranslations`（内容 → 译文的映射）
+2. 调用 `incrementalTranslate()` 进行增量翻译
+3. 翻译 frontmatter 元数据（title, summary 字段）→ 独立 DeepSeek 调用
+4. 重建 frontmatter（更新 title、summary、language 字段）
+5. 译文写入目标语言文件
+6. 更新 DB 记录（title, language, isAITranslated）
+7. 重新渲染 HTML（含 wiki 链接检测）
+8. 返回翻译统计 + translations map + translatedGroups
+
+### 清理翻译数据
+
+```bash
+# 清空所有翻译相关的 AiTask 记录
+npx prisma db execute --stdin <<< "DELETE FROM \"AiTask\" WHERE type = 'translate';"
+
+# 同时清除 Redis 残留
+docker compose exec redis redis-cli EVAL \
+  "return redis.call('DEL', unpack(redis.call('KEYS', ARGV[1])))" 0 "bull:*"
 ```

@@ -26,6 +26,7 @@ interface ArticleApiResponse {
     publishedAt: string | null;
     updatedAt: string;
     changelog: string | null;
+    isAITranslated: boolean;
   };
   html: string;
 }
@@ -92,6 +93,7 @@ export default async function ArticlePage({ params }: Props) {
         likes={0}
         lang={lang}
         changelog={data.article.changelog}
+        isAITranslated={data.article.isAITranslated}
       />
     </div>
   );

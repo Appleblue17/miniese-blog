@@ -45,6 +45,8 @@ export async function GET(
         updatedAt: true,
         changelog: true,
         renderedContent: true,
+        isAITranslated: true,
+        originalId: true,
       },
     });
 
@@ -67,6 +69,8 @@ export async function GET(
         publishedAt: article.publishedAt?.toISOString() || null,
         updatedAt: article.updatedAt.toISOString(),
         changelog: article.changelog,
+        isAITranslated: article.isAITranslated,
+        originalId: article.originalId,
       },
       html: article.renderedContent || "",
     });

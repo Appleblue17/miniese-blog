@@ -3,6 +3,7 @@
  *
  * Deletes an article (published or draft) and its associated file.
  * If deleting a published article, also deletes:
+ *   - Any linked translation records and their files
  *   - Any linked draft records and their files
  *   - Related wiki links (cascaded by Prisma)
  *   - Related comments (cascaded by Prisma)
@@ -46,14 +47,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If deleting a published article, also delete its linked drafts
+    // If deleting a published article, also delete its linked translations and drafts
     if (article.status === "published") {
+      // --- Delete linked translations ---
+      const translations = await prisma.article.findMany({
+        where: { originalId: id },
+        select: { id: true, contentPath: true },
+      });
+
+      for (const t of translations) {
+        if (t.contentPath) {
+          const filePath = path.join(process.cwd(), t.contentPath);
+          try {
+            await unlink(filePath);
+          } catch {
+            // File may not exist
+          }
+        }
+      }
+
+      await prisma.article.deleteMany({
+        where: { originalId: id },
+      });
+
+      // --- Delete linked drafts ---
       const drafts = await prisma.article.findMany({
         where: { draftOfId: id },
         select: { id: true, contentPath: true },
       });
 
-      // Delete linked draft files
       for (const draft of drafts) {
         if (draft.contentPath) {
           const filePath = path.join(process.cwd(), draft.contentPath);
@@ -65,7 +87,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Delete linked draft records (cascade will handle wikiLinks and comments on the main article)
       await prisma.article.deleteMany({
         where: { draftOfId: id },
       });

@@ -14,30 +14,18 @@
  *    - Never split mid-paragraph across chunk boundaries
  * 4. For content with no headings, fall back to double-newline splitting
  *    with the same size guards
+ *
+ * Provides both `splitArticle` (full content) and `splitRange` (line range).
  */
 
-/**
- * A single chunk of an article.
- */
-export interface Chunk {
-  /** Sequential ID starting from 0 */
-  id: number;
-  /** Title of the chunk (e.g. "# Introduction") */
-  title: string;
-  /** Full content of the chunk including the title */
-  content: string;
-  /** Starting line number in the original source file (1-based) */
-  startLine: number;
-  /** Ending line number in the original source file (1-based, inclusive) */
-  endLine: number;
-}
+import {
+  type Chunk,
+  TARGET_CHUNK_SIZE,
+  MIN_CHUNK_SIZE,
+  MAX_CHUNK_SIZE,
+} from "./types";
 
-/** Target characters per chunk */
-const TARGET_CHUNK_SIZE = 5000;
-/** Minimum characters per chunk (avoid tiny chunks) */
-const MIN_CHUNK_SIZE = 1000;
-/** Maximum characters per chunk (avoid oversized chunks) */
-const MAX_CHUNK_SIZE = 8000;
+export type { Chunk };
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -53,7 +41,7 @@ const MAX_CHUNK_SIZE = 8000;
  * - Never creates chunks larger than MAX_CHUNK_SIZE (splits oversized sections by paragraph)
  * - Falls back to double-newline splitting when no headings exist
  *
- * @param content - The full Markdown article content.
+ * @param content - The full Markdown article content (may include frontmatter).
  * @returns An array of chunks.
  */
 export function splitArticle(content: string): Chunk[] {
@@ -72,7 +60,9 @@ export function splitArticle(content: string): Chunk[] {
     return [];
   }
 
-  // Step 3: If total content is small, return as a single chunk
+  // Step 3: If total content is small (≤ MAX_CHUNK_SIZE), return as a single
+  // chunk. This ensures short articles are sent to AI in one piece, avoiding
+  // unnecessary multi-chunk splitting for small content.
   const totalChars = body.length;
   if (totalChars <= MAX_CHUNK_SIZE) {
     const firstLine = lines.find((l) => l.trim().length > 0);
@@ -89,6 +79,69 @@ export function splitArticle(content: string): Chunk[] {
 
   // Step 4: Merge sections into chunks respecting size boundaries
   return mergeSectionsIntoChunks(sections, lines);
+}
+
+/**
+ * Splits a specific line range into chunks, using the same heading-based
+ * chunking algorithm as `splitArticle`.
+ *
+ * Used when a diff block with context exceeds MAX_CHUNK_SIZE and needs
+ * further subdivision while respecting heading boundaries.
+ *
+ * @param lines - The full lines array of the article body (without frontmatter)
+ * @param startLine - Start of the range (1-based, inclusive)
+ * @param endLine - End of the range (1-based, inclusive)
+ * @param offsetId - Starting ID for the returned chunks (default 0)
+ * @returns An array of sub-chunks covering the range
+ */
+export function splitRange(
+  lines: string[],
+  startLine: number,
+  endLine: number,
+  offsetId = 0,
+): Chunk[] {
+  // Extract the range lines
+  const rangeLines = lines.slice(startLine - 1, endLine);
+
+  if (rangeLines.length === 0) {
+    return [];
+  }
+
+  // If the range itself is small, return as single chunk
+  const rangeSize = rangeLines.reduce((acc, l) => acc + l.length + 1, 0);
+  if (rangeSize <= MAX_CHUNK_SIZE) {
+    const firstLine = rangeLines.find((l) => l.trim().length > 0);
+    return [
+      {
+        id: offsetId,
+        title: firstLine ? firstLine.trim().substring(0, 60) : "Content",
+        content: rangeLines.join("\n"),
+        startLine,
+        endLine,
+      },
+    ];
+  }
+
+  // Use the same section-merge logic on the extracted range.
+  // We need to remap section line numbers to the full lines array.
+  const sections = splitIntoSections(rangeLines);
+
+  if (sections.length === 0) {
+    return [];
+  }
+
+  // Remap section line numbers to the original lines array
+  const remappedSections = sections.map((s) => ({
+    startLine: s.startLine + startLine - 1,
+    endLine: s.endLine + startLine - 1,
+    heading: s.heading,
+  }));
+
+  // Merge with offset id
+  const chunks = mergeSectionsIntoChunks(remappedSections, lines);
+
+  // Re-assign IDs starting from offsetId
+  return chunks.map((c, i) => ({ ...c, id: offsetId + i }));
 }
 
 // ---------------------------------------------------------------------------
@@ -467,7 +520,7 @@ function splitByTargetSizeLines(
  * @param content - Raw Markdown content possibly with frontmatter.
  * @returns Content with frontmatter removed.
  */
-function stripFrontmatter(content: string): string {
+export function stripFrontmatter(content: string): string {
   const trimmed = content.trimStart();
   if (!trimmed.startsWith("---")) {
     return content;
@@ -482,4 +535,23 @@ function stripFrontmatter(content: string): string {
   // Return everything after the closing ---
   const afterFrontmatter = trimmed.slice(endIndex + 4);
   return afterFrontmatter.trimStart();
+}
+
+/**
+ * Extracts the raw YAML frontmatter string from content.
+ * Returns empty string if no valid frontmatter is found.
+ *
+ * @param content - Raw content that may include YAML frontmatter
+ * @returns The frontmatter string (inclusive of `---` markers), or empty string
+ */
+export function extractFrontmatterBlock(content: string): string {
+  const trimmed = content.trimStart();
+  if (!trimmed.startsWith("---")) {
+    return "";
+  }
+  const endIndex = trimmed.indexOf("\n---", 3);
+  if (endIndex === -1) {
+    return "";
+  }
+  return trimmed.slice(0, endIndex + 4);
 }

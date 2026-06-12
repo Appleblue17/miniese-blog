@@ -5,7 +5,7 @@
  * Handles common AI output quirks (markdown code blocks, extra text, etc.).
  */
 
-import type { ReviewReport } from "../../types/ai";
+import type { ReviewReport, GenerateResult } from "../../types/ai";
 
 const VALID_SECTION_TYPES = new Set([
   "factual",
@@ -41,6 +41,14 @@ function extractJson(text: string): string | null {
 }
 
 /**
+ * @deprecated Translation response parsing is no longer needed.
+ * translator2.ts uses `[TRANSLATE_START]/[TRANSLATE_END]` markers directly.
+ */
+export interface TranslateResponse {
+  translations: Record<string, string>;
+}
+
+/**
  * Parses a DeepSeek review response into a structured ReviewReport.
  *
  * Handles:
@@ -52,6 +60,71 @@ function extractJson(text: string): string | null {
  * @param responseText - The raw text response from DeepSeek.
  * @returns A parsed ReviewReport, or null if parsing failed.
  */
+/**
+ * Parses a DeepSeek term generation response into a structured GenerateResult.
+ *
+ * Expected format:
+ * ```json
+ * {
+ *   "terms": [
+ *     {
+ *       "name": "TermName",
+ *       "definition": "Concise definition of the term.",
+ *       "tags": ["tag1", "tag2"],
+ *       "aliases": ["alias1", "alias2"]
+ *     }
+ *   ]
+ * }
+ * ```
+ *
+ * @param responseText - The raw text response from DeepSeek.
+ * @returns A parsed GenerateResult, or null if parsing failed.
+ */
+export function parseGenerateResponse(
+  responseText: string,
+): GenerateResult | null {
+  try {
+    const jsonStr = extractJson(responseText);
+    if (!jsonStr) {
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonStr) as {
+      terms?: Array<{
+        name?: string;
+        definition?: string;
+        tags?: string[];
+        aliases?: string[];
+      }>;
+    };
+
+    if (!parsed.terms || !Array.isArray(parsed.terms)) {
+      return null;
+    }
+
+    const terms = parsed.terms
+      .filter((t) => t.name && t.name.trim())
+      .map((t) => ({
+        name: t.name!.trim(),
+        definition: (t.definition ?? "").trim(),
+        tags: Array.isArray(t.tags)
+          ? t.tags.filter((tag): tag is string => typeof tag === "string")
+          : [],
+        aliases: Array.isArray(t.aliases)
+          ? t.aliases.filter((a): a is string => typeof a === "string")
+          : [],
+      }));
+
+    if (terms.length === 0) {
+      return null;
+    }
+
+    return { terms };
+  } catch {
+    return null;
+  }
+}
+
 export function parseReviewReport(
   responseText: string,
 ): ReviewReport | null {

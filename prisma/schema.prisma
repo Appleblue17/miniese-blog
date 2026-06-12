@@ -66,6 +66,13 @@ model Article {
   viewCount        Int             @default(0)
   likes            Int             @default(0)
 
+  isAITranslated  Boolean         @default(false)
+
+  // 翻译版本绑定：若此记录是 AI 翻译版本，指向原文章
+  originalId      String?
+  originalArticle Article?  @relation("ArticleTranslation", fields: [originalId], references: [id])
+  translations    Article[] @relation("ArticleTranslation")
+
   // 草稿绑定：若此记录是草稿，指向它所属的已发布文章
   draftOfId String?
   draftOf   Article?  @relation("DraftRelation", fields: [draftOfId], references: [id])
@@ -76,6 +83,7 @@ model Article {
   aiTasks     AiTask[]
 
   @@unique([slug, language])
+  @@unique([originalId, language])
 }
 
 model WikiEntry {
