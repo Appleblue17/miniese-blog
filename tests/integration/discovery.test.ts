@@ -94,13 +94,19 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Clean up test data
-  await prisma.wikiDiscovery.deleteMany({
-    where: { article: { slug: "test-discovery-article" } },
-  });
-  await prisma.article.deleteMany({
+  // Clean up test data — including WikiEntries created by approve tests
+  const article = await prisma.article.findFirst({
     where: { slug: "test-discovery-article" },
   });
+  if (article) {
+    await prisma.wikiEntry.deleteMany({
+      where: { name: { in: ["SingleApprove", "SingleReject"] } },
+    });
+    await prisma.wikiDiscovery.deleteMany({
+      where: { articleId: article.id },
+    });
+    await prisma.article.delete({ where: { id: article.id } });
+  }
 });
 
 // ---------------------------------------------------------------------------

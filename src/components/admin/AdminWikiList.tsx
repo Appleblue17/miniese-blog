@@ -467,28 +467,44 @@ function StatusTabBar({
   );
 }
 
-// --- Discovery Card (importance bar, type badge, approve/reject) ---
+// --- Circular Importance indicator (Issue 5) ---
 
-function ImportanceBar({ value }: { value: number }) {
+function CircularImportance({ value }: { value: number }) {
   const pct = Math.round(value * 100);
-  const color =
-    value >= 0.9
-      ? "bg-green-500"
-      : value >= 0.7
-        ? "bg-blue-500"
-        : value >= 0.5
-          ? "bg-yellow-500"
-          : "bg-slate-300 dark:bg-slate-600";
+  const circumference = 2 * Math.PI * 14; // r=14
+  const offset = circumference - (pct / 100) * circumference;
+  const colorClasses =
+    pct >= 90
+      ? "stroke-green-500"
+      : pct >= 70
+        ? "stroke-blue-500"
+        : pct >= 50
+          ? "stroke-yellow-500"
+          : "stroke-slate-400";
 
   return (
-    <div className="flex items-center gap-2 min-w-[120px]">
-      <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700">
-        <div
-          className={`h-1.5 rounded-full ${color}`}
-          style={{ width: `${pct}%` }}
+    <div className="relative size-9 shrink-0">
+      <svg className="size-9 -rotate-90" viewBox="0 0 32 32">
+        {/* Background circle */}
+        <circle
+          cx="16" cy="16" r="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          className="text-slate-200 dark:text-slate-700"
         />
-      </div>
-      <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
+        {/* Progress arc */}
+        <circle
+          cx="16" cy="16" r="14"
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className={`${colorClasses} transition-all duration-300`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-mono font-medium text-muted-foreground">
         {pct}%
       </span>
     </div>
@@ -537,15 +553,17 @@ function DiscoveryCard({
   discovery,
   onApprove,
   onReject,
+  onUndoReject,
   processing,
 }: {
   discovery: DiscoveryItem;
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
+  onUndoReject: (id: string) => Promise<void>;
   processing: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3">
+    <div className="rounded-lg border border-border bg-card px-4 py-3 hover:border-muted-foreground/30 hover:bg-accent/30 transition-all duration-200">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Term name + badges */}
@@ -557,20 +575,15 @@ function DiscoveryCard({
             </span>
           </div>
 
-          {/* Importance bar */}
-          <div className="mb-1">
-            <ImportanceBar value={discovery.importance} />
-          </div>
-
           {/* Definition */}
           {discovery.definition && (
-            <p className="text-xs text-muted-foreground line-clamp-2">
+            <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
               {discovery.definition}
             </p>
           )}
 
           {/* Meta */}
-          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
             {discovery.articleSlug && (
               <span>
                 来自:{" "}
@@ -600,27 +613,46 @@ function DiscoveryCard({
           </div>
         </div>
 
-        {/* Action buttons for pending items */}
-        {discovery.status === "pending" && (
-          <div className="flex items-center gap-1 shrink-0">
+        {/* Right side: importance + actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Circular importance indicator */}
+          <CircularImportance value={discovery.importance} />
+
+          {/* Action buttons for pending items */}
+          {discovery.status === "pending" && (
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                onClick={() => onApprove(discovery.id)}
+                disabled={processing}
+                className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors disabled:opacity-50 cursor-pointer"
+                title="同意"
+              >
+                <Check className="size-3.5" />
+              </button>
+              <button
+                onClick={() => onReject(discovery.id)}
+                disabled={processing}
+                className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors disabled:opacity-50 cursor-pointer"
+                title="驳回"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Undo reject button for rejected items (Issue 4) */}
+          {discovery.status === "rejected" && (
             <button
-              onClick={() => onApprove(discovery.id)}
+              onClick={() => onUndoReject(discovery.id)}
               disabled={processing}
-              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 transition-colors disabled:opacity-50 cursor-pointer"
-              title="同意"
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50 cursor-pointer"
+              title="撤销驳回"
             >
-              <Check className="size-3.5" />
+              <RefreshCw className={`size-3 ${processing ? "animate-spin" : ""}`} />
+              撤销驳回
             </button>
-            <button
-              onClick={() => onReject(discovery.id)}
-              disabled={processing}
-              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
-              title="驳回"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -846,6 +878,21 @@ export function AdminWikiList({
     }
   }
 
+  async function undoRejectDiscovery(id: string) {
+    setProcessing(true);
+    try {
+      const res = await fetch(`/api/admin/discoveries/${id}/undo-reject`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Undo reject failed");
+      await fetchDiscoveries();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Undo reject failed");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Derived state
   // -----------------------------------------------------------------------
@@ -879,7 +926,7 @@ export function AdminWikiList({
           <button
             onClick={approveAll}
             disabled={processing}
-            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 hover:border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 border border-transparent transition-all disabled:opacity-50 cursor-pointer"
           >
             <Check className="size-3 mr-1" />
             同意全部
@@ -887,7 +934,7 @@ export function AdminWikiList({
           <button
             onClick={approveHighImportance}
             disabled={processing}
-            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 hover:border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 border border-transparent transition-all disabled:opacity-50 cursor-pointer"
           >
             <Star className="size-3 mr-1" />
             高重要性
@@ -895,7 +942,7 @@ export function AdminWikiList({
           <button
             onClick={() => approveTopN(5)}
             disabled={processing}
-            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-cyan-100 text-cyan-700 hover:bg-cyan-200 hover:border-cyan-300 dark:bg-cyan-900/30 dark:text-cyan-400 dark:hover:bg-cyan-900/50 border border-transparent transition-all disabled:opacity-50 cursor-pointer"
           >
             <Filter className="size-3 mr-1" />
             前5个
@@ -903,7 +950,7 @@ export function AdminWikiList({
           <button
             onClick={() => setShowCustomDialog(true)}
             disabled={processing}
-            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400 transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 hover:border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/50 border border-transparent transition-all disabled:opacity-50 cursor-pointer"
           >
             <Filter className="size-3 mr-1" />
             自定义
@@ -912,7 +959,7 @@ export function AdminWikiList({
           <button
             onClick={rejectBatch}
             disabled={processing}
-            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 hover:border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 border border-transparent transition-all disabled:opacity-50 cursor-pointer"
           >
             <X className="size-3 mr-1" />
             驳回
@@ -1083,6 +1130,7 @@ export function AdminWikiList({
                 discovery={d}
                 onApprove={approveDiscovery}
                 onReject={rejectDiscovery}
+                onUndoReject={undoRejectDiscovery}
                 processing={processing}
               />
             ))}

@@ -5,6 +5,14 @@
 ## [Unreleased]
 
 ### Added
+- **Wiki 词条发现引擎**: 扫描文章内容自动提取候选词条（`discoverWikiCandidates()`）
+  - 统一 chunking pipeline（splitArticle），长文章分块处理
+  - 三层去重：AI 响应内去重、已有 WikiEntry 过滤、已有 WikiDiscovery 过滤
+  - `processDiscover` worker handler — 读取文章 → AI 扫描 → 写入 `WikiDiscovery` 表
+  - 10 个单元测试 + 14 个集成测试
+- **翻译后自动词条发现**: `processTranslate` 完成后对译文文章自动触发 `addJob("discover", ...)`（fire-and-forget）
+- **发现提案列表页**: `/admin/wiki/discoveries/` — 词条发现提案列表，支持批量操作
+- **用户指南**: 新增「重启 Worker」和「清空知识库」操作说明到 `docs/user-guide.md`
 - **审查引擎重构 (reviewer.ts)**: 迁移到统一增量 pipeline，与 translator2 架构一致。
   - `incrementalReview()` 复用 `detectChanges` + `splitRange` + `buildContext`
   - 21 个 reviewer 单元测试 + 2 个 roundtrip 测试
@@ -26,6 +34,9 @@
   - 译文写入目标语言文件 + 更新 DB 记录 + HTML 重新渲染
 
 ### Fixed
+- **详情页「暂无定义」**: `processDiscover()` 返回的 `candidates` 缺少 `definition` 字段。修复：在 `candidates.map()` 加入 `definition: c.definition`
+- **重复词条**: `WikiDiscovery` 表缺少 `@@unique([articleId, term])` 约束；`filterPendingProposals()` 只检查 `pending` 状态。修复：添加唯一约束 + 迁移，改为检查所有状态
+- **英文术语中文解释**: discovery prompt 未指定 definition 语言。修复：在 system/user prompt 中明确要求 language consistency
 - **增量审查不工作**: 草稿的 `AiTask` 记录关联草稿 articleId，发布后创建新文章导致找不到 `contentSnapshot`。修复：`processReview` 中使用 `draftOfId` 解析查找已发布文章的审查记录
 - **草稿记录未删除**: 发布后使用 `update` 而非 `delete`，导致孤立草稿记录。修复：迁移 AiTask 后执行 `prisma.article.delete()`
 - **新文章流程孤立草稿**: 审查自动创建草稿后用户留在上传页，点击发布导致草稿被孤立。修复：审查按钮移至草稿编辑页（步骤二），上传页仅保留存草稿和下一步按钮

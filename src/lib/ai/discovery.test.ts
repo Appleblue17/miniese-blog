@@ -158,7 +158,7 @@ describe("discoverWikiCandidates", () => {
     );
   });
 
-  it("should query pending proposals filtered by articleId", async () => {
+  it("should query existing proposals filtered by articleId", async () => {
     mockCallDeepSeek.mockResolvedValueOnce({
       content: JSON.stringify({
         candidates: [
@@ -173,10 +173,12 @@ describe("discoverWikiCandidates", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           articleId: "article-1",
-          status: "pending",
         }),
       }),
     );
+    // Should NOT filter by status (all statuses included)
+    const callArg = mockPrisma.wikiDiscovery.findMany.mock.calls[0][0];
+    expect(callArg.where).not.toHaveProperty("status");
   });
 
   it("should handle empty AI response gracefully", async () => {

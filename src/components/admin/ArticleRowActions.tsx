@@ -334,8 +334,8 @@ function PublishedArticleRow({
         return;
       }
       setDiscovering(false);
-      // Redirect to discoveries page
-      router.push("/admin/wiki/discoveries");
+      // Redirect to task detail page
+      router.push(`/admin/ai-tasks/${data.taskId}`);
     } catch {
       setError("词条发现请求失败");
       setDiscovering(false);
@@ -362,14 +362,14 @@ function PublishedArticleRow({
             <p className="text-xs text-destructive">{error}</p>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0 ml-4">
+        <div className="flex items-center gap-0.5 shrink-0 ml-4">
           {/* Create/edit draft button */}
           {!hasDraft ? (
             <button
               type="button"
               onClick={handleCreateDraft}
               disabled={creatingDraft}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+              className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
               title="创建草稿"
             >
               {creatingDraft ? (
@@ -377,18 +377,19 @@ function PublishedArticleRow({
               ) : (
                 <Edit className="size-3.5" />
               )}
-              <span className="hidden sm:inline">编辑</span>
+              <span>编辑</span>
             </button>
           ) : null}
 
           {/* View link */}
           <Link
             href={`/${article.language}/articles/${article.slug}`}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             target="_blank"
             title="查看"
           >
             <Eye className="size-3.5" />
+            <span>查看</span>
           </Link>
 
           {/* Refresh wiki links button */}
@@ -396,10 +397,11 @@ function PublishedArticleRow({
             type="button"
             onClick={handleRefreshLinks}
             disabled={refreshingLinks}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
             title="刷新词条链接"
           >
             <RefreshCw className={`size-3.5 ${refreshingLinks ? "animate-spin" : ""}`} />
+            <span>链接</span>
           </button>
 
           {/* Translate button */}
@@ -407,11 +409,11 @@ function PublishedArticleRow({
             type="button"
             onClick={handleTranslate}
             disabled={translating || hasPendingTranslate}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title={hasPendingTranslate ? "已有翻译任务处理中" : "AI 翻译"}
           >
             <Languages className={`size-3.5 ${translating ? "animate-pulse" : hasPendingTranslate ? "text-blue-400" : ""}`} />
-            <span className="hidden sm:inline ml-1">{hasPendingTranslate ? "翻译中" : "翻译"}</span>
+            <span>{hasPendingTranslate ? "翻译中" : "翻译"}</span>
           </button>
 
           {/* Discover terms button */}
@@ -419,21 +421,25 @@ function PublishedArticleRow({
             type="button"
             onClick={handleDiscover}
             disabled={discovering || hasPendingDiscover}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             title={hasPendingDiscover ? "词条发现任务处理中" : "扫描文章发现新词条"}
           >
             <Sparkles className={`size-3.5 ${discovering ? "animate-pulse" : hasPendingDiscover ? "text-yellow-400" : ""}`} />
-            <span className="hidden sm:inline ml-1">{hasPendingDiscover ? "发现中" : "发现词条"}</span>
+            <span>{hasPendingDiscover ? "发现中" : "发现词条"}</span>
           </button>
+
+          {/* Separator */}
+          <span className="w-px h-6 bg-border mx-1" />
 
           {/* Delete button */}
           <button
             type="button"
             onClick={() => setShowDelete(true)}
-            className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             title="删除"
           >
             <Trash2 className="size-3.5" />
+            <span>删除</span>
           </button>
         </div>
       </div>

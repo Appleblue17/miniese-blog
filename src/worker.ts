@@ -21,6 +21,7 @@ import { renderMarkdown } from "./lib/markdown/renderer";
 import { detectWikiLinks } from "./lib/markdown/linkDetector";
 import { parseFrontmatter } from "./lib/articles/frontmatter";
 import { discoverWikiCandidates } from "./lib/ai/discovery";
+import { addJob } from "./lib/queue/producer";
 import type { Job } from "bull";
 import type { Prisma } from "./generated/prisma/client";
 
@@ -181,7 +182,8 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
  * 7. Write translated content to the target language file
  * 8. Update article's DB record (title, language, isAITranslated)
  * 9. Re-render the target article to HTML
- * 10. Return translation stats
+ * 10. Trigger term discovery for the translated article (fire-and-forget)
+ * 11. Return translation stats
  *
  * Payload required fields:
  * - `articleId`: ID of the source article (the one being translated FROM)
@@ -445,7 +447,18 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 11. Return result including the full translation map for future incremental runs
+  // 11. Trigger term discovery for the translated article (fire-and-forget)
+  addJob("discover", {
+    articleId: targetArticleIdStr,
+    articleSlug: sourceArticle.slug,
+    articleLang: targetLang,
+  }).catch((err) => {
+    console.warn(
+      `[Worker] Failed to trigger discovery for translated article ${targetArticleIdStr}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+
+  // 12. Return result including the full translation map for future incremental runs
   //     and translatedGroups for the detail page display
   return {
     articleId: articleIdStr,
@@ -813,6 +826,7 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     candidates: candidates.map((c) => ({
       term: c.term,
       type: c.type,
+      definition: c.definition,
       importance: c.importance,
     })),
   };

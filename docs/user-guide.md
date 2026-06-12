@@ -236,6 +236,45 @@ docker compose exec redis redis-cli EVAL \
 3. **测试会产生残留数据**，运行集成测试后建议清理 Redis（见上方清理命令）
 4. 当前 Job 重试策略：最多 3 次，指数退避（初始 2s）
 
+### 重启 Worker
+
+修改 worker 代码或 prompt 后，需重启 Worker 才能生效：
+
+```bash
+# 查找并杀掉旧 Worker 进程
+pkill -f "tsx src/worker" 2>/dev/null
+
+# 重新启动
+npm run worker
+
+# 验证是否正常运行
+# 输出: [Worker] ai-tasks worker started. Waiting for jobs...
+```
+
+### 清空知识库（Wiki）
+
+将系统恢复到无任何知识库条目的状态：
+
+```bash
+# 1. 清空 WikiEntry 和 WikiDiscovery 表
+npx prisma db execute --stdin <<< "DELETE FROM \"WikiEntry\"; DELETE FROM \"WikiDiscovery\";"
+
+# 2. 删除文件系统中的 wiki 源文件
+find content/wiki -name "*.md" -delete
+
+# 3. 可选：同时清除已有的 AiTask 记录（包含词条发现的历史记录）
+npx prisma db execute --stdin <<< "DELETE FROM \"AiTask\";"
+
+# 4. 清空 Redis 中的残留任务
+docker compose exec redis redis-cli EVAL \
+  "return redis.call('DEL', unpack(redis.call('KEYS', ARGV[1])))" 0 "bull:*"
+
+echo "知识库已清空"
+
+# 5. 重启 Worker 使清理生效
+pkill -f "tsx src/worker" 2>/dev/null && npm run worker
+```
+
 ---
 
 ## AI 审查系统

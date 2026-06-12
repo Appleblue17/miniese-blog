@@ -164,6 +164,7 @@ model WikiDiscovery {
 
   article       Article?        @relation(fields: [articleId], references: [id], onDelete: SetNull)
 
+  @@unique([articleId, term])
   @@index([articleId, term])
   @@index([status])
   @@index([articleId])

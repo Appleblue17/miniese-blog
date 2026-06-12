@@ -264,3 +264,25 @@
 - **遇到的问题**：
   - `draftOfId` 解析需要在 worker 中进行，因为 worker 不感知文章是否已被发布
   - 发布时迁移 AiTask 记录需要处理两种场景：draftOfId（更新已有文章）和 draftId only（首次发布）
+
+### 任务 阶段5.4：Wiki-Discovery 整合与修复
+- **时间**：2026-06-12
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **词条发现引擎 (Discovery)**: 扫描文章内容提取候选词条，存储在 `WikiDiscovery` 表中供博主审核。
+    - `discoverWikiCandidates()` — 统一 chunking pipeline（splitArticle），长文章分块处理，去重合并
+    - `filterExistingWikiEntries()` — 过滤已存在的 `WikiEntry` 记录（同语言）
+    - `filterPendingProposals()` — 过滤已存在任何状态的 `WikiDiscovery` 提案
+    - `processDiscover` worker handler — 读取文章 → AI 扫描 → 写入 `WikiDiscovery` 表
+    - 10 个单元测试 + 14 个集成测试
+  - **自动触发**: 发布文章时自动触发词条发现（`triggerAutoGenerate`），翻译完成后自动对译文文章触发发现（`processTranslate` step 11）
+  - **前端列表页**: `/admin/wiki/discoveries/` — 词条发现提案列表，支持批量操作
+  - **Bug 修复 — 详情页「暂无定义」**: `worker.ts:processDiscover()` 返回的 `candidates` 缺少 `definition` 字段。修复：在 `candidates.map()` 中加入 `definition: c.definition`
+  - **Bug 修复 — 重复词条**: 两个根因：
+    - `WikiDiscovery` 表缺少 `@@unique([articleId, term])` 约束 → 添加唯一约束 + 迁移
+    - `filterPendingProposals()` 只检查 `pending` 状态 → 改为检查所有状态
+  - **Prompt 修复 — 英文术语中文解释**: `definition` 语言与文章内容不匹配。修复：在 system/user prompt 中明确要求 definition 语言与文章一致
+- **测试结果**：241/241 通过（discovery 单元测试 10 + 集成测试 14，其余回归通过）
+- **遇到的问题**：
+  - Worker 代码更新后需重启 Worker 进程才能生效，旧进程继续使用旧代码导致翻译后自动发现未触发
+  - WikiDiscovery 唯一约束：初始有重复数据，迁移前需手动清理（`DELETE FROM "WikiDiscovery" WHERE id NOT IN (SELECT DISTINCT ON ("articleId", term) id FROM "WikiDiscovery")`）

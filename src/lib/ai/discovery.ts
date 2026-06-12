@@ -5,7 +5,7 @@
  * Deduplicates across:
  * 1. Terms within the same AI response (case-insensitive)
  * 2. Existing WikiEntry records (already reviewed or proposed)
- * 3. Existing pending WikiDiscovery proposals for the same article
+ * 3. Existing WikiDiscovery proposals for the same article (any status)
  *
  * Uses the unified chunking pipeline (splitArticle) for long articles:
  * - Short articles (≤ MAX_CHUNK_SIZE) are sent as one API call
@@ -195,7 +195,11 @@ async function filterExistingWikiEntries(
 }
 
 /**
- * Removes candidates that already have a pending proposal for the same article.
+ * Removes candidates whose term already exists in ANY discovery proposal
+ * (pending, approved, or rejected) for the same article.
+ *
+ * This prevents the same term from being discovered multiple times for
+ * the same article across different discovery runs.
  *
  * @param candidates - Deduplicated candidate list.
  * @param articleId - The article's database ID.
@@ -207,21 +211,20 @@ async function filterPendingProposals(
 ): Promise<DiscoveryCandidate[]> {
   if (candidates.length === 0) return [];
 
-  const pendingProposals = await prisma.wikiDiscovery.findMany({
+  const existingProposals = await prisma.wikiDiscovery.findMany({
     where: {
       articleId,
-      status: "pending",
     },
     select: { term: true },
   });
 
-  if (pendingProposals.length === 0) return candidates;
+  if (existingProposals.length === 0) return candidates;
 
-  const pendingSet = new Set(
-    pendingProposals.map((p) => p.term.toLowerCase().trim()),
+  const existingSet = new Set(
+    existingProposals.map((p) => p.term.toLowerCase().trim()),
   );
 
   return candidates.filter(
-    (c) => !pendingSet.has(c.term.toLowerCase().trim()),
+    (c) => !existingSet.has(c.term.toLowerCase().trim()),
   );
 }

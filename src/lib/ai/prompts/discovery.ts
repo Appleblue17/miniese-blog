@@ -51,7 +51,8 @@ Return a strict JSON object:
 1. Each term should appear only once
 2. Do NOT output terms that don't exist in the article
 3. Output at most 20 candidates (longer articles can have slightly more)
-4. Focus on the content between [DISCOVER_START] and [DISCOVER_END] markers`;
+4. Focus on the content between [DISCOVER_START] and [DISCOVER_END] markers
+5. **The definition must be written in the same language as the article content.** If the article is in Chinese, write definitions in Chinese; if in English, write definitions in English.`;
 }
 
 /**
@@ -70,5 +71,7 @@ export function buildDiscoveryUserPrompt(content: string): string {
 ${content}
 [DISCOVER_END]
 
-Return a JSON object with a "candidates" array. Each candidate must have: "term", "type", "definition", and "importance".`;
+Return a JSON object with a "candidates" array. Each candidate must have: "term", "type", "definition", and "importance".
+
+**Important: The definition must be written in the same language as the article content above.** If the article is in Chinese, definitions must be in Chinese; if in English, in English.`;
 }

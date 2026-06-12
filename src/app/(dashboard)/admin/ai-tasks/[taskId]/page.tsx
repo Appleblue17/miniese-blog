@@ -8,7 +8,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readFile } from "fs/promises";
 import path from "path";
-import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search } from "lucide-react";
+import { ArrowLeft, Bot, AlertCircle, Download, Globe, Sparkles, Search, BookOpen } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import ReviewChunkList from "@/components/admin/ReviewChunkList";
@@ -555,28 +555,106 @@ export default async function TaskDetailPage({
       {/* Discovery summary */}
       {discoverOutput && task.status === "completed" && (
         <div className="mb-8">
-          <div className="rounded-lg border border-border bg-card p-4 text-center inline-block">
-            <p className="text-2xl font-bold">{discoverOutput.candidateCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">候选词条</p>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+              <Sparkles className="size-5 text-amber-500" />
+              词条发现结果
+            </h2>
+            <Link
+              href="/admin/wiki?status=pending"
+              className="text-xs text-primary hover:underline underline-offset-2"
+            >
+              查看候选词条 →
+            </Link>
           </div>
+
+          {/* Stat card */}
+          <div className="rounded-lg border border-border bg-card p-4 mb-4 inline-flex items-center gap-4">
+            <div className="rounded-full bg-amber-100 dark:bg-amber-900/30 p-2">
+              <Sparkles className="size-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{discoverOutput.candidateCount}</p>
+              <p className="text-xs text-muted-foreground">候选词条</p>
+            </div>
+          </div>
+
+          {/* Candidate cards */}
           {discoverOutput.candidates.length > 0 && (
-            <div className="mt-4 flex flex-col gap-2">
-              {discoverOutput.candidates.map((candidate, idx) => (
-                <div key={idx} className="rounded-lg border border-border bg-card/50 px-4 py-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{candidate.term}</span>
-                    <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-2 py-0.5">
-                      {candidate.type === "acronym" ? "缩写" : candidate.type === "concept" ? "概念" : candidate.type === "theorem" ? "定理" : candidate.type === "tech" ? "技术" : candidate.type}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground ml-auto">
-                      重要性: {Math.round(candidate.importance * 100)}%
-                    </span>
+            <div className="flex flex-col gap-2">
+              {discoverOutput.candidates.map((candidate, idx) => {
+                const pct = Math.round(candidate.importance * 100);
+                const typeLabel = (t: string) => {
+                  switch (t) {
+                    case "acronym": return "缩写";
+                    case "concept": return "概念";
+                    case "theorem": return "定理";
+                    case "tech": return "技术";
+                    default: return t;
+                  }
+                };
+                const typeColor = (t: string) => {
+                  switch (t) {
+                    case "acronym": return "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300";
+                    case "concept": return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+                    case "theorem": return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+                    case "tech": return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300";
+                    default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+                  }
+                };
+
+                return (
+                  <div key={idx} className="rounded-lg border border-border bg-card px-5 py-4 hover:border-muted-foreground/30 hover:bg-accent/30 transition-all duration-200">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        {/* Term name + type badge + lang (matching wiki management style) */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="size-4 text-muted-foreground shrink-0" />
+                          <span className="font-semibold text-sm">{candidate.term}</span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(candidate.type)}`}>
+                            {typeLabel(candidate.type)}
+                          </span>
+                        </div>
+
+                        {/* Definition as "简要解释" */}
+                        {candidate.definition && (
+                          <div className="flex flex-col gap-0.5 mb-1">
+                            <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">简要解释</span>
+                            <p className="text-sm text-foreground leading-relaxed">{candidate.definition}</p>
+                          </div>
+                        )}
+                        {!candidate.definition && (
+                          <p className="text-xs text-muted-foreground/40 italic">暂无定义</p>
+                        )}
+                      </div>
+
+                      {/* Importance — circular + label */}
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <div className="relative size-10">
+                          <svg className="size-10 -rotate-90" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3"
+                              className="text-slate-200 dark:text-slate-700" />
+                            <circle cx="18" cy="18" r="16" fill="none" strokeWidth="3"
+                              strokeDasharray={`${(pct / 100) * 100.53} 100.53`}
+                              strokeLinecap="round"
+                              className={
+                                pct >= 90 ? "stroke-green-500" :
+                                pct >= 70 ? "stroke-blue-500" :
+                                pct >= 50 ? "stroke-yellow-500" :
+                                "stroke-slate-400"
+                              }
+                            />
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-mono font-medium">
+                            {pct}%
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-muted-foreground/60">重要性</span>
+                      </div>
+                    </div>
                   </div>
-                  {candidate.definition && (
-                    <p className="text-sm text-muted-foreground">{candidate.definition}</p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,10 +1,9 @@
 /**
  * @file WikiEntryForm - Create/edit form for wiki entries.
  *
- * Create mode: only name + language (creates a WikiDiscovery pending entry,
- * AI automatically refines type/definition/importance).
+ * Create mode: input name + language → AI analyzes inline and shows result
+ * below the form (non-editable). User clicks confirm or cancel.
  * Edit mode: full form with all fields (only for unreviewed/reviewed entries).
- * Edit mode also includes a review button (unreviewed → reviewed).
  *
  * NOTE: Create and Edit modes are implemented as separate internal components
  * to comply with React hooks rules (hooks must not be called conditionally).
@@ -17,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Save, CheckCircle2, X, Sparkles } from "lucide-react";
+import { Loader2, Save, CheckCircle2, X, Sparkles, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,7 +140,7 @@ function TagInput({
 
 // --- Create Form (internal component) ---
 
-/** AI-refined term data shown in preview step */
+/** AI-refined term data shown inline after analysis */
 interface AiPreview {
   type: string;
   definition: string;
@@ -150,12 +149,10 @@ interface AiPreview {
 
 function CreateForm() {
   const router = useRouter();
-  const [step, setStep] = useState<"input" | "preview">("input");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
   const [preview, setPreview] = useState<AiPreview | null>(null);
-  const [editDefinition, setEditDefinition] = useState("");
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -168,16 +165,16 @@ function CreateForm() {
   const name = form.watch("name");
   const language = form.watch("language");
 
-  /** Step 1: Call AI to refine the term and show preview */
+  /** Call AI to refine the term and show preview inline */
   const handleAnalyze = async () => {
     const valid = await form.trigger();
     if (!valid) return;
 
     setRefining(true);
     setError(null);
+    setPreview(null);
 
     try {
-      // Call a lightweight AI refine first (not creating the record yet)
       const res = await fetch("/api/ai/refine-term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,8 +192,6 @@ function CreateForm() {
         definition: data.definition || "",
         importance: typeof data.importance === "number" ? data.importance : 0.5,
       });
-      setEditDefinition(data.definition || "");
-      setStep("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI 分析请求失败");
     } finally {
@@ -204,8 +199,10 @@ function CreateForm() {
     }
   };
 
-  /** Step 2: Submit the confirmed term as a WikiDiscovery */
+  /** Submit the confirmed term as a WikiDiscovery */
   const handleSubmit = async () => {
+    if (!preview) return;
+
     setSubmitting(true);
     setError(null);
 
@@ -216,7 +213,7 @@ function CreateForm() {
         body: JSON.stringify({
           name: name.trim(),
           language,
-          overrideDefinition: editDefinition,
+          overrideDefinition: preview.definition,
         }),
       });
 
@@ -256,97 +253,6 @@ function CreateForm() {
     }
   };
 
-  if (step === "preview" && preview) {
-    return (
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => { setStep("input"); setPreview(null); setError(null); }}
-            className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2"
-          >
-            &larr; 返回修改
-          </button>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h2 className="text-xl font-bold mb-4">AI 分析结果</h2>
-
-          <div className="flex flex-col gap-4">
-            {/* Term + type */}
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-semibold">{name}</span>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${typeColor(preview.type)}`}>
-                {typeLabel(preview.type)}
-              </span>
-              <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-                {language === "zh" ? "中文" : "EN"}
-              </span>
-            </div>
-
-            {/* Importance bar */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground shrink-0">重要性:</span>
-              <div className="flex-1 max-w-xs">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-                    <div
-                      className={`h-2 rounded-full ${preview.importance >= 0.9 ? "bg-green-500" : preview.importance >= 0.7 ? "bg-blue-500" : preview.importance >= 0.5 ? "bg-yellow-500" : "bg-slate-300 dark:bg-slate-600"}`}
-                      style={{ width: `${Math.round(preview.importance * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-mono text-muted-foreground w-8 text-right">
-                    {Math.round(preview.importance * 100)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Definition (editable) */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">简短定义（可编辑）</label>
-              <textarea
-                value={editDefinition}
-                onChange={(e) => setEditDefinition(e.target.value)}
-                rows={2}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-y"
-                placeholder="AI 生成的简短定义..."
-              />
-              <p className="text-xs text-muted-foreground">
-                您可以修改 AI 生成的简短定义，修改后仍将提交为申请。
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex items-center gap-3 pt-2">
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting && <Loader2 className="size-4 animate-spin mr-2" />}
-            <Sparkles className="size-4 mr-2" />
-            {submitting ? "提交中..." : "确认提交申请"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => { setStep("input"); setPreview(null); setError(null); }}
-            disabled={submitting}
-          >
-            返回修改
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6">
       {/* Name */}
@@ -358,6 +264,7 @@ function CreateForm() {
           {...form.register("name")}
           className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
           placeholder="例如: DFS, 勾股定理"
+          disabled={refining || (!!preview && !submitting)}
         />
         {form.formState.errors.name && (
           <p className="text-xs text-destructive">
@@ -372,6 +279,7 @@ function CreateForm() {
         <select
           {...form.register("language")}
           className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          disabled={refining || (!!preview && !submitting)}
         >
           <option value="zh">中文</option>
           <option value="en">English</option>
@@ -379,9 +287,11 @@ function CreateForm() {
       </div>
 
       {/* Hint */}
-      <p className="text-xs text-muted-foreground">
-        输入词条名称后点击&ldquo;AI 分析&rdquo;，系统将自动分析词条类型和重要性，供您确认后提交申请。
-      </p>
+      {!preview && !refining && (
+        <p className="text-xs text-muted-foreground">
+          输入词条名称后点击&ldquo;AI 分析&rdquo;，系统将自动分析词条类型、定义和重要性，确认后提交申请。
+        </p>
+      )}
 
       {/* Refining indicator */}
       {refining && (
@@ -398,21 +308,95 @@ function CreateForm() {
         </div>
       )}
 
+      {/* Inline AI Preview (Issue 3: simplified, non-editable) */}
+      {preview && !refining && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-foreground">
+            <Sparkles className="size-4 text-amber-500" />
+            AI 分析结果
+          </h3>
+
+          <div className="flex flex-col gap-3">
+            {/* Term + type + language */}
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{name}</span>
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(preview.type)}`}>
+                {typeLabel(preview.type)}
+              </span>
+              <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+                {language === "zh" ? "中文" : "EN"}
+              </span>
+            </div>
+
+            {/* Definition (read-only) */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">定义</span>
+              <p className="text-sm text-foreground bg-muted/50 rounded-lg px-3 py-2 leading-relaxed">
+                {preview.definition || "（暂无定义）"}
+              </p>
+            </div>
+
+            {/* Importance */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-muted-foreground">重要性</span>
+              <div className="relative size-8">
+                <svg className="size-8 -rotate-90" viewBox="0 0 32 32">
+                  <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="3"
+                    className="text-slate-200 dark:text-slate-700" />
+                  <circle cx="16" cy="16" r="14" fill="none" strokeWidth="3"
+                    strokeDasharray={`${Math.round(preview.importance * 88)} 88`}
+                    strokeLinecap="round"
+                    className={
+                      preview.importance >= 0.9 ? "stroke-green-500" :
+                      preview.importance >= 0.7 ? "stroke-blue-500" :
+                      preview.importance >= 0.5 ? "stroke-yellow-500" :
+                      "stroke-slate-400"
+                    }
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-mono font-medium text-muted-foreground">
+                  {Math.round(preview.importance * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
-        <Button type="button" onClick={handleAnalyze} disabled={refining}>
-          {refining && <Loader2 className="size-4 animate-spin mr-2" />}
-          <Sparkles className="size-4 mr-2" />
-          {refining ? "分析中..." : "AI 分析"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push("/admin/wiki")}
-        >
-          取消
-        </Button>
-      </div>
+      {!preview ? (
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="button" onClick={handleAnalyze} disabled={refining}>
+            {refining && <Loader2 className="size-4 animate-spin mr-2" />}
+            <Sparkles className="size-4 mr-2" />
+            {refining ? "分析中..." : "AI 分析"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/admin/wiki")}
+          >
+            取消
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 pt-2">
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting && <Loader2 className="size-4 animate-spin mr-2" />}
+            <Check className="size-4 mr-2" />
+            {submitting ? "提交中..." : "确认提交申请"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => { setPreview(null); setError(null); }}
+            disabled={submitting}
+          >
+            <X className="size-4 mr-2" />
+            取消
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
