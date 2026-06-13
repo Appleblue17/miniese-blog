@@ -19,7 +19,6 @@
 import { prisma } from "../db";
 import { callDeepSeek } from "./client";
 import { splitArticle, stripFrontmatter } from "./chunker/chunker";
-import { buildDiscoverySystemPrompt, buildDiscoveryUserPrompt } from "./prompts/discovery";
 
 /**
  * A candidate term discovered by the AI.
@@ -67,7 +66,7 @@ export async function discoverWikiCandidates(
 
   for (const chunk of chunks) {
     try {
-      const candidates = await processChunk(chunk.content, customDiscoveryPrompt);
+      const candidates = await processChunk(chunk.content, articleLang, customDiscoveryPrompt);
       allCandidates.push(...candidates);
     } catch (err) {
       console.warn(
@@ -91,20 +90,16 @@ export async function discoverWikiCandidates(
  * Processes a single chunk of article content through the AI.
  *
  * @param chunkContent - The chunk content to scan.
+ * @param language - The article's language code ("zh" | "en").
  * @param customPrompt - Optional custom discovery prompt template.
  * @returns List of candidate terms from this chunk.
  */
-async function processChunk(chunkContent: string, customPrompt?: string): Promise<DiscoveryCandidate[]> {
-  let combinedPrompt: string;
-
-  if (customPrompt) {
-    // Use custom prompt with placeholder substitution
-    combinedPrompt = customPrompt.replace(/\{\{content\}\}/g, chunkContent);
-  } else {
-    const systemPrompt = buildDiscoverySystemPrompt();
-    const userPrompt = buildDiscoveryUserPrompt(chunkContent);
-    combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-  }
+async function processChunk(chunkContent: string, language: string, customPrompt?: string): Promise<DiscoveryCandidate[]> {
+  // Use the provided prompt (from settings) with placeholder substitution.
+  // customPrompt is always provided by the worker (loaded from settings).
+  const combinedPrompt = (customPrompt || "")
+    .replace(/\{\{content\}\}/g, chunkContent)
+    .replace(/\{\{language\}\}/g, language === "en" ? "English" : "Chinese");
 
   const response = await callDeepSeek({
     prompt: combinedPrompt,

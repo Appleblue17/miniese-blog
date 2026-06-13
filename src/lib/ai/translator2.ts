@@ -105,43 +105,23 @@ function buildChunkPrompt(
   targetText: string,
   customPrompt?: string,
 ): string {
-  if (customPrompt) {
-    // Use custom prompt with placeholder substitution
-    let prompt = customPrompt;
-    prompt = prompt.replace(/\{\{sourceLang\}\}/g, sourceLang);
-    prompt = prompt.replace(/\{\{targetLang\}\}/g, targetLang);
-    prompt = prompt.replace(/\{\{context\}\}/g, contextText);
-    prompt = prompt.replace(/\{\{target\}\}/g, targetText);
-    return prompt;
-  }
-
-  const lines: string[] = [];
-
-  lines.push(`Translate the following content from ${sourceLang} to ${targetLang}.`);
-  lines.push(
-    "Requirements:\n" +
-      "1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。\n" +
-      "2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改它们。\n" +
-      "3. Keep all formatting, syntax markers, and code blocks unchanged.\n" +
-      "4. Keep all technical terms and proper nouns in their original form.\n" +
-      "5. Keep code inside code blocks unchanged.\n" +
-      "6. Keep inline links, images, and other syntax unchanged.\n" +
-      "7. Do NOT add any explanations or notes.\n" +
-      "8. Return ONLY the translated content, wrapped in the same " +
-      "[TRANSLATE_START]/[TRANSLATE_END] markers.",
-  );
-
-  if (contextText.trim()) {
+  if (!customPrompt) {
+    // Minimal fallback for tests (production always provides prompt from settings)
+    const lines: string[] = [];
+    lines.push(`Translate the following content from ${sourceLang} to ${targetLang}.`);
     lines.push("");
-    lines.push(contextText);
+    lines.push("[TRANSLATE_START]");
+    lines.push(targetText);
+    lines.push("[TRANSLATE_END]");
+    return lines.join("\n");
   }
 
-  lines.push("");
-  lines.push("[TRANSLATE_START]");
-  lines.push(targetText);
-  lines.push("[TRANSLATE_END]");
-
-  return lines.join("\n");
+  let prompt = customPrompt;
+  prompt = prompt.replace(/\{\{sourceLang\}\}/g, sourceLang);
+  prompt = prompt.replace(/\{\{targetLang\}\}/g, targetLang);
+  prompt = prompt.replace(/\{\{context\}\}/g, contextText);
+  prompt = prompt.replace(/\{\{target\}\}/g, targetText);
+  return prompt;
 }
 
 // ---------------------------------------------------------------------------

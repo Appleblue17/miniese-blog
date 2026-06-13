@@ -86,11 +86,26 @@ export function clearSettingsCache(): void {
 
 /**
  * Updates settings by merging with current, writes to custom-settings.json.
+ *
+ * Empty-string prompt values are removed from the merge so they don't
+ * override the defaults from default-settings.json. This allows the
+ * "恢复默认" (reset to default) action to work correctly: setting a prompt
+ * to an empty string restores the default template on next load.
  */
 export async function updateSettings(
   updates: Partial<AppSettings>,
 ): Promise<AppSettings> {
   const current = await getSettings();
+
+  // Strip empty-string prompts so defaults remain in effect
+  if (updates.prompts) {
+    for (const key of Object.keys(updates.prompts)) {
+      if (!updates.prompts[key]?.trim()) {
+        delete updates.prompts[key];
+      }
+    }
+  }
+
   const merged = mergeDeep(current, updates);
 
   const customPath = path.join(process.cwd(), "config/custom-settings.json");

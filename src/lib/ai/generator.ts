@@ -7,7 +7,6 @@
  */
 
 import { callDeepSeek } from "./client";
-import { buildGenerateSystemPrompt, buildGenerateUserPrompt } from "./prompts/generate";
 
 /**
  * A generated wiki entry from AI.
@@ -44,6 +43,7 @@ export interface GenerateResult {
  * @param term - The term name to generate content for.
  * @param definitionHint - Short hint/definition from discovery (for reference).
  * @param context - Optional article slug for context.
+ * @param language - The target language code ("zh" or "en"). Defaults to "zh".
  * @param customGeneratePrompt - Optional custom generate prompt template.
  * @returns A GenerateResult with the generated entry or error info.
  */
@@ -51,21 +51,16 @@ export async function generateWikiEntry(
   term: string,
   definitionHint: string,
   context?: string,
+  language: "zh" | "en" = "zh",
   customGeneratePrompt?: string,
 ): Promise<GenerateResult> {
-  let combinedPrompt: string;
-
-  if (customGeneratePrompt) {
-    // Use custom prompt with placeholder substitution
-    combinedPrompt = customGeneratePrompt
-      .replace(/\{\{term\}\}/g, term)
-      .replace(/\{\{definitionHint\}\}/g, definitionHint || "none")
-      .replace(/\{\{context\}\}/g, context || "none");
-  } else {
-    const systemPrompt = buildGenerateSystemPrompt();
-    const userPrompt = buildGenerateUserPrompt(term, definitionHint, context);
-    combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-  }
+  // Use the provided prompt (from settings) with placeholder substitution.
+  // customGeneratePrompt is always provided by the worker (loaded from settings).
+  const combinedPrompt = (customGeneratePrompt || "")
+    .replace(/\{\{term\}\}/g, term)
+    .replace(/\{\{definitionHint\}\}/g, definitionHint || "none")
+    .replace(/\{\{context\}\}/g, context || "none")
+    .replace(/\{\{language\}\}/g, language);
 
   console.log(`[Generator] Generating wiki entry for term: "${term}"`);
 

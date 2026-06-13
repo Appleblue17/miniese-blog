@@ -43,7 +43,9 @@ describe("Settings API", () => {
     expect(settings.pagination.articlesPerPage).toBe(10);
     expect(settings.appearance.primary.lightHue).toBe(200);
     expect(settings.features.aiReview).toBe(true);
-    expect(settings.prompts.review).toBe("");
+    // Prompts are now in default-settings.json, so they should contain content
+    expect(settings.prompts.review).toContain("技术编辑");
+    expect(settings.prompts.review).toContain("{{content}}");
   });
 
   it("updates a single field and persists", async () => {
@@ -117,6 +119,26 @@ describe("Settings API", () => {
     expect(settings.features.autoTranslate).toBe(true);
 
     // Previous settings preserved
+    expect(settings.site.title).toBe("My Blog");
+    expect(settings.appearance.themeMode).toBe("dark");
+  });
+
+  it("empty prompt strings do not override the default prompt templates", async () => {
+    // Try to "reset" prompt by saving empty strings
+    await updateSettings({
+      prompts: { review: "", translate: "", discovery: "", generate: "" },
+    });
+
+    const settings = await getSettings();
+
+    // Default prompt content should still be intact
+    expect(settings.prompts.review).toContain("技术编辑");
+    expect(settings.prompts.review).toContain("{{content}}");
+    expect(settings.prompts.translate).toContain("翻译为 {{targetLang}}");
+    expect(settings.prompts.discovery).toContain("技术文档分析专家");
+    expect(settings.prompts.generate).toContain("技术百科编辑");
+
+    // Other settings unaffected
     expect(settings.site.title).toBe("My Blog");
     expect(settings.appearance.themeMode).toBe("dark");
   });

@@ -132,7 +132,7 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
     taskId,
   );
 
-  // 3b. Load custom review prompt from settings (if set)
+  // 3b. Load the effective review prompt from settings
   const customReviewPrompt = await loadCustomPrompt("review");
 
   // 4. Perform incremental review with progress callback
@@ -160,7 +160,7 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
           );
         });
     },
-    customReviewPrompt ?? undefined,
+    customReviewPrompt,
   );
 
   console.log(
@@ -274,7 +274,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     translateTaskId,
   );
 
-  // 6b. Load custom translate prompt from settings (if set)
+  // 6b. Load the effective translate prompt from settings
   const customTranslatePrompt = await loadCustomPrompt("translate");
 
   // 7. Perform incremental translation with progress callback
@@ -302,7 +302,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
           );
         });
     },
-    customTranslatePrompt ?? undefined,
+    customTranslatePrompt,
   );
 
   console.log(
@@ -622,11 +622,12 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
 
   // 3. Call generateWikiEntry() with term + definition hint + optional context
   const context = discovery.articleSlug || undefined;
+  const termLang: "zh" | "en" = (discovery.articleLang as "zh" | "en") || "zh";
 
-  // 3b. Load custom generate prompt from settings (if set)
+  // 3b. Load the effective generate prompt from settings
   const customGeneratePrompt = await loadCustomPrompt("generate");
 
-  const result = await generateWikiEntry(discovery.term, discovery.definition, context, customGeneratePrompt ?? undefined);
+  const result = await generateWikiEntry(discovery.term, discovery.definition, context, termLang, customGeneratePrompt);
 
   if (!result.success || !result.entry) {
     const reason = result.reason || "unknown";
@@ -802,10 +803,10 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
   }
 
   // 2. Perform discovery using the unified chunking pipeline
-  // 2b. Load custom discovery prompt from settings (if set)
+  // 2b. Load the effective discovery prompt from settings
   const customDiscoveryPrompt = await loadCustomPrompt("discovery");
 
-  const candidates = await discoverWikiCandidates(articleIdStr, langStr, content, customDiscoveryPrompt ?? undefined);
+  const candidates = await discoverWikiCandidates(articleIdStr, langStr, content, customDiscoveryPrompt);
 
   console.log(
     `[Worker] Discovery found ${candidates.length} candidate terms for article ${articleIdStr}`,

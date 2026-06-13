@@ -34,9 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
 import type { AppSettings } from "../../../../../config/settings";
-import { REVIEW_PROMPT } from "@/lib/ai/prompts/review";
 
-// Default hardcoded prompts shown when no custom override is set
+// Default hardcoded settings (prompts are loaded from default-settings.json via API)
 const DEFAULT_SETTINGS: AppSettings = {
   site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog" },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
@@ -54,80 +53,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     markdown: { name: "Markdown", extensions: [".md"], enabled: true },
     notesaw: { name: "Notesaw", extensions: [".md"], enabled: true },
   },
+  publish: { defaultAuthor: "博主" },
   prompts: { review: "", translate: "", discovery: "", generate: "" },
-};
-
-const DEFAULT_PROMPTS: Record<string, string> = {
-  review: REVIEW_PROMPT,
-  translate: `将以下内容从源语言翻译为目标语言。
-
-要求：
-1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。
-2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改它们。
-3. 保持所有格式、语法标记和代码块不变。
-4. 保持所有技术术语和专有名词的原始形式。
-5. 保持代码块内的代码不变。
-6. 保持内联链接、图片和其他语法不变。
-7. 不要添加任何解释或备注。
-8. 只返回翻译后的内容，并包裹在相同的 [TRANSLATE_START]/[TRANSLATE_END] 标记中。`,
-  discovery: `你是一位技术文档分析专家。请扫描以下文章内容，提取值得添加为知识库词条的术语。
-
-## 值得添加的术语类型
-- 缩写（中英文皆可）：API、中科院、PPO
-- 技术术语/概念：闭包、依赖注入、函数式编程
-- 定理/公式：勾股定理、贝叶斯定理、NP完全
-- 技术栈/工具：TypeScript、Docker、PostgreSQL
-- 其他需要解释的名词：RFC 2616、OAuth 2.0
-
-## 不值得添加的类型
-- 常见名词：汽车、红色、桌子
-- 常见动词：运行、调用、返回
-- 代词/连词：这个、那个、以及
-- 人名（非知名人物）：小明、李老师
-
-## 输出格式
-返回严格的 JSON 对象：
-
-{
-  "candidates": [
-    {
-      "term": "术语名称",
-      "type": "acronym | concept | theorem | tech | other",
-      "definition": "一句话简要解释（10-30字）",
-      "importance": 0.95
-    }
-  ]
-}`,
-  generate: `你是一位技术百科编辑。请为给定的术语生成完整的词条内容。
-
-## 输出格式
-返回严格的 JSON 对象：
-
-{
-  "aliases": ["别名1", "别名2"],
-  "definition": "简短定义（30-80字，用于悬停预览）",
-  "content": "详细介绍...\\n\\n#### 示例\\n...",
-  "tags": ["标签1", "标签2"],
-  "type": "acronym | concept | theorem | tech | other"
-}
-
-## 写作要求
-1. **definition**：一句简洁的定义，适合悬停预览。使用与术语上下文相同的语言。
-2. **content**：完整教程风格的词条内容（Markdown格式），包括：
-   - 详细介绍（2-3段）
-   - 使用示例（如有）
-   - 相关概念（如有）
-   - 公式使用 KaTeX 格式，行内公式用 $公式$，展示公式用 $$公式$$
-   - 不要包含顶级标题（名称已显示在页面上）
-   - 使用 ####（四级标题）作为小节标题，避免嵌套标题
-3. **aliases**：常见的别名或缩写
-4. **tags**：分类标签
-5. **type**：可选值：acronym、concept、theorem、tech、other
-
-## 基于训练知识
-- 使用你的现有知识生成内容
-- 不要编造不存在的信息
-- 如果确实无法生成有意义的内容，返回 { "unable": true }`,
 };
 
 type TabId = "general" | "appearance" | "features" | "notifications" | "advanced";
@@ -299,14 +226,19 @@ export default function SettingsPage() {
 
   // Local copy for editing
   const [local, setLocal] = useState<AppSettings | null>(null);
+  // Default prompts from default-settings.json (used for "恢复默认")
+  const [defaultPrompts, setDefaultPrompts] = useState<Record<string, string> | null>(null);
   const { setTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((r) => r.json())
-      .then((data: AppSettings) => {
-        setSettings(data);
-        setLocal(JSON.parse(JSON.stringify(data))); // deep clone
+      .then((data: AppSettings & { defaultPrompts?: Record<string, string> }) => {
+        // Strip defaultPrompts from the settings object
+        const { defaultPrompts: dp, ...settingsOnly } = data;
+        setSettings(settingsOnly as AppSettings);
+        setLocal(JSON.parse(JSON.stringify(settingsOnly)) as AppSettings);
+        if (dp) setDefaultPrompts(dp);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -575,6 +507,24 @@ export default function SettingsPage() {
                     onReset={() => resetField("pagination", "wikiPerPage")}
                   />
                 </div>
+              </div>
+            </div>
+
+            <SectionHeading>发布设置</SectionHeading>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">默认作者</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={local.publish.defaultAuthor}
+                  onChange={(e) => updateLocal("publish", "defaultAuthor", e.target.value)}
+                  className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                />
+                <ResetButton
+                  isDefault={local.publish.defaultAuthor === DEFAULT_SETTINGS.publish.defaultAuthor}
+                  onReset={() => resetField("publish", "defaultAuthor")}
+                />
               </div>
             </div>
           </div>
@@ -1074,10 +1024,6 @@ export default function SettingsPage() {
                       }`}
                     />
                   </button>
-                  <ResetButton
-                    isDefault={local.features[feat.key] === DEFAULT_SETTINGS.features[feat.key]}
-                    onReset={() => resetField("features", feat.key)}
-                  />
                 </div>
               </div>
             ))}
@@ -1113,10 +1059,6 @@ export default function SettingsPage() {
                     }`}
                   />
                 </button>
-                <ResetButton
-                  isDefault={local.notifications.email === DEFAULT_SETTINGS.notifications.email}
-                  onReset={() => resetField("notifications", "email")}
-                />
               </div>
             </div>
 
@@ -1170,10 +1112,6 @@ export default function SettingsPage() {
                       }`}
                     />
                   </button>
-                  <ResetButton
-                    isDefault={(local.notifications as Record<string, unknown>)[item.key] === (DEFAULT_SETTINGS.notifications as Record<string, unknown>)[item.key]}
-                    onReset={() => resetField("notifications", item.key)}
-                  />
                 </div>
               </div>
             ))}
@@ -1205,39 +1143,41 @@ export default function SettingsPage() {
               );
             })}
 
-            <SectionHeading>Prompt 模板</SectionHeading>
+            <SectionHeading>助手任务 Prompt</SectionHeading>
             <p className="text-xs text-muted-foreground">
-              以下为 AI 任务的默认 Prompt 模板。留空使用内置默认模板，填写自定义内容将覆寫默认。
+              设置各助手任务的提示词，用于生成助手任务的描述。
             </p>
 
             {Object.keys(local.prompts).map((key) => {
               const val = local.prompts[key];
-              // Show the effective prompt: custom override if set, otherwise the built-in default
-              const effectiveVal = val || DEFAULT_PROMPTS[key] || "";
-              const isCustom = !!val;
+              const defaultVal = defaultPrompts?.[key] ?? "";
+              // Show the effective content: custom value if set, otherwise the default template
+              const displayValue = val || defaultVal;
+              // "恢复默认" is hidden when the current value matches the default template
+              const matchesDefault = displayValue === defaultVal;
               return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-sm font-medium capitalize">{key}</label>
                   <div className="flex items-center gap-2">
-                    {isCustom && (
-                      <>
-                        <span className="text-[10px] text-primary">自定义</span>
-                        <button
-                          type="button"
-                          onClick={() => updateLocal("prompts", key, "")}
-                          className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                          title="恢复默认模板"
-                        >
-                          <Undo2 className="size-3" />
-                          恢复默认
-                        </button>
-                      </>
+                    {!matchesDefault && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Reset: put the default template from default-settings.json into the textarea
+                          updateLocal("prompts", key, defaultVal);
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                        title="恢复默认模板"
+                      >
+                        <Undo2 className="size-3" />
+                        恢复默认
+                      </button>
                     )}
                   </div>
                 </div>
                 <textarea
-                  value={effectiveVal}
+                  value={displayValue}
                   onChange={(e) => updateLocal("prompts", key, e.target.value)}
                   rows={6}
                   className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y"
