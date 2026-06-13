@@ -22,6 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { WikiStatus } from "@/types/wiki";
 
+/** Map language code to display label */
+function langLabel(code: string): string {
+  return code === "zh" ? "中文" : "EN";
+}
+
 // --- Schema ---
 
 const createSchema = z.object({
@@ -329,9 +334,9 @@ function CreateForm() {
               >
                 {typeLabel(preview.type)}
               </span>
-              <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-                {language === "zh" ? "中文" : "EN"}
-              </span>
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0.5">
+                {langLabel(language)}
+              </Badge>
             </div>
 
             {/* Definition (read-only) */}

@@ -27,7 +27,7 @@
       "lightSaturation": 70,
       "darkSaturation": 70,
       "lightLightness": 55,
-      "darkLightness": 50
+      "darkLightness": 45
     },
     "backgroundImage": "",
     "backgroundOpacity": 10,
@@ -38,9 +38,9 @@
     "markdownBgColorDark": "#0d1117"
   },
   "features": {
-    "aiReview": false,
-    "autoTranslate": false,
-    "wikiDiscovery": false,
+    "aiReview": true,
+    "autoTranslate": true,
+    "wikiDiscovery": true,
     "wikiGenerate": true,
     "comments": true,
     "rss": true

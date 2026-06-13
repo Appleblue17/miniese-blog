@@ -36,7 +36,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
+
+/** Map language code to display label */
+function langLabel(code: string): string {
+  return code === "zh" ? "中文" : "EN";
+}
 
 // ---------------------------------------------------------------------------
 // Props & Constants
@@ -149,7 +155,7 @@ function DeleteModal({
   loading,
 }: {
   name: string;
-  onConfirm: () => void;
+  onConfirm: ((e: React.MouseEvent) => void);
   onCancel: () => void;
   loading: boolean;
 }) {
@@ -189,7 +195,7 @@ function DeleteModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={(e) => onConfirm(e)}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
           >
@@ -212,69 +218,84 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
   const [undoing, setUndoing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/wiki/${encodeURIComponent(entry.name)}?lang=${entry.language}`,
-        { method: "DELETE" },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "删除失败");
+  const handleDelete = useCallback(
+    async (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      e?.preventDefault();
+      setDeleting(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/wiki/${encodeURIComponent(entry.name)}?lang=${entry.language}`,
+          { method: "DELETE" },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "删除失败");
+          setDeleting(false);
+          return;
+        }
+        setShowDelete(false);
+        onRefresh();
+      } catch {
+        setError("删除请求失败");
         setDeleting(false);
-        return;
       }
-      setShowDelete(false);
-      onRefresh();
-    } catch {
-      setError("删除请求失败");
-      setDeleting(false);
-    }
-  }, [entry.name, entry.language, onRefresh]);
+    },
+    [entry.name, entry.language, onRefresh],
+  );
 
-  const handleReview = useCallback(async () => {
-    setReviewing(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/wiki/${encodeURIComponent(entry.name)}/review?lang=${entry.language}`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "审查失败");
+  const handleReview = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setReviewing(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/wiki/${encodeURIComponent(entry.name)}/review?lang=${entry.language}`,
+          { method: "POST" },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "审查失败");
+          setReviewing(false);
+          return;
+        }
+        onRefresh();
+      } catch {
+        setError("审查请求失败");
         setReviewing(false);
-        return;
       }
-      onRefresh();
-    } catch {
-      setError("审查请求失败");
-      setReviewing(false);
-    }
-  }, [entry.name, entry.language, onRefresh]);
+    },
+    [entry.name, entry.language, onRefresh],
+  );
 
-  const handleUndo = useCallback(async () => {
-    setUndoing(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/wiki/${encodeURIComponent(entry.name)}/undo?lang=${entry.language}`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "撤销失败");
+  const handleUndo = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setUndoing(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/wiki/${encodeURIComponent(entry.name)}/undo?lang=${entry.language}`,
+          { method: "POST" },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "撤销失败");
+          setUndoing(false);
+          return;
+        }
+        onRefresh();
+      } catch {
+        setError("撤销请求失败");
         setUndoing(false);
-        return;
       }
-      onRefresh();
-    } catch {
-      setError("撤销请求失败");
-      setUndoing(false);
-    }
-  }, [entry.name, entry.language, onRefresh]);
+    },
+    [entry.name, entry.language, onRefresh],
+  );
 
   const canEdit = entry.status === "unreviewed" || entry.status === "reviewed";
   const canReview = entry.status === "unreviewed";
@@ -282,15 +303,23 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
 
   return (
     <>
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+      <Link
+        href={`/${entry.language}/wiki/${encodeURIComponent(entry.name)}`}
+        target="_blank"
+        className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted ${
+          entry.status === "deleted"
+            ? "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20"
+            : "border-border bg-card"
+        }`}
+      >
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <BookOpen className="size-4 text-muted-foreground shrink-0" />
             <span className="font-medium truncate">{entry.name}</span>
             {entry.type && <TypeBadge type={entry.type} />}
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5">
-              {entry.language}
-            </span>
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0.5">
+              {langLabel(entry.language)}
+            </Badge>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {entry.aliases.length > 0 && <span>别名: {entry.aliases.join(", ")}</span>}
@@ -298,7 +327,7 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
-        <div className="flex items-center gap-2 shrink-0 ml-4">
+        <div className="flex items-center gap-2 shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
           <StatusBadge status={entry.status} />
 
           {entry.status === "unreviewed" && (
@@ -353,19 +382,29 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
           )}
 
           {canEdit && (
-            <Link
-              href={`/admin/wiki/${entry.id}`}
-              className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.open(`/admin/wiki/${entry.id}`, "_self");
+              }}
+              className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
               title="编辑"
             >
               <Edit className="size-3.5" />
-            </Link>
+              <span className="ml-1 hidden sm:inline">编辑</span>
+            </button>
           )}
 
           {canDelete && (
             <button
               type="button"
-              onClick={() => setShowDelete(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setShowDelete(true);
+              }}
               className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               title="移至已删除"
             >
@@ -373,12 +412,12 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
             </button>
           )}
         </div>
-      </div>
+      </Link>
 
       {showDelete && (
         <DeleteModal
           name={entry.name}
-          onConfirm={handleDelete}
+          onConfirm={(e) => handleDelete(e)}
           onCancel={() => {
             setShowDelete(false);
             setError(null);
@@ -626,9 +665,9 @@ function DiscoveryCard({
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-sm">{discovery.term}</span>
             <TypeBadge type={discovery.type} />
-            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-              {discovery.articleLang === "zh" ? "中文" : "EN"}
-            </span>
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0.5">
+              {langLabel(discovery.articleLang)}
+            </Badge>
             {discovery.status === "generated" && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
                 <CheckCircle2 className="size-3" />

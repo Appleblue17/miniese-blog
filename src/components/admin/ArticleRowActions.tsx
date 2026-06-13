@@ -4,6 +4,9 @@
  * Provides:
  * - Delete button with confirmation dialog for published articles and drafts
  * - Edit draft button for published articles without an existing draft
+ *
+ * Each row is wrapped in a clickable Link (clicking the card body navigates).
+ * Action buttons use e.stopPropagation() to prevent triggering the row link.
  */
 
 "use client";
@@ -13,7 +16,6 @@ import { useRouter } from "next/navigation";
 import {
   Trash2,
   Edit,
-  Eye,
   FileText,
   Loader2,
   AlertTriangle,
@@ -24,6 +26,7 @@ import {
   Globe,
 } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "./StatusBadge";
 
 // --- Types ---
@@ -81,6 +84,11 @@ interface ArticleRowActionsProps {
   pendingTasks: Record<string, string[]>;
 }
 
+/** Map language code to display label */
+function langLabel(code: string): string {
+  return code === "zh" ? "中文" : "EN";
+}
+
 // --- Helpers ---
 
 function formatDate(dateStr: string): string {
@@ -121,7 +129,9 @@ function ArticleMetaRow({
 }) {
   return (
     <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-      <span>{language === "zh" ? "中文" : "English"}</span>
+      <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0.5">
+        {langLabel(language)}
+      </Badge>
       {publishedAt != null && <span>发布 {formatDate(publishedAt)}</span>}
       <span>修改 {formatDateTime(updatedAt)}</span>
       {viewCount != null && <span>阅读 {viewCount}</span>}
@@ -142,7 +152,7 @@ function DeleteModal({
 }: {
   title: string;
   itemType: "文章" | "草稿";
-  onConfirm: () => void;
+  onConfirm: (e: React.MouseEvent) => void;
   onCancel: () => void;
   loading: boolean;
 }) {
@@ -182,7 +192,7 @@ function DeleteModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={(e) => onConfirm(e)}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
           >
@@ -218,134 +228,160 @@ function PublishedArticleRow({
   const hasPendingTranslate = activeTaskTypes.includes("translate");
   const hasPendingDiscover = activeTaskTypes.includes("discover");
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/articles/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: article.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "删除失败");
+  const handleDelete = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setDeleting(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/articles/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: article.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "删除失败");
+          setDeleting(false);
+          return;
+        }
+        setShowDelete(false);
+        router.refresh();
+      } catch {
+        setError("删除请求失败");
         setDeleting(false);
-        return;
       }
-      setShowDelete(false);
-      router.refresh();
-    } catch {
-      setError("删除请求失败");
-      setDeleting(false);
-    }
-  }, [article.id, router]);
+    },
+    [article.id, router],
+  );
 
-  const handleCreateDraft = useCallback(async () => {
-    setCreatingDraft(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/articles/create-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleId: article.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "创建草稿失败");
+  const handleCreateDraft = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setCreatingDraft(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/articles/create-draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ articleId: article.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "创建草稿失败");
+          setCreatingDraft(false);
+          return;
+        }
+        router.push(data.draft.url);
+      } catch {
+        setError("创建草稿请求失败");
         setCreatingDraft(false);
-        return;
       }
-      // Navigate to the new draft
-      router.push(data.draft.url);
-    } catch {
-      setError("创建草稿请求失败");
-      setCreatingDraft(false);
-    }
-  }, [article.id, router]);
+    },
+    [article.id, router],
+  );
 
-  const handleRefreshLinks = useCallback(async () => {
-    setRefreshingLinks(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/articles/render", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          articleId: article.id,
-          lang: article.language,
-          preserveUpdatedAt: true,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "刷新链接失败");
+  const handleRefreshLinks = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setRefreshingLinks(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/articles/render", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            articleId: article.id,
+            lang: article.language,
+            preserveUpdatedAt: true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "刷新链接失败");
+          setRefreshingLinks(false);
+          return;
+        }
         setRefreshingLinks(false);
-        return;
+        router.refresh();
+      } catch {
+        setError("刷新链接请求失败");
+        setRefreshingLinks(false);
       }
-      setRefreshingLinks(false);
-      router.refresh();
-    } catch {
-      setError("刷新链接请求失败");
-      setRefreshingLinks(false);
-    }
-  }, [article.id, article.language, router]);
+    },
+    [article.id, article.language, router],
+  );
 
-  const handleTranslate = useCallback(async () => {
-    setTranslating(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/ai/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          articleId: article.id,
-          sourceLanguage: article.language,
-          targetLanguage: article.language === "zh" ? "en" : "zh",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "翻译任务提交失败");
+  const handleTranslate = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTranslating(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            articleId: article.id,
+            sourceLanguage: article.language,
+            targetLanguage: article.language === "zh" ? "en" : "zh",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "翻译任务提交失败");
+          setTranslating(false);
+          return;
+        }
         setTranslating(false);
-        return;
+        router.push(`/admin/ai-tasks/${data.taskId}`);
+      } catch {
+        setError("翻译请求失败");
+        setTranslating(false);
       }
-      setTranslating(false);
-      // Redirect to ai-tasks page showing task detail
-      router.push(`/admin/ai-tasks/${data.taskId}`);
-    } catch {
-      setError("翻译请求失败");
-      setTranslating(false);
-    }
-  }, [article.id, article.language, router]);
+    },
+    [article.id, article.language, router],
+  );
 
-  const handleDiscover = useCallback(async () => {
-    setDiscovering(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/ai/discover", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleId: article.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "词条发现任务提交失败");
+  const handleDiscover = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setDiscovering(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/ai/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ articleId: article.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "词条发现任务提交失败");
+          setDiscovering(false);
+          return;
+        }
         setDiscovering(false);
-        return;
+        router.push(`/admin/ai-tasks/${data.taskId}`);
+      } catch {
+        setError("词条发现请求失败");
+        setDiscovering(false);
       }
-      setDiscovering(false);
-      // Redirect to task detail page
-      router.push(`/admin/ai-tasks/${data.taskId}`);
-    } catch {
-      setError("词条发现请求失败");
-      setDiscovering(false);
-    }
-  }, [article.id, router]);
+    },
+    [article.id, router],
+  );
 
   return (
     <>
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+      <Link
+        href={`/${article.language}/articles/${article.slug}`}
+        className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
+        target="_blank"
+      >
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-medium truncate">{article.title}</span>
@@ -361,7 +397,7 @@ function PublishedArticleRow({
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
-        <div className="flex items-center gap-0.5 shrink-0 ml-4">
+        <div className="flex items-center gap-0.5 shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
           {/* Create/edit draft button */}
           {!hasDraft ? (
             <button
@@ -379,17 +415,6 @@ function PublishedArticleRow({
               <span>编辑</span>
             </button>
           ) : null}
-
-          {/* View link */}
-          <Link
-            href={`/${article.language}/articles/${article.slug}`}
-            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            target="_blank"
-            title="查看"
-          >
-            <Eye className="size-3.5" />
-            <span>查看</span>
-          </Link>
 
           {/* Refresh wiki links button */}
           <button
@@ -437,7 +462,11 @@ function PublishedArticleRow({
           {/* Delete button */}
           <button
             type="button"
-            onClick={() => setShowDelete(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setShowDelete(true);
+            }}
             className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             title="删除"
           >
@@ -445,7 +474,7 @@ function PublishedArticleRow({
             <span>删除</span>
           </button>
         </div>
-      </div>
+      </Link>
 
       {showDelete && (
         <DeleteModal
@@ -467,7 +496,10 @@ function PublishedArticleRow({
 
 function LinkedDraftRow({ draft }: { draft: DraftItem }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-dashed border-yellow-300 dark:border-yellow-700 bg-card/50 px-4 py-2.5 ml-6 border-l-2 border-l-yellow-400">
+    <Link
+      href={`/admin/articles/${draft.id}/edit`}
+      className="flex items-center justify-between rounded-lg border border-dashed border-yellow-300 dark:border-yellow-700 bg-card/50 px-4 py-2.5 ml-6 border-l-2 border-l-yellow-400 transition-colors hover:bg-yellow-50/50 dark:hover:bg-yellow-950/20"
+    >
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <FileText className="size-3.5 text-muted-foreground shrink-0" />
@@ -481,16 +513,11 @@ function LinkedDraftRow({ draft }: { draft: DraftItem }) {
           lineCount={draft.lineCount}
         />
       </div>
-      <div className="flex items-center gap-1 shrink-0 ml-4">
-        <Link
-          href={`/admin/articles/${draft.id}/edit`}
-          className="text-xs text-primary hover:underline"
-        >
-          编辑草稿
-        </Link>
+      <div className="flex items-center gap-2 shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
+        <span className="text-xs text-primary">点击编辑草稿</span>
         <DeleteDraftButton draft={draft} />
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -498,7 +525,11 @@ function LinkedDraftRow({ draft }: { draft: DraftItem }) {
 
 function TranslationRow({ translation }: { translation: TranslationItem }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-dashed border-blue-300 dark:border-blue-700 bg-card/50 px-4 py-2.5 ml-6 border-l-2 border-l-blue-400">
+    <Link
+      href={`/${translation.language}/articles/${translation.slug}`}
+      className="flex items-center justify-between rounded-lg border border-dashed border-blue-300 dark:border-blue-700 bg-card/50 px-4 py-2.5 ml-6 border-l-2 border-l-blue-400 transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
+      target="_blank"
+    >
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <Globe className="size-3.5 text-blue-500 shrink-0" />
@@ -515,19 +546,8 @@ function TranslationRow({ translation }: { translation: TranslationItem }) {
           lineCount={translation.lineCount}
         />
       </div>
-      <div className="flex items-center gap-1 shrink-0 ml-4">
-        <Link
-          href={`/${translation.language}/articles/${translation.slug}`}
-          className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          target="_blank"
-          title="查看翻译"
-        >
-          <Eye className="size-3.5" />
-          <span className="hidden sm:inline ml-1">查看</span>
-        </Link>
-        {/* Translations cannot be edited or deleted from here */}
-      </div>
-    </div>
+      {/* Translations cannot be edited or deleted from here */}
+    </Link>
   );
 }
 
@@ -539,34 +559,43 @@ function DeleteDraftButton({ draft }: { draft: DraftItem }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/articles/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: draft.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "删除失败");
+  const handleDelete = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setDeleting(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/articles/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: draft.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "删除失败");
+          setDeleting(false);
+          return;
+        }
+        setShowDelete(false);
+        router.refresh();
+      } catch {
+        setError("删除请求失败");
         setDeleting(false);
-        return;
       }
-      setShowDelete(false);
-      router.refresh();
-    } catch {
-      setError("删除请求失败");
-      setDeleting(false);
-    }
-  }, [draft.id, router]);
+    },
+    [draft.id, router],
+  );
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setShowDelete(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setShowDelete(true);
+        }}
         className="inline-flex items-center rounded-md p-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
         title="删除草稿"
       >
@@ -597,28 +626,33 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/articles/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: draft.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "删除失败");
+  const handleDelete = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setDeleting(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/articles/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: draft.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "删除失败");
+          setDeleting(false);
+          return;
+        }
+        setShowDelete(false);
+        router.refresh();
+      } catch {
+        setError("删除请求失败");
         setDeleting(false);
-        return;
       }
-      setShowDelete(false);
-      router.refresh();
-    } catch {
-      setError("删除请求失败");
-      setDeleting(false);
-    }
-  }, [draft.id, router]);
+    },
+    [draft.id, router],
+  );
 
   return (
     <div className="flex flex-col gap-1">
@@ -634,7 +668,10 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
       </div>
 
       {/* Draft row (below placeholder) */}
-      <div className="flex items-center justify-between rounded-lg border border-dashed border-yellow-300 dark:border-yellow-700 bg-card px-4 py-3 ml-6 border-l-2 border-l-yellow-400">
+      <Link
+        href={`/admin/articles/${draft.id}/edit`}
+        className="flex items-center justify-between rounded-lg border border-dashed border-yellow-300 dark:border-yellow-700 bg-card px-4 py-3 ml-6 border-l-2 border-l-yellow-400 transition-colors hover:bg-yellow-50/50 dark:hover:bg-yellow-950/20"
+      >
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <FileText className="size-3.5 text-muted-foreground shrink-0" />
@@ -649,23 +686,22 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
-        <div className="flex items-center gap-1 shrink-0 ml-4">
-          <Link
-            href={`/admin/articles/${draft.id}/edit`}
-            className="text-xs text-primary hover:underline"
-          >
-            编辑
-          </Link>
+        <div className="flex items-center gap-1 shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs text-primary">编辑 →</span>
           <button
             type="button"
-            onClick={() => setShowDelete(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setShowDelete(true);
+            }}
             className="inline-flex items-center rounded-md p-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             title="删除草稿"
           >
             <Trash2 className="size-3.5" />
           </button>
         </div>
-      </div>
+      </Link>
 
       {showDelete && (
         <DeleteModal
