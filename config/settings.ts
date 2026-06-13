@@ -18,6 +18,9 @@ export interface AppSettings {
     articlesPerPage: number;
     wikiPerPage: number;
   };
+  publish: {
+    defaultAuthor: string;
+  };
   appearance: {
     themeMode: "light" | "dark" | "system";
     bodyWidth: number;

@@ -4,11 +4,21 @@ import { useCallback, useRef, useState } from "react";
 import { Upload, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import matter from "gray-matter";
 
 export interface UploadResult {
   fileName: string;
   fileContent: string;
+  /** Language parsed from frontmatter (zh|en), or "auto" if not specified */
   language: string;
+  /** Title parsed from frontmatter, or inferred from filename */
+  title: string;
+  /** Author parsed from frontmatter, or empty */
+  author: string;
+  /** Tags parsed from frontmatter */
+  tags: string[];
+  /** Summary parsed from frontmatter */
+  summary: string;
 }
 
 interface FileUploaderProps {
@@ -47,10 +57,36 @@ export function FileUploader({ onUpload }: FileUploaderProps) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
-        // Parse language from frontmatter (simple regex) — full parse via API later
-        const langMatch = content.match(/^---\s*\n[\s\S]*?\nlanguage:\s*(zh|en)/m);
-        const language = langMatch?.[1] || "zh";
-        onUpload({ fileName: file.name, fileContent: content, language });
+
+        // Parse frontmatter with gray-matter
+        let title = "";
+        let language = "auto";
+        let author = "";
+        let tags: string[] = [];
+        let summary = "";
+
+        try {
+          const parsed = matter(content);
+          const data = parsed.data as Record<string, unknown>;
+          title = (data.title as string) || "";
+          language = (data.language === "en" ? "en" : data.language === "zh" ? "zh" : "auto");
+          author = (data.author as string) || "";
+          tags = Array.isArray(data.tags) ? (data.tags as string[]) : [];
+          summary = (data.summary as string) || "";
+        } catch {
+          // If parsing fails, fall through to filename-based inference
+        }
+
+        // If no title in frontmatter, infer from filename
+        if (!title) {
+          title = file.name
+            .replace(/\.(zh|en)\.md$/i, "") // Remove language suffix like .zh.md
+            .replace(/\.md$/i, "")            // Remove .md
+            .replace(/[-_]/g, " ")            // Replace hyphens/underscores with spaces
+            .replace(/\b\w/g, (c) => c.toUpperCase()); // Title case
+        }
+
+        onUpload({ fileName: file.name, fileContent: content, language, title, author, tags, summary });
       };
       reader.readAsText(file);
     },

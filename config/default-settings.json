@@ -8,6 +8,9 @@
     "articlesPerPage": 10,
     "wikiPerPage": 20
   },
+  "publish": {
+    "defaultAuthor": "博主"
+  },
   "appearance": {
     "themeMode": "system",
     "bodyWidth": 66,

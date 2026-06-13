@@ -6,6 +6,26 @@
 
 ### Added
 
+#### 发布流程优化
+- Settings 新增 `publish.defaultAuthor` 配置，PublishForm 从设置读取默认作者
+- 语言选择改为必选，保存/提交/确认前进行校验
+- 上传文件时从 frontmatter 提取标题、作者、标签、摘要；无 frontmatter 时从文件名推断标题
+- 删除草稿页面内联 AI 审查卡片，点击审查后直接跳转到详情页
+
+### Fixed
+
+- skipped 任务（feature disabled）在各处正确显示"已跳过"而非"已完成"
+  - reviews 列表页：映射 status 为 "skipped"，黄色标签
+  - reviews 详情页：跳过状态检测 + 显示 reason 提示卡片
+  - ai-tasks 列表页：API 映射 + AiTaskList 兼容
+  - ai-tasks 详情页：StatusBadge 跳过检测
+- Notesaw block 容器移除 `border-radius: 8px`，恢复直角左侧竖线样式
+- "编辑→"按钮文案改为"点击编辑草稿"，语义更清晰
+
+### Changed
+
+- 发布确认页不再硬编码 "博主"，使用 settings 中的 `publish.defaultAuthor`
+
 #### 基础架构
 - Next.js 16 + TypeScript 5 + Tailwind CSS 4 项目初始化
 - Prisma 7.8 + PostgreSQL 16 + Redis 7 配置

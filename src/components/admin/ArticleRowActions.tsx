@@ -687,7 +687,7 @@ function NewDraftRow({ draft }: { draft: DraftItem }) {
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-4" onClick={(e) => e.stopPropagation()}>
-          <span className="text-xs text-primary">编辑 →</span>
+          <span className="text-xs text-primary">点击编辑草稿</span>
           <button
             type="button"
             onClick={(e) => {

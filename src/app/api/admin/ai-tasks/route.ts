@@ -102,12 +102,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Map "completed + skipped" to a display status of "skipped"
+      const output = t.output as Record<string, unknown> | null;
+      const displayStatus =
+        t.status === "completed" && output?.skipped === true ? "skipped" : t.status;
+
       return {
         id: t.id,
         type: t.type,
-        status: t.status,
+        status: displayStatus,
         input: (t.input ?? {}) as Record<string, unknown>,
-        output: t.output as Record<string, unknown> | null,
+        output,
         error: t.error,
         createdAt: t.createdAt.toISOString(),
         completedAt: t.completedAt?.toISOString() ?? null,

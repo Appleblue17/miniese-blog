@@ -105,7 +105,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, output }: { status: string; output: ReviewOutput | null }) {
+  // Detect skipped tasks: completed with output.skipped = true
+  const isSkipped =
+    status === "completed" &&
+    output &&
+    (output as unknown as Record<string, unknown>).skipped === true;
+
   const config: Record<string, { label: string; color: string }> = {
     pending: {
       label: "等待中",
@@ -115,10 +121,9 @@ function StatusBadge({ status }: { status: string }) {
       label: "处理中",
       color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
     },
-    completed: {
-      label: "已完成",
-      color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    },
+    completed: isSkipped
+      ? { label: "已跳过", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" }
+      : { label: "已完成", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
     failed: { label: "失败", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
   };
   const c = config[status] ?? { label: status, color: "bg-slate-100 text-slate-700" };
@@ -160,7 +165,7 @@ export default async function ReviewDetailPage({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">审查报告</h1>
-            <StatusBadge status={review.status} />
+            <StatusBadge status={review.status} output={output} />
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {review.type} · 创建于 {formatDate(review.createdAt)}
@@ -179,6 +184,22 @@ export default async function ReviewDetailPage({
           </a>
         )}
       </div>
+
+      {/* Skipped state (feature disabled) */}
+      {review.status === "completed" && output && (output as unknown as Record<string, unknown>).skipped === true && (
+        <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="size-5 text-yellow-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-sm text-yellow-800 dark:text-yellow-200">审查已跳过</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                {(output as unknown as Record<string, unknown>).reason as string ||
+                  "此功能已在设置中关闭，任务被自动跳过。"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error state */}
       {review.status === "failed" && (

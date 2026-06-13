@@ -8,6 +8,9 @@
     "articlesPerPage": 10,
     "wikiPerPage": 20
   },
+  "publish": {
+    "defaultAuthor": "博主"
+  },
   "appearance": {
     "themeMode": "light",
     "bodyWidth": 66,
@@ -37,7 +40,7 @@
   },
   "features": {
     "aiReview": false,
-    "autoTranslate": false,
+    "autoTranslate": true,
     "wikiDiscovery": false,
     "wikiGenerate": false,
     "comments": true,

@@ -38,7 +38,7 @@ type Step = "upload" | "review" | "confirm";
 
 interface ArticleMeta {
   title: string;
-  language: "zh" | "en";
+  language: "zh" | "en" | "";
   fileType: "markdown" | "notesaw";
   tags: string[];
   author: string;
@@ -74,21 +74,17 @@ export function PublishForm({
   const [fileContent, setFileContent] = useState<string>(initialContent || "");
 
   // Metadata state
-  const [meta, setMeta] = useState<ArticleMeta>(
-    initialMeta || {
-      title: "",
-      language: "zh",
-      fileType: "markdown",
-      tags: [],
-      author: "博主",
-      summary: "",
-    },
-  );
+  const [meta, setMeta] = useState<ArticleMeta>({
+    title: "",
+    language: "",
+    fileType: "markdown",
+    tags: [],
+    author: "",
+    summary: "",
+  });
 
   // Extra frontmatter fields (not managed by UI)
-  const [extraFrontmatter, setExtraFrontmatter] = useState<Record<string, unknown>>(
-    initialExtraFrontmatter || {},
-  );
+  const [extraFrontmatter, setExtraFrontmatter] = useState<Record<string, unknown>>({});
 
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -105,24 +101,49 @@ export function PublishForm({
   const [error, setError] = useState<string | null>(null);
   const [published, setPublished] = useState<{ slug: string; url: string } | null>(null);
 
-  // AI Review state
+  // Load default author from settings and apply initial values
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/settings");
+        if (!res.ok) return;
+        const settings = await res.json();
+        if (cancelled) return;
+
+        const defaultAuthor = settings.publish?.defaultAuthor || "博主";
+
+        setMeta((prev) => ({
+          ...prev,
+          author: initialMeta?.author || defaultAuthor,
+          title: initialMeta?.title || prev.title,
+          language: initialMeta?.language || prev.language,
+          fileType: initialMeta?.fileType || prev.fileType,
+          tags: initialMeta?.tags || prev.tags,
+          summary: initialMeta?.summary || prev.summary,
+        }));
+
+        if (initialExtraFrontmatter) {
+          setExtraFrontmatter(initialExtraFrontmatter);
+        }
+      } catch {
+        // Use defaults
+        if (initialMeta) {
+          setMeta((prev) => ({ ...prev, ...initialMeta }));
+        }
+        if (initialExtraFrontmatter) {
+          setExtraFrontmatter(initialExtraFrontmatter);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI Review state — only used for triggering, no inline status display
   const [reviewTaskId, setReviewTaskId] = useState<string | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
-  const [reviewSummary, setReviewSummary] = useState<{
-    totalIssues: number;
-    errors: number;
-    warnings: number;
-    suggestions: number;
-  } | null>(null);
-  const [reviewProgress, setReviewProgress] = useState<{
-    totalChunks: number;
-    processedChunks: number;
-  } | null>(null);
-  const [reviewPolling, setReviewPolling] = useState(false);
-  // When true, the review button is locked (already submitted or waiting)
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  // Confirm dialog for re-review
-  const [showReviewConfirm, setShowReviewConfirm] = useState(false);
 
   // Restore review state when loading an existing draft
   useEffect(() => {
@@ -138,35 +159,13 @@ export function PublishForm({
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        const tasks = data.tasks as Array<{
-          id: string;
-          status: string;
-          output: Record<string, unknown> | null;
-        }>;
+        const tasks = data.tasks as Array<{ id: string }>;
         if (tasks.length === 0) return;
 
-        // Pick the most recent review task for this draft
-        const latest = tasks[0];
-        setReviewTaskId(latest.id);
-        setReviewStatus(latest.status);
-        // Restore the "已提交审查" state so the button shows correctly on refresh
+        setReviewTaskId(tasks[0].id);
         setReviewSubmitted(true);
-
-        if (latest.status === "completed" && latest.output) {
-          const summary = (latest.output as Record<string, unknown>).summary as
-            | {
-                totalIssues: number;
-                errors: number;
-                warnings: number;
-                suggestions: number;
-              }
-            | undefined;
-          if (summary) {
-            setReviewSummary(summary);
-          }
-        }
       } catch {
-        // Silently ignore — the review section will show "no review" state
+        // Silently ignore
       }
     })();
 
@@ -174,19 +173,6 @@ export function PublishForm({
       cancelled = true;
     };
   }, [draftId]);
-
-  // Cleanup polling interval on unmount
-  useEffect(() => {
-    return () => {
-      const interval = (window as unknown as Record<string, unknown>).__reviewPollInterval as
-        | number
-        | undefined;
-      if (interval) {
-        clearInterval(interval);
-        delete (window as unknown as Record<string, unknown>).__reviewPollInterval;
-      }
-    };
-  }, []);
 
   // Preview
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -202,18 +188,24 @@ export function PublishForm({
     setFileName(result.fileName);
     setFileContent(result.fileContent);
 
-    // Parse frontmatter using gray-matter
+    // Parse frontmatter using gray-matter (already done in FileUploader, but re-parse here for extra fields)
     try {
       const parsed = matter(result.fileContent);
       const data = parsed.data as Record<string, unknown>;
 
+      const fileLanguage = (data.language === "en" ? "en" : data.language === "zh" ? "zh" : "") as "zh" | "en" | "";
+      const fileTitle = (data.title as string) || result.title;
+      const fileAuthor = (data.author as string) || result.author || meta.author;
+      const fileTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
+      const fileSummary = (data.summary as string) || result.summary;
+
       setMeta({
-        title: (data.title as string) || "",
-        language: (data.language === "en" ? "en" : "zh") as "zh" | "en",
+        title: fileTitle,
+        language: fileLanguage,
         fileType: (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw",
-        tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
-        author: (data.author as string) || "博主",
-        summary: (data.summary as string) || "",
+        tags: fileTags,
+        author: fileAuthor,
+        summary: fileSummary,
       });
 
       // Collect extra frontmatter
@@ -237,7 +229,15 @@ export function PublishForm({
       }
       setExtraFrontmatter(extra);
     } catch {
-      // Ignore parse errors, use defaults
+      // Use values from UploadResult
+      setMeta((prev) => ({
+        ...prev,
+        title: result.title || prev.title,
+        language: (result.language === "en" || result.language === "zh" ? result.language : "") as "zh" | "en" | "",
+        author: result.author || prev.author,
+        tags: result.tags,
+        summary: result.summary || "",
+      }));
     }
 
     setPreviewHtml(null);
@@ -247,12 +247,8 @@ export function PublishForm({
     setDraftId(null);
     // Reset review state — re-uploading a file should allow re-trigger
     setReviewTaskId(null);
-    setReviewStatus(null);
-    setReviewSummary(null);
-    setReviewProgress(null);
     setReviewSubmitted(false);
-    setShowReviewConfirm(false);
-  }, []);
+  }, [meta.author]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!fileContent) return;
@@ -284,6 +280,10 @@ export function PublishForm({
     if (!fileName || !fileContent) return;
     if (!meta.title.trim()) {
       setError("标题不能为空");
+      return;
+    }
+    if (!meta.language) {
+      setError("请选择语言");
       return;
     }
 
@@ -322,6 +322,10 @@ export function PublishForm({
       setError("标题不能为空");
       return;
     }
+    if (!meta.language) {
+      setError("请选择语言");
+      return;
+    }
 
     // Prevent double submission
     if (reviewSubmitted) return;
@@ -329,9 +333,6 @@ export function PublishForm({
     // First save as draft if not yet saved
     setSavingDraft(true);
     setError(null);
-    setReviewTaskId(null);
-    setReviewStatus(null);
-    setReviewSummary(null);
 
     try {
       let currentDraftId = draftId;
@@ -360,9 +361,6 @@ export function PublishForm({
         return;
       }
 
-      // Mark as submitted — prevent re-trigger until file re-upload
-      setReviewSubmitted(true);
-
       // Trigger AI review
       const reviewRes = await fetch("/api/ai/review", {
         method: "POST",
@@ -371,68 +369,16 @@ export function PublishForm({
       });
       const reviewData = await reviewRes.json();
       if (!reviewRes.ok) {
-        setReviewSubmitted(false);
         setError(reviewData.error || "触发审查失败");
         return;
       }
 
       const taskId = reviewData.taskId;
-      setReviewTaskId(taskId);
-      setReviewStatus("pending");
+      // Mark as submitted — prevent re-trigger
+      setReviewSubmitted(true);
 
-      // Start polling for results
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusRes = await fetch(`/api/ai/status/${taskId}`);
-          if (!statusRes.ok) {
-            clearInterval(pollInterval);
-            return;
-          }
-          const statusData = await statusRes.json();
-          const newStatus = statusData.status as string;
-          setReviewStatus(newStatus);
-
-          // Show chunk progress during processing
-          if (newStatus === "processing") {
-            const output = (statusData.output ?? {}) as Record<string, unknown>;
-            const progress = output.progress as
-              | {
-                  totalChunks: number;
-                  processedChunks: number;
-                }
-              | undefined;
-            if (progress) {
-              setReviewProgress(progress);
-            }
-          }
-
-          if (newStatus === "completed") {
-            clearInterval(pollInterval);
-            const output = (statusData.output ?? {}) as Record<string, unknown>;
-            const summary = output.summary as
-              | {
-                  totalIssues: number;
-                  errors: number;
-                  warnings: number;
-                  suggestions: number;
-                }
-              | undefined;
-            if (summary) {
-              setReviewSummary(summary);
-            }
-            // Clear progress once complete
-            setReviewProgress(null);
-          } else if (newStatus === "failed") {
-            clearInterval(pollInterval);
-            setError(`审查失败: ${statusData.error || "未知错误"}`);
-          }
-        } catch {
-          // Ignore polling errors, continue retrying
-        }
-      }, 2000);
-
-      // Store interval reference for cleanup
-      (window as unknown as Record<string, unknown>).__reviewPollInterval = pollInterval;
+      // Redirect to task detail page
+      window.location.href = `/admin/reviews/${taskId}`;
     } catch {
       setError("提交审查请求失败");
     } finally {
@@ -444,6 +390,10 @@ export function PublishForm({
     if (!fileContent) return;
     if (!meta.title.trim()) {
       setError("标题不能为空");
+      return;
+    }
+    if (!meta.language) {
+      setError("请选择语言");
       return;
     }
     setError(null);
@@ -538,13 +488,15 @@ export function PublishForm({
       {/* Language + File Type in a row */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="meta-language">语言</Label>
+          <Label htmlFor="meta-language">
+            语言 <span className="text-destructive">*</span>
+          </Label>
           <Select
             value={meta.language}
-            onValueChange={(v) => setMeta((m) => ({ ...m, language: v as "zh" | "en" }))}
+            onValueChange={(v) => setMeta((m) => ({ ...m, language: v as "zh" | "en" | "" }))}
           >
             <SelectTrigger id="meta-language">
-              <SelectValue />
+              <SelectValue placeholder="选择语言" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="zh">中文</SelectItem>
@@ -844,95 +796,6 @@ export function PublishForm({
           {renderMetaEditor()}
         </Card>
 
-        {/* AI Review Status */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium">AI 审查</h3>
-            {reviewTaskId && (
-              <a
-                href={`/admin/reviews/${reviewTaskId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline"
-              >
-                查看详情 &rarr;
-              </a>
-            )}
-          </div>
-
-          {!reviewTaskId && !reviewStatus && (
-            <p className="text-sm text-muted-foreground">点击「交给助手审查」按钮发起 AI 审查。</p>
-          )}
-
-          {reviewTaskId && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                {reviewStatus === "pending" && (
-                  <>
-                    <div className="size-3 rounded-full bg-slate-400 animate-pulse" />
-                    <span className="text-sm text-muted-foreground">等待处理...</span>
-                  </>
-                )}
-                {reviewStatus === "processing" && (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin text-blue-500" />
-                    <span className="text-sm text-blue-600 dark:text-blue-400">AI 正在审查...</span>
-                    {reviewProgress && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({reviewProgress.processedChunks}/{reviewProgress.totalChunks} 段落)
-                      </span>
-                    )}
-                    {/* Progress bar */}
-                    {reviewProgress && reviewProgress.totalChunks > 0 && (
-                      <div className="w-full mt-1.5">
-                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                            style={{
-                              width: `${(reviewProgress.processedChunks / reviewProgress.totalChunks) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          已处理 {reviewProgress.processedChunks}/{reviewProgress.totalChunks}{" "}
-                          个段落
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {reviewStatus === "completed" && (
-                  <>
-                    <Check className="size-3.5 text-green-500" />
-                    <span className="text-sm text-green-600 dark:text-green-400">审查完成</span>
-                  </>
-                )}
-                {reviewStatus === "failed" && (
-                  <>
-                    <AlertCircle className="size-3.5 text-red-500" />
-                    <span className="text-sm text-red-600 dark:text-red-400">审查失败</span>
-                  </>
-                )}
-              </div>
-
-              {reviewSummary && (
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                  <span className="text-red-600 dark:text-red-400">
-                    {reviewSummary.errors} 错误
-                  </span>
-                  <span className="text-yellow-600 dark:text-yellow-400">
-                    {reviewSummary.warnings} 警告
-                  </span>
-                  <span className="text-blue-600 dark:text-blue-400">
-                    {reviewSummary.suggestions} 建议
-                  </span>
-                  <span>共 {reviewSummary.totalIssues} 个问题</span>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
         {/* Preview */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -958,39 +821,6 @@ export function PublishForm({
           )}
         </Card>
 
-        {/* Re-review confirm dialog */}
-        {showReviewConfirm && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-            onClick={() => setShowReviewConfirm(false)}
-          >
-            <div
-              className="mx-4 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold mb-2">重新提交审查？</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                这篇文章已经提交过 AI 审查，确定要再次提交吗？
-              </p>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setShowReviewConfirm(false)}>
-                  取消
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowReviewConfirm(false);
-                    handleSubmitReview();
-                  }}
-                >
-                  <Sparkles className="size-4" />
-                  确认重新审查
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Action buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button
@@ -1008,14 +838,8 @@ export function PublishForm({
           </Button>
           <Button
             variant="secondary"
-            onClick={() => {
-              if (reviewSubmitted) {
-                setShowReviewConfirm(true);
-              } else {
-                handleSubmitReview();
-              }
-            }}
-            disabled={savingDraft || (reviewSubmitted && reviewStatus === "processing")}
+            onClick={handleSubmitReview}
+            disabled={savingDraft || reviewSubmitted}
             className="sm:order-2"
           >
             <Sparkles className="size-4" />
@@ -1069,7 +893,7 @@ export function PublishForm({
           </div>
           <div className="flex gap-2">
             <span className="text-muted-foreground shrink-0 w-16">语言：</span>
-            <span>{meta.language === "zh" ? "中文" : "English"}</span>
+            <span>{meta.language === "zh" ? "中文" : meta.language === "en" ? "English" : "未选择"}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-muted-foreground shrink-0 w-16">格式：</span>

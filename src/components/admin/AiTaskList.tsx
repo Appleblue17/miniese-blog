@@ -64,10 +64,11 @@ function formatDate(dateStr: string): string {
 
 function isSkipped(task: AiTaskItem): boolean {
   return (
-    task.status === "completed" &&
-    task.output !== null &&
-    typeof task.output === "object" &&
-    (task.output as Record<string, unknown>).skipped === true
+    task.status === "skipped" ||
+    (task.status === "completed" &&
+      task.output !== null &&
+      typeof task.output === "object" &&
+      (task.output as Record<string, unknown>).skipped === true)
   );
 }
 
