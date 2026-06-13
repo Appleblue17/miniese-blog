@@ -21,8 +21,6 @@ export interface AppSettings {
   appearance: {
     themeMode: "light" | "dark" | "system";
     bodyWidth: number;
-    articleListLayout: "adaptive" | "fixed-1" | "fixed-2" | "fixed-3";
-    wikiListLayout: "adaptive" | "fixed-1" | "fixed-2" | "fixed-3";
     primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     backgroundImage: string;

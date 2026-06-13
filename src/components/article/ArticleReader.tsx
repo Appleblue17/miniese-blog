@@ -109,7 +109,10 @@ export function ArticleReader({
               <div className="flex flex-wrap items-center gap-1.5">
                 <Tag className="size-3.5 text-muted-foreground" />
                 {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
+                  <Badge
+                    key={tag}
+                    className="bg-primary-tag/15 text-primary-tag border-primary-tag/25"
+                  >
                     {tag}
                   </Badge>
                 ))}

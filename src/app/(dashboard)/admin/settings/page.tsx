@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog" },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
   appearance: {
-    themeMode: "system", bodyWidth: 66, articleListLayout: "adaptive", wikiListLayout: "adaptive",
+    themeMode: "system", bodyWidth: 66,
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     backgroundImage: "", backgroundOpacity: 10, markdownBgOpacity: 80,
@@ -136,13 +136,6 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "features", label: "功能开关", icon: <ToggleLeft className="size-4" /> },
   { id: "notifications", label: "通知", icon: <Bell className="size-4" /> },
   { id: "advanced", label: "高级", icon: <Terminal className="size-4" /> },
-];
-
-const LIST_LAYOUT_OPTIONS: { value: string; label: string }[] = [
-  { value: "adaptive", label: "自适应" },
-  { value: "fixed-1", label: "单列" },
-  { value: "fixed-2", label: "两列" },
-  { value: "fixed-3", label: "三列" },
 ];
 
 const THEME_OPTIONS: { value: string; label: string; icon: React.ReactNode }[] = [
@@ -635,48 +628,6 @@ export default function SettingsPage() {
                   <ResetButton
                     isDefault={a.bodyWidth === DEFAULT_SETTINGS.appearance.bodyWidth}
                     onReset={() => resetField("appearance", "bodyWidth")}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium block mb-1">文章列表布局</label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={a.articleListLayout}
-                    onChange={(e) => updateLocal("appearance", "articleListLayout", e.target.value)}
-                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
-                  >
-                    {LIST_LAYOUT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ResetButton
-                    isDefault={a.articleListLayout === DEFAULT_SETTINGS.appearance.articleListLayout}
-                    onReset={() => resetField("appearance", "articleListLayout")}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium block mb-1">词条列表布局</label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={a.wikiListLayout}
-                    onChange={(e) => updateLocal("appearance", "wikiListLayout", e.target.value)}
-                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
-                  >
-                    {LIST_LAYOUT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ResetButton
-                    isDefault={a.wikiListLayout === DEFAULT_SETTINGS.appearance.wikiListLayout}
-                    onReset={() => resetField("appearance", "wikiListLayout")}
                   />
                 </div>
               </div>

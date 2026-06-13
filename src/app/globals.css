@@ -55,7 +55,7 @@
   --color-accent-hsl-dark: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-dark));
   --color-accent-hsl-light: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-lightest));
   --color-ai-bg: var(--ai-bg);
-  --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
+  --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), 75%);
 }
 
 :root {

@@ -125,7 +125,7 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
               {entry.tags.map((tag) => (
                 <Badge
                   key={tag}
-                  className="bg-primary-hsl/10 text-primary-hsl border-primary-hsl/20 text-[9px] px-1.5 py-0.5"
+                  className="bg-primary-tag/15 text-primary-tag border-primary-tag/25 text-[9px] px-1.5 py-0.5"
                 >
                   {tag}
                 </Badge>

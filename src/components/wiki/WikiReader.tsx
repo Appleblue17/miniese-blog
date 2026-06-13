@@ -210,7 +210,10 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
           <div className="flex flex-wrap items-center gap-1.5">
             <Tag className="size-3 text-muted-foreground shrink-0" />
             {entry.tags.map((tag) => (
-              <Badge key={tag} variant="outline">
+              <Badge
+                key={tag}
+                className="bg-primary-tag/15 text-primary-tag border-primary-tag/25"
+              >
                 {tag}
               </Badge>
             ))}

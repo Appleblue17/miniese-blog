@@ -11,8 +11,6 @@
   "appearance": {
     "themeMode": "system",
     "bodyWidth": 66,
-    "articleListLayout": "adaptive",
-    "wikiListLayout": "adaptive",
     "primary": {
       "lightHue": 200,
       "darkHue": 260,
