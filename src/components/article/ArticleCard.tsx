@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Clock, Eye, Heart, User, Tag } from "lucide-react";
+import { Calendar, Clock, Eye, Heart, User, Tag, FileText } from "lucide-react";
 
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,27 +35,32 @@ function formatDate(dateStr?: string): string {
  */
 function estimateReadingTime(article: ArticleMeta): string {
   const text = `${article.title} ${article.summary || ""}`;
-  // Simple heuristic: count characters (works for both CJK and Latin)
   const charCount = text.length;
   const minutes = Math.max(1, Math.round(charCount / 500));
   return `${minutes} min read`;
+}
+
+/** Map language code to display label */
+function langLabel(code: string): string {
+  return code === "zh" ? "中文" : "EN";
 }
 
 export function ArticleCard({ article, lang }: ArticleCardProps) {
   return (
     <Link href={`/${lang}/articles/${article.slug}`} className="block group">
       <Card className="transition-shadow hover:shadow-md">
-        <CardContent className="flex flex-col gap-3 pt-4">
-          {/* Title row with language badge */}
+        <CardContent className="flex flex-col gap-2.5 pt-4">
+          {/* Title row with icon and language badge */}
           <div className="flex items-start gap-2">
-            <CardTitle className="flex-1 text-lg group-hover:text-primary transition-colors">
+            <FileText className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <CardTitle className="flex-1 text-lg group-hover:text-primary-hsl transition-colors">
               {article.title}
             </CardTitle>
             <Badge
               variant="outline"
               className="shrink-0 mt-0.5 text-[10px] uppercase tracking-wider"
             >
-              {article.language}
+              {langLabel(article.language)}
             </Badge>
           </div>
 
@@ -97,7 +102,10 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
             <div className="flex flex-wrap items-center gap-1.5">
               <Tag className="size-3 text-muted-foreground shrink-0" />
               {article.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-[10px]">
+                <Badge
+                  key={tag}
+                  className="bg-primary-hsl/10 text-primary-hsl border-primary-hsl/20 text-[10px]"
+                >
                   {tag}
                 </Badge>
               ))}

@@ -6,7 +6,7 @@
  * - Supports tag filtering
  * - Pagination controls
  * - Loading and empty states
- * - Follows the same pattern as ArticleList
+ * - Layout driven by settings (adaptive / fixed-1 / fixed-2 / fixed-3)
  */
 
 "use client";
@@ -23,12 +23,36 @@ interface WikiListProps {
   initialTag?: string;
 }
 
+type Layout = "adaptive" | "fixed-1" | "fixed-2" | "fixed-3";
+
+const LAYOUT_CLASSES: Record<Layout, string> = {
+  adaptive: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4",
+  "fixed-1": "flex flex-col gap-4",
+  "fixed-2": "grid grid-cols-1 sm:grid-cols-2 gap-4",
+  "fixed-3": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4",
+};
+
+const DEFAULT_LAYOUT: Layout = "adaptive";
+
 export function WikiList({ lang, initialTag }: WikiListProps) {
   const [data, setData] = useState<WikiListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [tag, setTag] = useState(initialTag || "");
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);
   const limit = 20;
+
+  // Fetch layout setting on mount
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((s) => {
+        if (s?.appearance?.wikiListLayout) {
+          setLayout(s.appearance.wikiListLayout);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -68,6 +92,7 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
 
   const title = lang === "zh" ? "知识库" : "Wiki";
   const subtitle = lang === "zh" ? "词条" : "entries";
+  const gridClass = LAYOUT_CLASSES[layout] || LAYOUT_CLASSES.adaptive;
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,7 +126,7 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
       {/* Entry cards */}
       {!loading && data && data.entries.length > 0 && (
         <>
-          <div className="flex flex-col gap-4">
+          <div className={gridClass}>
             {data.entries.map((entry: WikiEntryMeta) => (
               <WikiCard key={entry.id} entry={entry} lang={lang} />
             ))}

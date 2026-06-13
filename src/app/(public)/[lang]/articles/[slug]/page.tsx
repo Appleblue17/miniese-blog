@@ -77,7 +77,7 @@ export default async function ArticlePage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
       <ArticleReader
         title={data.article.title}
         author={data.article.author}

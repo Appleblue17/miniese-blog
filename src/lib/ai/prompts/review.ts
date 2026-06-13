@@ -83,13 +83,16 @@ export const REVIEW_PROMPT = `你是一位专业的技术编辑，请对以下�
 {{content}}`;
 
 /**
- * Fills the review prompt with the actual article content.
+ * Fills a review prompt with the actual article content.
+ * Uses the custom prompt if provided, otherwise the built-in default.
  *
  * @param content - The article chunk content to review.
+ * @param customPrompt - Optional custom prompt template (uses built-in if not provided)
  * @returns The filled prompt string.
  */
-export function buildReviewPrompt(content: string): string {
-  return REVIEW_PROMPT.replace("{{content}}", content);
+export function buildReviewPrompt(content: string, customPrompt?: string): string {
+  const template = customPrompt || REVIEW_PROMPT;
+  return template.replace("{{content}}", content);
 }
 
 /**
@@ -101,9 +104,11 @@ export function buildReviewPrompt(content: string): string {
  *
  * @param contextText - Surrounding context text (outside the markers)
  * @param targetText - The target content to review (inside the markers)
+ * @param customPrompt - Optional custom prompt template (uses built-in if not provided)
  * @returns The filled prompt string
  */
-export function buildReviewPromptWithContext(contextText: string, targetText: string): string {
+export function buildReviewPromptWithContext(contextText: string, targetText: string, customPrompt?: string): string {
+  const template = customPrompt || REVIEW_PROMPT;
   const combined: string[] = [];
 
   if (contextText.trim()) {
@@ -115,5 +120,5 @@ export function buildReviewPromptWithContext(contextText: string, targetText: st
   combined.push(targetText);
   combined.push("[REVIEW_END]");
 
-  return REVIEW_PROMPT.replace("{{content}}", combined.join("\n"));
+  return template.replace("{{content}}", combined.join("\n"));
 }

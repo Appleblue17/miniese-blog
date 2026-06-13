@@ -251,7 +251,7 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
       >
         {renderedBlocks.ai ? (
           <div
-            className="prose prose-sm dark:prose-invert max-w-none"
+            className="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-ai-bg p-4"
             dangerouslySetInnerHTML={{ __html: renderedBlocks.ai }}
           />
         ) : (

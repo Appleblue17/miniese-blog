@@ -4,9 +4,14 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-12
+**最后更新**：2026-06-13
 
-### v0.8.3 2026-06-12
+### v0.8.4 2026-06-13
+
+- §6.2：补充 prompt 自定义集成说明——`loadCustomPrompt()`、placeholder 替换、worker 集成
+- §11.4：设置页路由新增"恢复默认"按钮说明
+- §3 目录结构：补充 `src/lib/ai/promptLoader.ts`
+- §6.4.10：补充 `promptLoader.ts` 文件引用
 
 - §6.4.10：新增 reviewer.ts 文件引用（reviewer roundtrip 测试），目录结构补充 `src/lib/ai/reviewer.ts`
 - §6.5：新增审查器实现说明——`incrementalReview` 函数复用通用 pipeline，`processReview` 在 worker 中调用，`draftOfId` 解析逻辑
@@ -408,9 +413,19 @@ async function callDeepSeek(prompt: string, responseFormat?: "json"): Promise<st
 
 ### 6.2 提示词管理
 
-- 存储在 `lib/ai/prompts/` 目录下，每个功能一个 `.txt` 或 `.ts` 文件
+- 存储在 `lib/ai/prompts/` 目录下，每个功能一个 `.ts` 文件
 - 支持变量插值（如 `{{articleContent}}`）
-- 博主可在仪表盘修改（未来功能）
+- **自定义 Prompt 管道**：博主可在仪表盘（高级 tab）修改 prompt 模板，自定义内容会覆盖内置默认模板
+  - `promptLoader.ts` 中的 `loadCustomPrompt(key)` 从站点设置数据库读取自定义 prompt
+  - 如果设置中对应 key 的值为空字符串，返回 `null`，AI 函数使用内置默认模板
+  - 如果设置了自定义值，返回该字符串，AI 函数用它替换默认模板
+- **Placeholder 替换规则**：自定义 prompt 支持以下占位符，在 AI 函数调用时自动替换
+  - **review**：`{{content}}` — 文章内容
+  - **translate**：`{{sourceLang}}`、`{{targetLang}}`、`{{context}}`、`{{target}}`
+  - **discovery**：`{{content}}` — 文章内容
+  - **generate**：`{{term}}`、`{{definitionHint}}`、`{{context}}`
+- **默认模板**：硬编码在各自的 prompt 文件中（如 `REVIEW_PROMPT`），当无自定义设置时使用
+- **Worker 集成**：`worker.ts` 中每个 handler 在调用 AI 函数前先调用 `loadCustomPrompt(key)`，将结果（或 `undefined`）传入 AI 函数
 
 ### 6.3 审查报告格式
 
@@ -828,11 +843,18 @@ src/lib/ai/chunker/
 └── context.test.ts  # 上下文单元测试
 
 src/lib/ai/
+├── promptLoader.ts      # 自定义 prompt 加载器 (loadCustomPrompt)
 ├── translator2.ts       # 行级增量翻译引擎
 ├── translator2.test.ts  # 25 个单元测试
 ├── reviewer.ts          # 增量审查引擎（复用通用 pipeline）
 ├── reviewer.test.ts     # 21 个单元测试
-└── review_roundtrip.test.ts  # 2 个 roundtrip 集成测试
+├── review_roundtrip.test.ts  # 2 个 roundtrip 集成测试
+├── discovery.ts         # 词条发现引擎
+├── generator.ts         # 词条生成引擎
+├── client.ts            # DeepSeek API 封装
+├── client.test.ts       # API 封装测试
+├── parsers.ts           # 响应解析
+└── parsers.test.ts      # 解析器测试
 
 src/components/admin/
 ├── TranslateChunkList.tsx  # 翻译详情页组件（上下文嵌入 + 全局控制）

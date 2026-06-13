@@ -86,10 +86,16 @@ export interface TranslateResult {
 /**
  * Builds a translation prompt for a single target chunk with context.
  *
+ * When `customPrompt` is provided, uses it as the full prompt template.
+ * The custom prompt must contain `[TRANSLATE_START]` and `[TRANSLATE_END]` markers
+ * to delimit the target text, and should include context references using
+ * `{{context}}` and `{{target}}` placeholders.
+ *
  * @param sourceLang - Source language name
  * @param targetLang - Target language name
  * @param contextText - Context text (unmarked)
  * @param targetText - Target text to translate
+ * @param customPrompt - Optional custom prompt template
  * @returns The prompt string
  */
 function buildChunkPrompt(
@@ -97,7 +103,18 @@ function buildChunkPrompt(
   targetLang: string,
   contextText: string,
   targetText: string,
+  customPrompt?: string,
 ): string {
+  if (customPrompt) {
+    // Use custom prompt with placeholder substitution
+    let prompt = customPrompt;
+    prompt = prompt.replace(/\{\{sourceLang\}\}/g, sourceLang);
+    prompt = prompt.replace(/\{\{targetLang\}\}/g, targetLang);
+    prompt = prompt.replace(/\{\{context\}\}/g, contextText);
+    prompt = prompt.replace(/\{\{target\}\}/g, targetText);
+    return prompt;
+  }
+
   const lines: string[] = [];
 
   lines.push(`Translate the following content from ${sourceLang} to ${targetLang}.`);
@@ -211,6 +228,7 @@ function replaceLines(
  * @param sourceLang - Source language name (e.g., "Chinese", "English")
  * @param targetLang - Target language name (e.g., "English", "Chinese")
  * @param onProgress - Optional callback for progress reporting (processed, total)
+ * @param customTranslatePrompt - Optional custom translation prompt template
  * @returns The translation result
  */
 export async function incrementalTranslate(
@@ -220,6 +238,7 @@ export async function incrementalTranslate(
   sourceLang: string,
   targetLang: string,
   onProgress?: ProgressCallback,
+  customTranslatePrompt?: string,
 ): Promise<TranslateResult> {
   // Strip frontmatter
   const newFrontmatter = extractFrontmatterBlock(newSourceContent);
@@ -363,7 +382,7 @@ export async function incrementalTranslate(
     const targetText = targetParts.join("\n");
 
     // Build prompt and call AI
-    const prompt = buildChunkPrompt(sourceLang, targetLang, contextText, targetText);
+    const prompt = buildChunkPrompt(sourceLang, targetLang, contextText, targetText, customTranslatePrompt);
 
     const result = await callDeepSeek({
       prompt,

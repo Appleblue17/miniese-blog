@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import { ActionBar } from "@/components/layout/ActionBar";
 import { Footer } from "@/components/layout/Footer";
+import { SettingsApplier } from "@/components/layout/SettingsApplier";
 
 const featherSprite = (() => {
   try {
@@ -89,6 +90,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <SettingsApplier />
           <Navbar />
           <ActionBar />
           <div className="md:pl-56 flex flex-col min-h-full">

@@ -46,6 +46,16 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* HSL theme colors — used for dynamic theming via CSS variables */
+  --color-primary-hsl: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
+  --color-primary-hsl-dark: hsl(var(--primary-hue), var(--primary-sat), var(--primary-dark));
+  --color-primary-hsl-light: hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightest));
+  --color-accent-hsl: hsl(var(--accent-hue), var(--accent-sat), var(--primary-light));
+  --color-accent-hsl-dark: hsl(var(--accent-hue), var(--accent-sat), var(--primary-dark));
+  --color-accent-hsl-light: hsl(var(--accent-hue), var(--accent-sat), var(--primary-lightest));
+  --color-ai-bg: var(--ai-bg);
+  --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
 }
 
 :root {
@@ -81,6 +91,22 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* HSL theme — Light mode */
+  --primary-hue: 200;
+  --accent-hue: 280;
+  --primary-sat: 70%;
+  --accent-sat: 70%;
+  --primary-lightness: 55%;
+  --accent-lightness: 55%;
+  --primary-light: 55%;
+  --primary-dark: 45%;
+  --primary-lightest: 70%;
+  --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.5), 98%);
+  --markdown-bg-opacity: 80%;
+  --markdown-text-color: #1f2328;
+  --markdown-bg-color-global: #ffffff;
+  --body-width: 48rem;
 }
 
 .dark {
@@ -115,6 +141,15 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* HSL theme — Dark mode */
+  --primary-hue: 260;
+  --accent-hue: 280;
+  --primary-light: 65%;
+  --primary-dark: 50%;
+  --primary-lightest: 75%;
+  --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.3), 15%);
+  --markdown-text-color: #f0f6fc;
 }
 
 @layer base {

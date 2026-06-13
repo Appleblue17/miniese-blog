@@ -55,7 +55,7 @@ export function Navbar() {
           <Link
             href={localize("")}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${
-              pathname === localize("") ? "bg-muted font-medium" : ""
+              pathname === localize("") ? "bg-muted font-medium text-primary-hsl" : ""
             }`}
           >
             <Home className="size-4" />
@@ -71,7 +71,7 @@ export function Navbar() {
                 key={item.href}
                 href={fullHref}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${
-                  isActive ? "bg-muted font-medium" : ""
+                  isActive ? "bg-muted font-medium text-primary-hsl" : ""
                 }`}
               >
                 <item.icon className="size-4" />

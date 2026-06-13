@@ -6,6 +6,7 @@
  * - Supports tag filtering
  * - Pagination controls
  * - Loading and empty states
+ * - Layout driven by settings (adaptive / fixed-1 / fixed-2 / fixed-3)
  */
 
 "use client";
@@ -29,12 +30,36 @@ interface ApiResponse {
   totalPages: number;
 }
 
+type Layout = "adaptive" | "fixed-1" | "fixed-2" | "fixed-3";
+
+const LAYOUT_CLASSES: Record<Layout, string> = {
+  adaptive: "flex flex-col gap-4",
+  "fixed-1": "flex flex-col gap-4",
+  "fixed-2": "grid grid-cols-1 sm:grid-cols-2 gap-4",
+  "fixed-3": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4",
+};
+
+const DEFAULT_LAYOUT: Layout = "adaptive";
+
 export function ArticleList({ lang, initialTag }: ArticleListProps) {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [tag, setTag] = useState(initialTag || "");
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);
   const limit = 10;
+
+  // Fetch layout setting on mount
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((s) => {
+        if (s?.appearance?.articleListLayout) {
+          setLayout(s.appearance.articleListLayout);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -68,6 +93,8 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const gridClass = LAYOUT_CLASSES[layout] || LAYOUT_CLASSES.adaptive;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -96,7 +123,7 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
       {/* Article cards */}
       {!loading && data && data.articles.length > 0 && (
         <>
-          <div className="flex flex-col gap-4">
+          <div className={gridClass}>
             {data.articles.map((article) => (
               <ArticleCard key={article.id} article={article} lang={lang} />
             ))}

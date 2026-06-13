@@ -310,3 +310,32 @@
 - **测试结果**：301 测试，296/301 通过（5 个预存在的集成测试因外部服务不可用跳过），`npx tsc --noEmit` 编译通过
 - **遇到的问题**：
   - 无新增问题
+
+### 任务 阶段5.6：AI Prompt 自定义集成 + 设置页"恢复默认"按钮
+- **时间**：2026-06-13
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Prompt 自定义管道**：站点设置中的 prompt 模板现在实际应用到 AI 调用中。
+    - 新建 `src/lib/ai/promptLoader.ts` — `loadCustomPrompt(key)` 从设置 DB 读取自定义 prompt
+    - `prompts/review.ts` — `buildReviewPrompt()` 和 `buildReviewPromptWithContext()` 接受可选 `customPrompt` 参数
+    - `reviewer.ts` — `incrementalReview()` 接受 `customReviewPrompt`，透传给 prompt 构建函数
+    - `translator2.ts` — `buildChunkPrompt()` 接受 `customPrompt`，支持 `{{sourceLang}}`/`{{targetLang}}`/`{{context}}`/`{{target}}` 占位符；`incrementalTranslate()` 透传
+    - `discovery.ts` — `discoverWikiCandidates()` 和 `processChunk()` 接受 `customDiscoveryPrompt`，支持 `{{content}}` 占位符
+    - `generator.ts` — `generateWikiEntry()` 接受 `customGeneratePrompt`，支持 `{{term}}`/`{{definitionHint}}`/`{{context}}` 占位符
+    - `worker.ts` — 全部 4 个 handler（`processReview`/`processTranslate`/`processDiscover`/`processGenerate`）调用 `loadCustomPrompt(key)` 并将结果传入各自函数
+    - `settings/page.tsx` — 高级 tab 显示 editable textarea，`DEFAULT_PROMPTS` 映射展示有效 Prompt
+  - **设置页"恢复默认"按钮**：所有设置字段旁添加一键恢复默认的按钮。
+    - 新增 `DEFAULT_SETTINGS` 常量（镜像 `default-settings.json`）
+    - 新增 `ResetButton` 组件（`isDefault` 为 `true` 时自动隐藏，显示 `Undo2` 图标 + "恢复默认"）
+    - 新增 `resetField` 回调
+    - 常规 tab：5 个字段（站点标题/描述/头部标题、每页文章数/词条数）
+    - 外观 tab：主题模式、正文宽度、2 个列表布局、4 组色相/饱和度/明度滑块（浅色/深色 × 主题色/强调色）、Markdown 背景色/字体颜色（浅+深）、背景不透明度
+    - 功能开关 tab：6 个 toggle（AI 审查/自动翻译/词条发现/词条生成/评论/RSS）
+    - 通知 tab：5 个字段（邮件通知、管理员邮箱、新评论/发现/翻译通知）
+    - 高级 tab：4 个 Prompt textarea（已有自定义时才显示"恢复默认"）
+  - **Bug 修复 — 预览明度不更新**：调整明度滑块时右侧实时预览的标题/链接/按钮颜色未同步更新。
+    - 根因：预览区 `previewHeading` 和强调色引用硬编码了明度值（`55%`/`75%`），未使用 CSS 变量
+    - 修复：预览区所有颜色引用改为 `var(--primary-lightness)` 和 `var(--accent-lightness)`，这些 CSS 变量在 `useEffect` 中已随 local state 更新
+- **测试结果**：`npx tsc --noEmit` 编译通过，未新增测试
+- **遇到的问题**：
+  - 预览区明度硬编码问题：之前的实现中，预览标题使用 `hsl(var(--primary-hue), var(--primary-sat), 55%)` 这种写法，明度部分未引用 CSS 变量，导致滑块的实时变化无法反映到预览中

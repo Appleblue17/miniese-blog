@@ -111,7 +111,7 @@ export default async function WikiEntryPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
       <WikiReader entry={entry} lang={lang} />
     </div>
   );

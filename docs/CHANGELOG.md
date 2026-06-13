@@ -5,33 +5,23 @@
 ## [Unreleased]
 
 ### Added
-- **Wiki 词条发现引擎**: 扫描文章内容自动提取候选词条（`discoverWikiCandidates()`）
-  - 统一 chunking pipeline（splitArticle），长文章分块处理
-  - 三层去重：AI 响应内去重、已有 WikiEntry 过滤、已有 WikiDiscovery 过滤
-  - `processDiscover` worker handler — 读取文章 → AI 扫描 → 写入 `WikiDiscovery` 表
-  - 10 个单元测试 + 14 个集成测试
-- **翻译后自动词条发现**: `processTranslate` 完成后对译文文章自动触发 `addJob("discover", ...)`（fire-and-forget）
-- **发现提案列表页**: `/admin/wiki/discoveries/` — 词条发现提案列表，支持批量操作
-- **用户指南**: 新增「重启 Worker」和「清空知识库」操作说明到 `docs/user-guide.md`
-- **审查引擎重构 (reviewer.ts)**: 迁移到统一增量 pipeline，与 translator2 架构一致。
-  - `incrementalReview()` 复用 `detectChanges` + `splitRange` + `buildContext`
-  - 21 个 reviewer 单元测试 + 2 个 roundtrip 测试
-- **翻译引擎重构 (translator2.ts)**: 纯行级 diff 管道的增量翻译引擎。
-  - `detectChanges()` — 基于 Myers diff 的行级变化检测，支持相邻合并
-  - `splitRange()` — 按标题边界拆分 diff 块为子 chunk
-  - `buildContext()` — 上下文窗口构建，向最近标题边界靠拢
-  - `incrementalTranslate()` — 主流程：diff → splitRange → context → AI call → assembly
-  - `translateFull()` — 全量翻译委托给 `incrementalTranslate("", ...)` 的封装
-  - 25 个单元测试覆盖全量/增量/边际情况
-- **翻译详情页 (`/admin/ai-tasks/[taskId]`)**: 支持翻译类型任务的输出展示。
-  - 增量模式：每个 `translatedGroups[i]` 显示为一个 target chunk card
-  - 上下文（aboveContext/belowContext）嵌入到 card 内部，字号 `text-[11px]`
-  - 全局上下文显示/隐藏按钮（右上角 Eye/EyeOff 图标）
-  - 全量模式：整个文章作为一个 chunk 显示
-- **Worker 翻译处理**: `processTranslate` 完整实现增量翻译流水线。
-  - 从最新已完成任务加载 `existingTranslations`
-  - Frontmatter 元数据翻译（title, summary）
-  - 译文写入目标语言文件 + 更新 DB 记录 + HTML 重新渲染
+- **AI Prompt 自定义管道**: 站点设置中的 prompt 模板现在实际应用到 AI 调用中。
+  - `promptLoader.ts` — `loadCustomPrompt(key)` 从设置 DB 读取自定义 prompt
+  - `reviwer.ts`/`translator2.ts`/`discovery.ts`/`generator.ts` — 各自函数接受可选 `customPrompt` 参数
+  - `worker.ts` — 全部 4 个 handler 调用 `loadCustomPrompt(key)` 并传入自定义 prompt
+  - `prompts/review.ts` — `buildReviewPrompt()`/`buildReviewPromptWithContext()` 接受 `customPrompt`
+  - `translator2.ts` — `buildChunkPrompt()` 支持 `{{sourceLang}}/{{targetLang}}/{{context}}/{{target}}` 占位符
+  - `discovery.ts` — 支持 `{{content}}` 占位符
+  - `generator.ts` — 支持 `{{term}}/{{definitionHint}}/{{context}}` 占位符
+- **设置页"恢复默认"按钮**: 所有设置字段旁添加一键恢复默认的按钮。
+  - 新增 `DEFAULT_SETTINGS` 常量和 `ResetButton` 组件
+  - 常规/外观/功能开关/通知/高级 共 5 个 tab 全部字段支持恢复默认
+  - 4 组色相/饱和度/明度滑块的"恢复默认"按钮，各自仅重置对应模式（浅色/深色）的三个值，保留另一模式的值
+
+### Fixed
+- **预览明度不更新**: 调整明度滑块时右侧实时预览的标题/链接/按钮颜色未同步更新。
+  - 根因：预览区硬编码了明度值（`55%`/`75%`），未使用 CSS 变量
+  - 修复：预览区所有颜色引用改为 `var(--primary-lightness)` 和 `var(--accent-lightness)`
 
 ### Fixed
 - **详情页「暂无定义」**: `processDiscover()` 返回的 `candidates` 缺少 `definition` 字段。修复：在 `candidates.map()` 加入 `definition: c.definition`

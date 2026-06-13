@@ -27,7 +27,7 @@ export default async function HomePage({ params }: Props) {
   const { lang } = await params;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
+    <div className="mx-auto px-4 py-12" style={{ maxWidth: "var(--body-width, 48rem)" }}>
       {/* Hero */}
       <section className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight">

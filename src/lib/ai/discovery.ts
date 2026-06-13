@@ -44,12 +44,14 @@ export interface DiscoveryCandidate {
  * @param articleId - The article's database ID.
  * @param articleLang - The article's language code ("zh" | "en").
  * @param content - The full article content (may include frontmatter).
+ * @param customDiscoveryPrompt - Optional custom discovery prompt template.
  * @returns A deduplicated list of candidate terms.
  */
 export async function discoverWikiCandidates(
   articleId: string,
   articleLang: string,
   content: string,
+  customDiscoveryPrompt?: string,
 ): Promise<DiscoveryCandidate[]> {
   // 1. Strip frontmatter to get body
   const body = stripFrontmatter(content);
@@ -65,7 +67,7 @@ export async function discoverWikiCandidates(
 
   for (const chunk of chunks) {
     try {
-      const candidates = await processChunk(chunk.content);
+      const candidates = await processChunk(chunk.content, customDiscoveryPrompt);
       allCandidates.push(...candidates);
     } catch (err) {
       console.warn(
@@ -89,12 +91,20 @@ export async function discoverWikiCandidates(
  * Processes a single chunk of article content through the AI.
  *
  * @param chunkContent - The chunk content to scan.
+ * @param customPrompt - Optional custom discovery prompt template.
  * @returns List of candidate terms from this chunk.
  */
-async function processChunk(chunkContent: string): Promise<DiscoveryCandidate[]> {
-  const systemPrompt = buildDiscoverySystemPrompt();
-  const userPrompt = buildDiscoveryUserPrompt(chunkContent);
-  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+async function processChunk(chunkContent: string, customPrompt?: string): Promise<DiscoveryCandidate[]> {
+  let combinedPrompt: string;
+
+  if (customPrompt) {
+    // Use custom prompt with placeholder substitution
+    combinedPrompt = customPrompt.replace(/\{\{content\}\}/g, chunkContent);
+  } else {
+    const systemPrompt = buildDiscoverySystemPrompt();
+    const userPrompt = buildDiscoveryUserPrompt(chunkContent);
+    combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  }
 
   const response = await callDeepSeek({
     prompt: combinedPrompt,

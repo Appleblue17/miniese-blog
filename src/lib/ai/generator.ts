@@ -44,16 +44,28 @@ export interface GenerateResult {
  * @param term - The term name to generate content for.
  * @param definitionHint - Short hint/definition from discovery (for reference).
  * @param context - Optional article slug for context.
+ * @param customGeneratePrompt - Optional custom generate prompt template.
  * @returns A GenerateResult with the generated entry or error info.
  */
 export async function generateWikiEntry(
   term: string,
   definitionHint: string,
   context?: string,
+  customGeneratePrompt?: string,
 ): Promise<GenerateResult> {
-  const systemPrompt = buildGenerateSystemPrompt();
-  const userPrompt = buildGenerateUserPrompt(term, definitionHint, context);
-  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  let combinedPrompt: string;
+
+  if (customGeneratePrompt) {
+    // Use custom prompt with placeholder substitution
+    combinedPrompt = customGeneratePrompt
+      .replace(/\{\{term\}\}/g, term)
+      .replace(/\{\{definitionHint\}\}/g, definitionHint || "none")
+      .replace(/\{\{context\}\}/g, context || "none");
+  } else {
+    const systemPrompt = buildGenerateSystemPrompt();
+    const userPrompt = buildGenerateUserPrompt(term, definitionHint, context);
+    combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  }
 
   console.log(`[Generator] Generating wiki entry for term: "${term}"`);
 

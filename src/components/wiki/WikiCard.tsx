@@ -38,6 +38,11 @@ function getTypeColor(type: string): string {
   return TYPE_COLORS[type] || TYPE_COLORS.other;
 }
 
+/** Map language code to display label */
+function langLabel(code: string): string {
+  return code === "zh" ? "中文" : "EN";
+}
+
 export interface WikiCardProps {
   entry: WikiEntryMeta;
   lang: string;
@@ -46,35 +51,60 @@ export interface WikiCardProps {
 export function WikiCard({ entry, lang }: WikiCardProps) {
   return (
     <Link href={`/${lang}/wiki/${encodeURIComponent(entry.name)}`} className="block group">
-      <Card className="transition-shadow hover:shadow-md">
-        <CardContent className="flex flex-col gap-3 pt-4">
-          {/* Title row with language badge */}
+      <Card className="transition-shadow hover:shadow-md h-full">
+        <CardContent className="flex flex-col gap-2.5 pt-4">
+          {/* Title row: icon + name + type + status + language — all in one line */}
           <div className="flex items-start gap-2">
-            <BookOpen className="size-4 mt-1 shrink-0 text-muted-foreground" />
-            <CardTitle className="flex-1 text-lg group-hover:text-primary transition-colors">
+            <BookOpen className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <CardTitle className="flex-1 text-base group-hover:text-primary-hsl transition-colors leading-snug">
               {entry.name}
             </CardTitle>
-            {/* Type badge */}
-            {entry.type && (
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getTypeColor(entry.type)}`}
+
+            {/* Compact right-side badges row */}
+            <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+              {/* Type badge */}
+              {entry.type && (
+                <span
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-tight ${getTypeColor(entry.type)}`}
+                >
+                  {getTypeLabel(entry.type)}
+                </span>
+              )}
+
+              {/* Status badge — compact */}
+              {entry.status === "creating" && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-accent-hsl/10 px-1.5 py-0.5 text-[9px] font-medium text-accent-hsl leading-tight">
+                  <Sparkles className="size-2.5" />
+                  生成中
+                </span>
+              )}
+              {entry.status === "reviewed" && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300 leading-tight">
+                  <ShieldCheck className="size-2.5" />
+                  已审查
+                </span>
+              )}
+              {entry.status === "unreviewed" && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 leading-tight">
+                  <Clock className="size-2.5" />
+                  待审查
+                </span>
+              )}
+
+              <Badge
+                variant="outline"
+                className="text-[9px] uppercase tracking-wider leading-tight px-1.5 py-0.5"
               >
-                {getTypeLabel(entry.type)}
-              </span>
-            )}
-            <Badge
-              variant="outline"
-              className="shrink-0 mt-0.5 text-[10px] uppercase tracking-wider"
-            >
-              {entry.language}
-            </Badge>
+                {langLabel(entry.language)}
+              </Badge>
+            </div>
           </div>
 
           {/* Aliases */}
           {entry.aliases.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {entry.aliases.map((alias) => (
-                <Badge key={alias} variant="secondary" className="text-[10px]">
+                <Badge key={alias} variant="secondary" className="text-[9px] px-1.5 py-0.5">
                   {alias}
                 </Badge>
               ))}
@@ -83,41 +113,25 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
 
           {/* Definition (truncated) */}
           {entry.definition && (
-            <p className="text-sm text-muted-foreground line-clamp-2">{entry.definition}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2 leading-snug">
+              {entry.definition}
+            </p>
           )}
 
           {/* Tags */}
           {entry.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1">
               <Tag className="size-3 text-muted-foreground shrink-0" />
               {entry.tags.map((tag) => (
-                <Badge key={tag} variant="outline" className="text-[10px]">
+                <Badge
+                  key={tag}
+                  className="bg-primary-hsl/10 text-primary-hsl border-primary-hsl/20 text-[9px] px-1.5 py-0.5"
+                >
                   {tag}
                 </Badge>
               ))}
             </div>
           )}
-
-          {/* Metadata: status badges */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {entry.status === "creating" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                <Sparkles className="size-2.5" />
-                生成中
-              </span>
-            )}
-            {entry.status === "reviewed" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
-                <ShieldCheck className="size-2.5" />
-                已审查
-              </span>
-            ) : entry.status === "unreviewed" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                <Clock className="size-2.5" />
-                待审查
-              </span>
-            ) : null}
-          </div>
         </CardContent>
       </Card>
     </Link>

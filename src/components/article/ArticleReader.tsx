@@ -135,7 +135,7 @@ export function ArticleReader({
 
             {/* AI Translation notice */}
             {isAITranslated && (
-              <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+              <div className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm text-accent-hsl-dark">
                 <svg
                   className="size-4 shrink-0"
                   fill="none"

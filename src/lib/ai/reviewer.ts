@@ -252,6 +252,7 @@ function mergeChunks(existing: ReviewChunk, incoming: ReviewChunk): ReviewChunk 
  * @param articleId - Article ID for the output (passed through)
  * @param version - Version string for the output (passed through)
  * @param onProgress - Optional callback for progress reporting (processed, total)
+ * @param customReviewPrompt - Optional custom review prompt override
  * @returns The review result
  */
 export async function incrementalReview(
@@ -261,6 +262,7 @@ export async function incrementalReview(
   articleId: string,
   version: string,
   onProgress?: ProgressCallback,
+  customReviewPrompt?: string,
 ): Promise<ReviewResult> {
   // Strip frontmatter
   const newBody = stripFrontmatter(newSourceContent);
@@ -455,7 +457,7 @@ export async function incrementalReview(
     const targetText = targetParts.join("\n");
 
     // Build prompt and call AI
-    const prompt = buildReviewPromptWithContext(contextText, targetText);
+    const prompt = buildReviewPromptWithContext(contextText, targetText, customReviewPrompt);
 
     try {
       const response = await callDeepSeek({
