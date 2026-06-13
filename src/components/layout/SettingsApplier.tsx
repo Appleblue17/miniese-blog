@@ -37,8 +37,11 @@ export function SettingsApplier() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-apply settings when theme changes (after settings have been fetched)
+  // Keep data-theme attribute in sync with the current theme class
+  // so that github-markdown.css [data-theme="dark"] selectors work after theme switching.
+  // Also re-apply settings when theme changes (after settings have been fetched).
   useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme ?? "light");
     if (settingsRef.current) {
       applySettings(settingsRef.current, resolvedTheme ?? "light");
     }

@@ -9,7 +9,7 @@
     "wikiPerPage": 20
   },
   "appearance": {
-    "themeMode": "system",
+    "themeMode": "light",
     "bodyWidth": 66,
     "primary": {
       "lightHue": 200,
@@ -29,10 +29,10 @@
     },
     "backgroundImage": "",
     "backgroundOpacity": 10,
-    "markdownBgOpacity": 80,
+    "markdownBgOpacity": 60,
     "markdownTextColorLight": "#1f2328",
     "markdownTextColorDark": "#f0f6fc",
-    "markdownBgColorLight": "#ffffff",
+    "markdownBgColorLight": "#e3e8ed",
     "markdownBgColorDark": "#0d1117"
   },
   "features": {
