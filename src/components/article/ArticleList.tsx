@@ -75,7 +75,9 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
       <div>
         <h1 className="text-xl font-bold">{lang === "zh" ? "文章" : "Articles"}</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {data && !loading ? `共 ${data.total} 篇文章` : "加载中..."}
+          {data && !loading
+            ? (lang === "zh" ? `共 ${data.total} 篇文章` : `${data.total} articles`)
+            : (lang === "zh" ? "加载中..." : "Loading...")}
         </p>
       </div>
 
@@ -89,8 +91,8 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
       {/* Empty state */}
       {!loading && data && data.articles.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
-          <p className="text-lg">暂无文章</p>
-          <p className="text-sm">还没有发布任何文章，请稍后再来。</p>
+          <p className="text-lg">{lang === "zh" ? "暂无文章" : "No articles"}</p>
+          <p className="text-sm">{lang === "zh" ? "还没有发布任何文章，请稍后再来。" : "No articles published yet. Check back later."}</p>
         </div>
       )}
 
@@ -113,11 +115,13 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
                 onClick={() => handlePageChange(page - 1)}
               >
                 <ChevronLeft className="size-4" />
-                上一页
+                {lang === "zh" ? "上一页" : "Prev"}
               </Button>
 
               <span className="text-sm text-muted-foreground px-4">
-                第 {data.page} / {data.totalPages} 页
+                {lang === "zh"
+                  ? `第 ${data.page} / ${data.totalPages} 页`
+                  : `Page ${data.page} of ${data.totalPages}`}
               </span>
 
               <Button
@@ -126,7 +130,7 @@ export function ArticleList({ lang, initialTag }: ArticleListProps) {
                 disabled={page >= data.totalPages}
                 onClick={() => handlePageChange(page + 1)}
               >
-                下一页
+                {lang === "zh" ? "下一页" : "Next"}
                 <ChevronRight className="size-4" />
               </Button>
             </div>

@@ -77,7 +77,9 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
       <div>
         <h1 className="text-xl font-bold">{title}</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {data && !loading ? `共 ${data.total} ${subtitle}` : "加载中..."}
+          {data && !loading
+            ? (lang === "zh" ? `共 ${data.total} ${subtitle}` : `${data.total} ${subtitle}`)
+            : (lang === "zh" ? "加载中..." : "Loading...")}
         </p>
       </div>
 

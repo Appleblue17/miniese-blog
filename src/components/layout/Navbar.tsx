@@ -7,10 +7,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-const navItems = [
-  { href: "/articles", label: "文章", icon: FileText },
-  { href: "/wiki", label: "知识库", icon: BookOpen },
-  { href: "/about", label: "关于", icon: Info },
+const navItems: Array<{ href: string; labelZh: string; labelEn: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { href: "/articles", labelZh: "文章", labelEn: "Articles", icon: FileText },
+  { href: "/wiki", labelZh: "知识库", labelEn: "Wiki", icon: BookOpen },
+  { href: "/about", labelZh: "关于", labelEn: "About", icon: Info },
 ];
 
 export function Navbar() {
@@ -31,7 +31,7 @@ export function Navbar() {
         size="icon"
         className="fixed top-3 left-3 z-50 md:hidden"
         onClick={() => setMobileOpen(!mobileOpen)}
-        aria-label={mobileOpen ? "关闭菜单" : "打开菜单"}
+        aria-label={mobileOpen ? (lang === "zh" ? "关闭菜单" : "Close menu") : (lang === "zh" ? "打开菜单" : "Open menu")}
       >
         {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </Button>
@@ -59,7 +59,7 @@ export function Navbar() {
             }`}
           >
             <Home className="size-4" />
-            主页
+            {lang === "zh" ? "主页" : "Home"}
           </Link>
 
           {navItems.map((item) => {
@@ -75,7 +75,7 @@ export function Navbar() {
                 }`}
               >
                 <item.icon className="size-4" />
-                {item.label}
+                {lang === "zh" ? item.labelZh : item.labelEn}
               </Link>
             );
           })}
@@ -91,7 +91,7 @@ export function Navbar() {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <Settings className="size-4" />
-            仪表盘
+            {lang === "zh" ? "仪表盘" : "Dashboard"}
           </Link>
         </div>
       </nav>

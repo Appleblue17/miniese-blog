@@ -49,11 +49,11 @@ function formatDate(dateStr: string): string {
 /**
  * Estimates reading time based on text content length.
  */
-function estimateReadingTime(html: string): string {
+function estimateReadingTime(html: string, lang: string): string {
   const text = html.replace(/<[^>]*>/g, "");
   const charCount = text.length;
   const minutes = Math.max(1, Math.round(charCount / 500));
-  return `${minutes} min read`;
+  return lang === "zh" ? `${minutes} 分钟阅读` : `${minutes} min read`;
 }
 
 export function ArticleReader({
@@ -97,7 +97,7 @@ export function ArticleReader({
               )}
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="size-3.5" />
-                {estimateReadingTime(html)}
+                {estimateReadingTime(html, lang)}
               </span>
               <span className="text-xs text-muted-foreground/60">
                 {lang === "zh" ? "更新于" : "Updated"} {formatDate(updatedAt)}
