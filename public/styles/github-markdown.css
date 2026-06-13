@@ -13,8 +13,9 @@
 
   /* Override background with CSS variable for dynamic opacity control.
      Uses the globally-set --markdown-bg-color as the base (from settings),
-     falls back to --bgColor-default, then applies opacity via color-mix. */
-  --markdown-bg-color: color-mix(in srgb, var(--markdown-bg-color-global, var(--bgColor-default, #ffffff)) var(--markdown-bg-opacity, 80%), transparent);
+     falls back to --bgColor-default, then applies opacity via color-mix
+     against the page background so the result is correct regardless of opacity. */
+  --markdown-bg-color: color-mix(in srgb, var(--markdown-bg-color-global, var(--bgColor-default, #ffffff)) var(--markdown-bg-opacity, 80%), var(--background, #ffffff));
 }
 @media (prefers-color-scheme: dark) {
   .markdown-body,
@@ -246,9 +247,8 @@
   -ms-text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
   margin: 0;
-  color: var(--fgColor-default);
+  color: var(--markdown-text-color, var(--fgColor-default));
   background-color: var(--markdown-bg-color, var(--bgColor-default));
-  --markdown-text-color-local: var(--markdown-text-color, var(--fgColor-default));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial,
     sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   font-size: 16px;
