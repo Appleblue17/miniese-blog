@@ -335,6 +335,10 @@ export default function SettingsPage() {
     const accentSat = isDark ? a.accent.darkSaturation : a.accent.lightSaturation;
     const primaryLight = isDark ? a.primary.darkLightness : a.primary.lightLightness;
     const accentLight = isDark ? a.accent.darkLightness : a.accent.lightLightness;
+    const primaryDark = Math.max(primaryLight - 20, 10);
+    const primaryLightest = Math.min(primaryLight + 20, 90);
+    const accentDark = Math.max(accentLight - 20, 10);
+    const accentLightest = Math.min(accentLight + 20, 90);
 
     document.documentElement.style.setProperty("--primary-hue", String(primaryHue));
     document.documentElement.style.setProperty("--accent-hue", String(accentHue));
@@ -342,6 +346,12 @@ export default function SettingsPage() {
     document.documentElement.style.setProperty("--accent-sat", `${accentSat}%`);
     document.documentElement.style.setProperty("--primary-lightness", `${primaryLight}%`);
     document.documentElement.style.setProperty("--accent-lightness", `${accentLight}%`);
+    document.documentElement.style.setProperty("--primary-light", `${primaryLight}%`);
+    document.documentElement.style.setProperty("--primary-dark", `${primaryDark}%`);
+    document.documentElement.style.setProperty("--primary-lightest", `${primaryLightest}%`);
+    document.documentElement.style.setProperty("--accent-light", `${accentLight}%`);
+    document.documentElement.style.setProperty("--accent-light-dark", `${accentDark}%`);
+    document.documentElement.style.setProperty("--accent-light-lightest", `${accentLightest}%`);
 
     // Sync body width
     document.documentElement.style.setProperty("--body-width", `${a.bodyWidth}rem`);
@@ -960,8 +970,8 @@ export default function SettingsPage() {
                   ? `hsl(var(--primary-hue), var(--primary-sat), 20%)`
                   : `hsl(var(--primary-hue), var(--primary-sat), 70%)`;
                 const previewHeading = isDark
-                  ? `hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightness))`
-                  : `hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightness))`;
+                  ? `hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))`
+                  : `hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))`;
 
                 const mdBgColor = isDark ? (a.markdownBgColorDark ?? "#0d1117") : (a.markdownBgColorLight ?? "#ffffff");
                 const mdTextColor = isDark ? (a.markdownTextColorDark ?? "#f0f6fc") : (a.markdownTextColorLight ?? "#1f2328");
@@ -994,7 +1004,7 @@ export default function SettingsPage() {
                   <a
                     href="#"
                     className="text-sm underline"
-                    style={{ color: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-lightness))` }}
+                    style={{ color: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))` }}
                   >
                     强调链接
                   </a>
@@ -1013,7 +1023,7 @@ export default function SettingsPage() {
                     type="button"
                     className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
                     style={{
-                      backgroundColor: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-lightness))`,
+                      backgroundColor: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))`,
                     }}
                   >
                     强调按钮
@@ -1095,7 +1105,7 @@ export default function SettingsPage() {
                         ? ""
                         : "bg-primary/20"
                     }`}
-                    style={local.features[feat.key] ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightness))" } : undefined}
+                    style={local.features[feat.key] ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
                   >
                     <span
                       className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
@@ -1134,7 +1144,7 @@ export default function SettingsPage() {
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                     local.notifications.email ? "" : "bg-primary/20"
                   }`}
-                  style={local.notifications.email ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightness))" } : undefined}
+                  style={local.notifications.email ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
                 >
                   <span
                     className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
@@ -1189,7 +1199,7 @@ export default function SettingsPage() {
                         ? ""
                         : "bg-primary/20"
                     }`}
-                    style={(local.notifications as Record<string, unknown>)[item.key] ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightness))" } : undefined}
+                    style={(local.notifications as Record<string, unknown>)[item.key] ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
                   >
                     <span
                       className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${

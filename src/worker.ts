@@ -22,6 +22,7 @@ import { parseFrontmatter } from "./lib/articles/frontmatter";
 import { discoverWikiCandidates } from "./lib/ai/discovery";
 import { addJob } from "./lib/queue/producer";
 import { loadCustomPrompt } from "./lib/ai/promptLoader";
+import { getSettings } from "../config/settings";
 import type { Job } from "bull";
 import type { Prisma } from "./generated/prisma/client";
 
@@ -869,12 +870,45 @@ const HANDLERS: Record<string, (job: Job) => Promise<Record<string, unknown>>> =
   // scan: disabled for now
 };
 
+/** Maps task type to its feature flag key in settings */
+const FEATURE_FLAGS: Record<string, string> = {
+  review: "aiReview",
+  translate: "autoTranslate",
+  discover: "wikiDiscovery",
+  generate: "wikiGenerate",
+};
+
 async function processJob(job: Job): Promise<Record<string, unknown>> {
   const { type, taskId } = job.data as {
     type: string;
     taskId: string;
     payload: Record<string, unknown>;
   };
+
+  // Check feature flag before processing
+  const featureKey = FEATURE_FLAGS[type];
+  if (featureKey) {
+    try {
+      const settings = await getSettings();
+      const enabled = settings.features?.[featureKey];
+      if (enabled === false) {
+        // Feature disabled — mark task as skipped (completed with no-op)
+        console.log(`[Worker] Feature "${featureKey}" is disabled, skipping task ${taskId}`);
+        await prisma.aiTask.update({
+          where: { id: taskId },
+          data: {
+            status: "completed",
+            output: { skipped: true, reason: `Feature "${featureKey}" is disabled in settings` } as JsonInput,
+            completedAt: new Date(),
+          },
+        });
+        return { skipped: true, reason: `Feature "${featureKey}" is disabled` };
+      }
+    } catch (err) {
+      // Settings load failure — log but proceed (don't block on settings error)
+      console.warn(`[Worker] Failed to check feature flag for "${type}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // Mark as processing
   await prisma.aiTask.update({

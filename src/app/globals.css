@@ -51,9 +51,9 @@
   --color-primary-hsl: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
   --color-primary-hsl-dark: hsl(var(--primary-hue), var(--primary-sat), var(--primary-dark));
   --color-primary-hsl-light: hsl(var(--primary-hue), var(--primary-sat), var(--primary-lightest));
-  --color-accent-hsl: hsl(var(--accent-hue), var(--accent-sat), var(--primary-light));
-  --color-accent-hsl-dark: hsl(var(--accent-hue), var(--accent-sat), var(--primary-dark));
-  --color-accent-hsl-light: hsl(var(--accent-hue), var(--accent-sat), var(--primary-lightest));
+  --color-accent-hsl: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light));
+  --color-accent-hsl-dark: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-dark));
+  --color-accent-hsl-light: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-lightest));
   --color-ai-bg: var(--ai-bg);
   --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
 }
@@ -102,6 +102,9 @@
   --primary-light: 55%;
   --primary-dark: 45%;
   --primary-lightest: 70%;
+  --accent-light: 55%;
+  --accent-light-dark: 35%;
+  --accent-light-lightest: 75%;
   --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.5), 98%);
   --markdown-bg-opacity: 80%;
   --markdown-text-color: #1f2328;
@@ -148,6 +151,9 @@
   --primary-light: 65%;
   --primary-dark: 50%;
   --primary-lightest: 75%;
+  --accent-light: 65%;
+  --accent-light-dark: 45%;
+  --accent-light-lightest: 85%;
   --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.3), 15%);
   --markdown-text-color: #f0f6fc;
 }

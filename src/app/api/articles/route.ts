@@ -15,12 +15,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSettings } from "../../../../config/settings";
 
 export async function GET(request: NextRequest) {
   try {
+    const settings = await getSettings();
+    const defaultLimit = settings.pagination?.articlesPerPage ?? 10;
+
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || String(defaultLimit), 10)));
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
 

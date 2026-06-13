@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { refineTerm } from "@/lib/ai/refineTerm";
+import { getSettings } from "../../../../config/settings";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
 
 // --- Helpers ---
@@ -56,9 +57,12 @@ function serializeEntry(entry: {
 
 export async function GET(request: NextRequest) {
   try {
+    const settings = await getSettings();
+    const defaultLimit = settings.pagination?.wikiPerPage ?? 20;
+
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || String(defaultLimit), 10)));
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
     const statusParam = searchParams.get("status");

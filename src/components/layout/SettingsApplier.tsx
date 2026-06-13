@@ -39,8 +39,18 @@ export function SettingsApplier() {
 
         const primaryLight = isDark ? a.primary.darkLightness : a.primary.lightLightness;
         const accentLight = isDark ? a.accent.darkLightness : a.accent.lightLightness;
+        const primaryDark = Math.max(primaryLight - 20, 10);
+        const primaryLightest = Math.min(primaryLight + 20, 90);
+        const accentDark = Math.max(accentLight - 20, 10);
+        const accentLightest = Math.min(accentLight + 20, 90);
         root.style.setProperty("--primary-lightness", `${primaryLight}%`);
         root.style.setProperty("--accent-lightness", `${accentLight}%`);
+        root.style.setProperty("--primary-light", `${primaryLight}%`);
+        root.style.setProperty("--primary-dark", `${primaryDark}%`);
+        root.style.setProperty("--primary-lightest", `${primaryLightest}%`);
+        root.style.setProperty("--accent-light", `${accentLight}%`);
+        root.style.setProperty("--accent-light-dark", `${accentDark}%`);
+        root.style.setProperty("--accent-light-lightest", `${accentLightest}%`);
         root.style.setProperty("--body-width", `${a.bodyWidth}rem`);
 
         const textColor = isDark ? (a.markdownTextColorDark ?? "#f0f6fc") : (a.markdownTextColorLight ?? "#1f2328");
