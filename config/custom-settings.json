@@ -1,0 +1,75 @@
+{
+  "site": {
+    "title": "Miniese's Blog",
+    "description": "个人技术博客与知识库",
+    "headerTitle": "Miniese's Blog"
+  },
+  "pagination": {
+    "articlesPerPage": 10,
+    "wikiPerPage": 20
+  },
+  "appearance": {
+    "themeMode": "system",
+    "bodyWidth": 66,
+    "primary": {
+      "lightHue": 200,
+      "darkHue": 260,
+      "lightSaturation": 70,
+      "darkSaturation": 70,
+      "lightLightness": 55,
+      "darkLightness": 65
+    },
+    "accent": {
+      "lightHue": 280,
+      "darkHue": 280,
+      "lightSaturation": 70,
+      "darkSaturation": 70,
+      "lightLightness": 55,
+      "darkLightness": 65
+    },
+    "backgroundImage": "",
+    "backgroundOpacity": 10,
+    "markdownBgOpacity": 80,
+    "markdownTextColorLight": "#1f2328",
+    "markdownTextColorDark": "#f0f6fc",
+    "markdownBgColorLight": "#ffffff",
+    "markdownBgColorDark": "#0d1117"
+  },
+  "features": {
+    "aiReview": false,
+    "autoTranslate": false,
+    "wikiDiscovery": false,
+    "wikiGenerate": false,
+    "comments": true,
+    "rss": true
+  },
+  "notifications": {
+    "email": true,
+    "adminEmail": "",
+    "onComment": true,
+    "onDiscovery": true,
+    "onTranslate": true
+  },
+  "compilers": {
+    "markdown": {
+      "name": "Markdown",
+      "extensions": [
+        ".md"
+      ],
+      "enabled": true
+    },
+    "notesaw": {
+      "name": "Notesaw",
+      "extensions": [
+        ".md"
+      ],
+      "enabled": true
+    }
+  },
+  "prompts": {
+    "review": "",
+    "translate": "",
+    "discovery": "",
+    "generate": ""
+  }
+}
