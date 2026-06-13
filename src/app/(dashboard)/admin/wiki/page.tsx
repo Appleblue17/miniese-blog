@@ -15,7 +15,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, ArrowLeft } from "lucide-react";
 import { AdminWikiList } from "@/components/admin/AdminWikiList";
 
 export const metadata: Metadata = {
@@ -34,9 +34,17 @@ export default async function AdminWikiPage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">知识库管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">管理词条和候选术语</p>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin"
+            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">知识库管理</h1>
+            <p className="text-sm text-muted-foreground mt-1">管理词条和候选术语</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Link

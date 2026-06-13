@@ -12,7 +12,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
+  ArrowLeft,
   Save,
   Settings2,
   Palette,
@@ -432,7 +434,15 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-4xl px-4 py-12">
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">站点设置</h1>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin"
+            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">站点设置</h1>
+        </div>
         <div className="flex items-center gap-3">
           {saveStatus === "success" && (
             <span className="inline-flex items-center gap-1 text-sm text-green-600">

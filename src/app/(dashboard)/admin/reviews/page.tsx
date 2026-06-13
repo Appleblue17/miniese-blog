@@ -98,9 +98,9 @@ export default async function AdminReviewsPage({
       <div className="flex items-center gap-4 mb-8">
         <Link
           href="/admin"
-          className="inline-flex items-center rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-5" />
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI 审查历史</h1>

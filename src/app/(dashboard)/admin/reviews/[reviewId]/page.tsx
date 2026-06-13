@@ -153,9 +153,9 @@ export default async function ReviewDetailPage({
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/admin/reviews"
-          className="inline-flex items-center rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-2">

@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { PlusCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import { ArticleRowActions } from "@/components/admin/ArticleRowActions";
 
@@ -123,12 +123,20 @@ export default async function AdminArticlesPage({
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">文章管理</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {total} 篇已发布
-            {newDrafts.length > 0 && ` · ${newDrafts.length} 篇新草稿`}
-          </p>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin"
+            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">文章管理</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {total} 篇已发布
+              {newDrafts.length > 0 && ` · ${newDrafts.length} 篇新草稿`}
+            </p>
+          </div>
         </div>
         <Link
           href="/admin/articles/new"

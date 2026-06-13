@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { AiTaskList } from "@/components/admin/AiTaskList";
@@ -102,9 +102,9 @@ export default async function AdminAiTasksPage({
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/admin"
-          className="inline-flex items-center rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <ChevronLeft className="size-4" />
+          <ArrowLeft className="size-5" />
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">助手任务</h1>
