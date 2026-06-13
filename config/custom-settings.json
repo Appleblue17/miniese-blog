@@ -38,9 +38,9 @@
     "markdownBgColorDark": "#0d1117"
   },
   "features": {
-    "aiReview": true,
-    "autoTranslate": true,
-    "wikiDiscovery": true,
+    "aiReview": false,
+    "autoTranslate": false,
+    "wikiDiscovery": false,
     "wikiGenerate": true,
     "comments": true,
     "rss": true

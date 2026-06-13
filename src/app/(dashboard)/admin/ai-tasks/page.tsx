@@ -1,13 +1,13 @@
 /**
  * @file /admin/ai-tasks - AI 助手任务列表
  *
- * 展示所有 AI 任务（审查、翻译、生成词条等），支持按类型筛选。
- * 顶部切换栏样式与知识库管理统一。
+ * 直接使用 Prisma 查询 AI 任务列表（避免 Server Component fetch 自身 API 的间接调用）。
  */
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Bot } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
+import { prisma } from "@/lib/db";
 import { AiTaskList } from "@/components/admin/AiTaskList";
 import type { AiTaskItem } from "@/app/api/admin/ai-tasks/route";
 
@@ -16,28 +16,7 @@ export const metadata: Metadata = {
 };
 
 const PAGE_SIZE = 20;
-
-interface AiTasksResponse {
-  tasks: AiTaskItem[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-async function fetchData(type: string, page: number): Promise<AiTasksResponse> {
-  try {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
-    if (type && type !== "all") params.set("type", type);
-    const res = await fetch(`${baseUrl}/api/admin/ai-tasks?${params.toString()}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return { tasks: [], total: 0, page: 1, totalPages: 0 };
-    return res.json();
-  } catch {
-    return { tasks: [], total: 0, page: 1, totalPages: 0 };
-  }
-}
+const VALID_TYPES = ["review", "translate", "generate", "discover"] as const;
 
 export default async function AdminAiTasksPage({
   searchParams,
@@ -45,11 +24,78 @@ export default async function AdminAiTasksPage({
   searchParams: Promise<{ type?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const activeType = params.type || "all";
+  const activeType =
+    params.type && VALID_TYPES.includes(params.type as (typeof VALID_TYPES)[number])
+      ? params.type
+      : "all";
   const currentPage = Math.max(1, parseInt(params.page || "1", 10));
 
-  const { tasks, total } = await fetchData(activeType, currentPage);
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)) || 1;
+  // ── Build where clause ──
+  const where: Record<string, unknown> = {};
+  if (activeType !== "all") where.type = activeType;
+
+  // ── Query ──
+  const [total, tasks] = await Promise.all([
+    prisma.aiTask.count({ where }),
+    prisma.aiTask.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        article: {
+          select: { title: true },
+        },
+      },
+    }),
+  ]);
+
+  // ── Batch lookup discovery terms for generate tasks ──
+  const generateTasks = tasks.filter((t) => t.type === "generate" && !t.articleId);
+  const discoveryIds: string[] = [];
+  for (const t of generateTasks) {
+    const input = (t.input ?? {}) as Record<string, unknown>;
+    const did = input.discoveryId as string | undefined;
+    if (did) discoveryIds.push(did);
+  }
+
+  const discoveries =
+    discoveryIds.length > 0
+      ? await prisma.wikiDiscovery.findMany({
+          where: { id: { in: discoveryIds } },
+          select: { id: true, term: true },
+        })
+      : [];
+  const discoveryTermMap = new Map(discoveries.map((d) => [d.id, d.term]));
+
+  // ── Map to AiTaskItem ──
+  const mapped: AiTaskItem[] = tasks.map((t) => {
+    let articleTitle: string | null = t.article?.title ?? null;
+
+    if (!articleTitle && t.type === "generate") {
+      const input = (t.input ?? {}) as Record<string, unknown>;
+      const discoveryId = input.discoveryId as string | undefined;
+      if (discoveryId) {
+        const term = discoveryTermMap.get(discoveryId);
+        articleTitle = term ? `词条: ${term}` : `词条(${discoveryId.slice(0, 8)}...)`;
+      }
+    }
+
+    return {
+      id: t.id,
+      type: t.type,
+      status: t.status,
+      input: (t.input ?? {}) as Record<string, unknown>,
+      output: t.output as Record<string, unknown> | null,
+      error: t.error,
+      createdAt: t.createdAt.toISOString(),
+      completedAt: t.completedAt?.toISOString() ?? null,
+      articleId: t.articleId,
+      articleTitle,
+    };
+  });
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">
@@ -67,7 +113,7 @@ export default async function AdminAiTasksPage({
       </div>
 
       <AiTaskList
-        tasks={tasks}
+        tasks={mapped}
         activeType={activeType}
         currentPage={currentPage}
         totalPages={totalPages}

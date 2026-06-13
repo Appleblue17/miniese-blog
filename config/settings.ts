@@ -40,12 +40,19 @@ export interface AppSettings {
 }
 
 let cachedSettings: AppSettings | null = null;
+const CACHE_TTL_MS = 5_000; // 5 seconds
+let cacheTime = 0;
 
 /**
  * Returns the current effective settings (default + custom merged).
+ * Uses a short-lived cache (5s TTL) so worker and API routes see updates
+ * without re-reading the file on every call.
  */
 export async function getSettings(): Promise<AppSettings> {
-  if (cachedSettings) return cachedSettings;
+  const now = Date.now();
+  if (cachedSettings && now - cacheTime < CACHE_TTL_MS) {
+    return cachedSettings;
+  }
 
   const defaultPath = path.join(process.cwd(), "config/default-settings.json");
   const customPath = path.join(process.cwd(), "config/custom-settings.json");
@@ -53,17 +60,27 @@ export async function getSettings(): Promise<AppSettings> {
   const defaultContent = await fs.readFile(defaultPath, "utf-8");
   const defaultSettings = JSON.parse(defaultContent) as AppSettings;
 
-  let settings = defaultSettings;
+  let settings: AppSettings = defaultSettings;
   try {
     const customContent = await fs.readFile(customPath, "utf-8");
     const customSettings = JSON.parse(customContent) as Partial<AppSettings>;
-    settings = mergeDeep(defaultSettings, customSettings) as AppSettings;
+    settings = mergeDeep(defaultSettings, customSettings);
   } catch {
     // No custom config, use defaults
   }
 
   cachedSettings = settings;
+  cacheTime = now;
   return settings;
+}
+
+/**
+ * Clears the cached settings so the next getSettings() call re-reads from disk.
+ * Used by the settings update API to ensure workers pick up changes immediately.
+ */
+export function clearSettingsCache(): void {
+  cachedSettings = null;
+  cacheTime = 0;
 }
 
 /**
@@ -73,7 +90,7 @@ export async function updateSettings(
   updates: Partial<AppSettings>,
 ): Promise<AppSettings> {
   const current = await getSettings();
-  const merged = mergeDeep(current, updates) as AppSettings;
+  const merged = mergeDeep(current, updates);
 
   const customPath = path.join(process.cwd(), "config/custom-settings.json");
   await fs.writeFile(customPath, JSON.stringify(merged, null, 2), "utf-8");
@@ -86,20 +103,24 @@ export async function updateSettings(
  * Deep merge `source` into `target` (mutates target).
  * Only plain objects are merged recursively; arrays and primitives are overwritten.
  */
-function mergeDeep(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...target };
+function mergeDeep(
+  target: object,
+  source: Partial<AppSettings>,
+): AppSettings {
+  const result = { ...target } as Record<string, unknown>;
+  const t = target as Record<string, unknown>;
 
-  for (const key of Object.keys(source)) {
+  for (const key of Object.keys(source) as (keyof AppSettings)[]) {
     const val = source[key];
     if (val !== null && typeof val === "object" && !Array.isArray(val)) {
-      result[key] = mergeDeep(
-        (target[key] as Record<string, unknown>) || {},
-        val as Record<string, unknown>,
+      result[key as string] = mergeDeep(
+        (t[key as string] as Record<string, unknown>) || {},
+        val as Partial<AppSettings>,
       );
     } else {
-      result[key] = val;
+      result[key as string] = val;
     }
   }
 
-  return result;
+  return result as unknown as AppSettings;
 }

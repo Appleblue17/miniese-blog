@@ -5,6 +5,8 @@
  * 1. Inserts a record in the `AiTask` database table.
  * 2. Adds the job to the Bull `ai-tasks` queue.
  * 3. Returns the `taskId` for frontend polling.
+ *
+ * Feature flag checking is handled by the worker at processing time.
  */
 
 import { getQueue } from "./client";
