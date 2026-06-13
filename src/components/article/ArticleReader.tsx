@@ -8,8 +8,6 @@
 import {
   Calendar,
   Clock,
-  Eye,
-  Heart,
   User,
   Tag,
   GitCommit,
@@ -101,14 +99,6 @@ export function ArticleReader({
                 <Clock className="size-3.5" />
                 {estimateReadingTime(html)}
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Eye className="size-3.5" />
-                {viewCount}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Heart className="size-3.5" />
-                {likes}
-              </span>
               <span className="text-xs text-muted-foreground/60">
                 {lang === "zh" ? "更新于" : "Updated"} {formatDate(updatedAt)}
               </span>
@@ -126,16 +116,19 @@ export function ArticleReader({
               </div>
             )}
 
+            {/* Divider before summary */}
+            {summary && <hr className="border-border" />}
+
             {/* Summary */}
             {summary && (
-              <p className="text-base text-muted-foreground border-l-2 border-muted-foreground/20 pl-4 italic">
-                {summary}
-              </p>
+              <div className="markdown-body-summary">
+                <p className="text-sm leading-relaxed text-muted-foreground">{summary}</p>
+              </div>
             )}
 
             {/* AI Translation notice */}
             {isAITranslated && (
-              <div className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm text-accent-hsl-dark">
+              <div className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm" style={{ color: 'hsl(var(--accent-hue), var(--accent-sat), 80%)' }}>
                 <svg
                   className="size-4 shrink-0"
                   fill="none"
@@ -158,9 +151,6 @@ export function ArticleReader({
             )}
           </header>
 
-          {/* Divider */}
-          <hr className="border-border" />
-
           {/* Rendered content */}
           <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
 
@@ -170,18 +160,15 @@ export function ArticleReader({
           {/* Footer area */}
           <footer className="flex flex-col gap-8 text-sm">
             {/* Copyright */}
-            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
-              <Copyright className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="font-medium">
-                  &copy; {new Date().getFullYear()} {author || "Miniese's Blog"}
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  {lang === "zh"
-                    ? "除非另有说明，本作品采用知识共享署名-非商业性使用 4.0 国际许可协议进行许可。"
-                    : "This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License, unless otherwise noted."}
-                </p>
-              </div>
+            <div className="flex items-start gap-2 text-xs text-muted-foreground/60">
+              <Copyright className="size-3 mt-0.5 shrink-0" />
+              <p>
+                {new Date().getFullYear()} {author || "Miniese's Blog"}
+                {" · "}
+                {lang === "zh"
+                  ? "CC BY-NC 4.0"
+                  : "CC BY-NC 4.0"}
+              </p>
             </div>
 
             {/* Changelog */}

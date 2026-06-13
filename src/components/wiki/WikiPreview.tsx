@@ -2,13 +2,14 @@
  * @file WikiPreview — Hover preview component for wiki links.
  *
  * Listens for hover events on elements with `[data-wiki-name]` attributes,
- * fetches the wiki entry's definition, and displays a preview card.
+ * fetches the wiki entry's detail, and displays a rich preview card with
+ * definition, aliases, and tags.
  *
  * Features:
  * - 300ms hover delay before showing preview
- * - Caches fetched definitions to avoid redundant API calls
+ * - Caches fetched entries to avoid redundant API calls
  * - Event delegation (no individual listeners per link)
- * - Scroll-aware (card repositions or hides on scroll)
+ * - Scroll-aware (card repositions on scroll)
  * - Mobile: tap-and-hold is handled by ignoring hover on touch devices
  *
  * Usage:
@@ -22,15 +23,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, ExternalLink } from "lucide-react";
+import { ExternalLink, Tag } from "lucide-react";
 
 interface WikiPreviewProps {
   /** Current page language ('zh' | 'en') */
   lang: string;
 }
 
-interface CachedEntry {
+interface PreviewData {
+  name: string;
   definition: string;
+  aliases: string[];
+  tags: string[];
+}
+
+interface CachedEntry {
+  data: PreviewData;
   expiresAt: number;
 }
 
@@ -41,30 +49,38 @@ const CACHE_TTL = 5 * 60 * 1000;
 const globalCache = new Map<string, CachedEntry>();
 
 /**
- * Fetches a wiki entry definition from the API.
+ * Fetches wiki entry detail from the API.
  * Uses an in-memory cache to avoid repeated requests.
  */
-async function fetchDefinition(wikiName: string, lang: string): Promise<string | null> {
+async function fetchEntry(wikiName: string, lang: string): Promise<PreviewData | null> {
   const cacheKey = `${lang}/${wikiName}`;
   const cached = globalCache.get(cacheKey);
 
   if (cached && Date.now() < cached.expiresAt) {
-    return cached.definition;
+    return cached.data;
   }
 
   try {
     const res = await fetch(`/api/wiki/${encodeURIComponent(wikiName)}?lang=${lang}`);
     if (!res.ok) return null;
 
-    const data = await res.json();
-    const definition: string = data.entry?.blocks?.definition || data.entry?.definition || "";
+    const json = await res.json();
+    const entry = json.entry;
+    if (!entry) return null;
+
+    const data: PreviewData = {
+      name: entry.name,
+      definition: entry.blocks?.definition || entry.definition || "",
+      aliases: entry.aliases || [],
+      tags: entry.tags || [],
+    };
 
     globalCache.set(cacheKey, {
-      definition,
+      data,
       expiresAt: Date.now() + CACHE_TTL,
     });
 
-    return definition;
+    return data;
   } catch {
     return null;
   }
@@ -72,14 +88,14 @@ async function fetchDefinition(wikiName: string, lang: string): Promise<string |
 
 export function WikiPreview({ lang }: WikiPreviewProps) {
   const [preview, setPreview] = useState<{
-    definition: string;
+    data: PreviewData;
     rect: DOMRect;
-    wikiName: string;
   } | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTargetRef = useRef<Element | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const currentNameRef = useRef<string | null>(null);
 
   // Check if device supports hover (i.e., not mobile)
   const [supportsHover, setSupportsHover] = useState(true);
@@ -113,16 +129,17 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
       }
 
       currentTargetRef.current = target;
+      currentNameRef.current = wikiName;
 
       timerRef.current = setTimeout(async () => {
         // Check that mouse is still on the same element
-        if (currentTargetRef.current !== target) return;
+        if (currentTargetRef.current !== target || currentNameRef.current !== wikiName) return;
 
-        const definition = await fetchDefinition(wikiName, lang);
-        if (!definition || currentTargetRef.current !== target) return;
+        const data = await fetchEntry(wikiName, lang);
+        if (!data || currentTargetRef.current !== target) return;
 
         const rect = target.getBoundingClientRect();
-        setPreview({ definition, rect, wikiName });
+        setPreview({ data, rect });
       }, 300);
     },
     [lang, supportsHover],
@@ -142,21 +159,18 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
         timerRef.current = null;
       }
       currentTargetRef.current = null;
+      currentNameRef.current = null;
       setPreview(null);
     }
   }, []);
 
   /**
-   * Handles scroll events: hide preview when scrolling,
-   * since the card position would become stale.
+   * Handles scroll events: update card position on scroll.
    */
   const handleScroll = useCallback(() => {
-    if (preview) {
-      // Update card position based on current element position
-      if (currentTargetRef.current) {
-        const rect = currentTargetRef.current.getBoundingClientRect();
-        setPreview((prev) => (prev ? { ...prev, rect } : null));
-      }
+    if (preview && currentTargetRef.current) {
+      const rect = currentTargetRef.current.getBoundingClientRect();
+      setPreview((prev) => (prev ? { ...prev, rect } : null));
     }
   }, [preview]);
 
@@ -189,11 +203,11 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
         <div
           ref={cardRef}
           role="tooltip"
-          className="fixed z-50 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg"
+          className="wiki-preview-card fixed z-50 w-80 rounded-xl border border-accent/20 bg-popover p-4 shadow-xl backdrop-blur-sm"
           style={{
             left: Math.min(
-              preview.rect.left + preview.rect.width / 2 - 144,
-              window.innerWidth - 304,
+              preview.rect.left + preview.rect.width / 2 - 160,
+              window.innerWidth - 336,
             ),
             top: preview.rect.bottom + 8,
           }}
@@ -207,15 +221,52 @@ export function WikiPreview({ lang }: WikiPreviewProps) {
           onMouseLeave={() => {
             setPreview(null);
             currentTargetRef.current = null;
+            currentNameRef.current = null;
           }}
         >
+          {/* Entry name */}
+          <p className="text-sm font-semibold text-foreground mb-1">
+            {preview.data.name}
+          </p>
+
+          {/* Aliases */}
+          {preview.data.aliases.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {preview.data.aliases.map((alias) => (
+                <span
+                  key={alias}
+                  className="inline-block rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                >
+                  {alias}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Definition text */}
-          <p className="text-sm leading-relaxed text-foreground">{preview.definition}</p>
+          <p className="text-sm leading-relaxed text-foreground/80 line-clamp-4">
+            {preview.data.definition}
+          </p>
+
+          {/* Tags */}
+          {preview.data.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <Tag className="size-2.5 text-muted-foreground/50 shrink-0" />
+              {preview.data.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-block rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground/70"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* "View full entry" link */}
           <a
-            href={`/${lang}/wiki/${encodeURIComponent(preview.wikiName)}`}
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            href={`/${lang}/wiki/${encodeURIComponent(preview.data.name)}`}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent-hsl hover:text-accent-hsl-dark transition-colors"
           >
             {lang === "zh" ? "查看完整词条" : "View full entry"}
             <ExternalLink className="size-3" />

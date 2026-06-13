@@ -39,6 +39,8 @@ beforeEach(() => {
     json: async () => ({
       entry: {
         name: "DFS",
+        aliases: ["深度优先搜索", "Depth-First Search"],
+        tags: ["算法", "图论"],
         definition: "深度优先搜索（Depth-First Search）是一种图遍历算法。",
         blocks: {
           definition: "深度优先搜索（Depth-First Search）是一种图遍历算法。",
@@ -158,6 +160,8 @@ describe("WikiPreview", () => {
           json: async () => ({
             entry: {
               name: uniqueName,
+              aliases: [],
+              tags: [],
               definition: "Cached definition",
               blocks: { definition: "Cached definition", human: "", ai: "", ref: "" },
             },
