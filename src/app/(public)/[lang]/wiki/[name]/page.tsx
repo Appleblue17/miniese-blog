@@ -11,6 +11,8 @@
  */
 
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { readFile } from "fs/promises";
 import path from "path";
 import type { Metadata } from "next";
@@ -112,6 +114,14 @@ export default async function WikiEntryPage({ params }: Props) {
 
   return (
     <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
+      <div className="mb-6">
+        <Link
+          href={`/${lang}/wiki`}
+          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
+      </div>
       <WikiReader entry={entry} lang={lang} />
     </div>
   );
