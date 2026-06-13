@@ -2,12 +2,14 @@
  * @file WikiReader - Displays a wiki entry with all its content blocks.
  *
  * Layout (top to bottom):
- * 1. Title area: main name + alias list (badges)
+ * 1. Title area: main name + alias list + metadata
  * 2. Definition block
  * 3. Human notes block
- * 4. AI content block (placeholder if empty)
- * 5. Article references (placeholder)
+ * 4. AI content block
+ * 5. References block
  * 6. Backlinks (placeholder)
+ *
+ * Empty sections (no content) are hidden entirely rather than showing a placeholder.
  */
 
 import {
@@ -18,7 +20,6 @@ import {
   Quote,
   Link2,
   MessageSquare,
-  Sparkles,
   ShieldCheck,
   Clock,
   Tag,
@@ -51,6 +52,10 @@ function typeLabel(type: string): string {
 
 function typeColor(type: string): string {
   return TYPE_COLORS[type] || TYPE_COLORS.other;
+}
+
+function langLabel(language: string): string {
+  return language === "zh" ? "中文" : "EN";
 }
 
 interface WikiReaderEntry {
@@ -92,26 +97,46 @@ function formatDate(dateStr: string): string {
 function SectionBlock({
   icon,
   title,
-  subtitle,
   children,
   className = "",
 }: {
   icon: React.ReactNode;
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section className={`flex flex-col gap-3 ${className}`}>
-      <div className="flex items-center gap-2 border-b border-border pb-2">
-        <span className="text-muted-foreground shrink-0">{icon}</span>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {subtitle && <span className="text-xs text-muted-foreground ml-auto">{subtitle}</span>}
+    <section className={`flex flex-col gap-2 ${className}`}>
+      <div className="flex items-center gap-2 border-b border-border pb-1.5">
+        <span className="text-primary shrink-0">{icon}</span>
+        <h2 className="text-sm font-semibold">{title}</h2>
       </div>
       <div className="markdown-body">{children}</div>
     </section>
   );
+}
+
+/**
+ * Review status badge — shown inline next to the AI Content title.
+ */
+function ReviewBadge({ status, lang }: { status: WikiStatus; lang: string }) {
+  if (status === "reviewed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-green-100/60 px-1.5 py-0.5 text-[11px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
+        <ShieldCheck className="size-3" />
+        {lang === "zh" ? "已审查" : "Reviewed"}
+      </span>
+    );
+  }
+  if (status === "unreviewed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-yellow-100/60 px-1.5 py-0.5 text-[11px] font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
+        <Clock className="size-3" />
+        {lang === "zh" ? "待审查" : "Unreviewed"}
+      </span>
+    );
+  }
+  return null;
 }
 
 export async function WikiReader({ entry, lang }: WikiReaderProps) {
@@ -123,50 +148,32 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
   };
 
   return (
-    <article className="flex flex-col gap-8">
+    <article className="flex flex-col gap-6">
       {/* 1. Title area */}
-      <header className="flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <BookOpen className="size-6 mt-1 shrink-0 text-primary" />
+      <header className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <BookOpen className="size-6 shrink-0 text-primary" />
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">{entry.name}</h1>
-
-            {/* Aliases as badges */}
-            {entry.aliases.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {entry.aliases.map((alias) => (
-                  <Badge key={alias} variant="secondary">
-                    {alias}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Status badges */}
-          <div className="flex flex-col gap-1 shrink-0">
-            {/* Type badge */}
-            {entry.type && (
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(entry.type)}`}
-              >
-                {typeLabel(entry.type)}
-              </span>
-            )}
-            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
-              {entry.language}
-            </Badge>
-            {entry.status === "creating" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                <Sparkles className="size-2.5" />
-                生成中
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Metadata */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        {/* Aliases */}
+        {entry.aliases.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {entry.aliases.map((alias) => (
+              <span
+                key={alias}
+                className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+              >
+                {alias}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Metadata row */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <Calendar className="size-3" />
             {lang === "zh" ? "创建于" : "Created"} {formatDate(entry.createdAt)}
@@ -175,14 +182,24 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
             <Calendar className="size-3" />
             {lang === "zh" ? "更新于" : "Updated"} {formatDate(entry.updatedAt)}
           </span>
+          {entry.type && (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeColor(entry.type)}`}
+            >
+              {typeLabel(entry.type)}
+            </span>
+          )}
+          <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {langLabel(entry.language)}
+          </span>
           {entry.status === "reviewed" ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
-              <ShieldCheck className="size-2.5" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
+              <ShieldCheck className="size-3" />
               {lang === "zh" ? "已审查" : "Reviewed"}
             </span>
           ) : entry.status === "unreviewed" ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-              <Clock className="size-2.5" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+              <Clock className="size-3" />
               {lang === "zh" ? "待审查" : "Unreviewed"}
             </span>
           ) : null}
@@ -208,81 +225,54 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
         <SectionBlock
           icon={<Quote className="size-4" />}
           title={lang === "zh" ? "定义" : "Definition"}
-          subtitle={
-            entry.status === "creating" ? (lang === "zh" ? "AI生成" : "AI-generated") : undefined
-          }
         >
           <p className="text-base leading-relaxed">{entry.blocks.definition || entry.definition}</p>
         </SectionBlock>
       )}
 
-      {/* 3. Human notes block */}
-      <SectionBlock
-        icon={<User className="size-4" />}
-        title={lang === "zh" ? "博主笔记" : "Human Notes"}
-      >
-        {renderedBlocks.human ? (
+      {/* 3. Human notes block — only show if there's content */}
+      {renderedBlocks.human && (
+        <SectionBlock
+          icon={<User className="size-4" />}
+          title={lang === "zh" ? "博主笔记" : "Human Notes"}
+        >
           <div
             className="prose prose-sm dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: renderedBlocks.human }}
           />
-        ) : (
-          <p className="text-sm text-muted-foreground italic">
-            {lang === "zh" ? "暂无博主笔记。" : "No human notes yet."}
-          </p>
-        )}
-      </SectionBlock>
+        </SectionBlock>
+      )}
 
-      {/* 4. AI content block */}
-      <SectionBlock
-        icon={<Bot className="size-4" />}
-        title={lang === "zh" ? "助手撰写" : "AI Content"}
-        subtitle={
-          entry.blocks.ai
-            ? entry.status === "reviewed"
-              ? lang === "zh"
-                ? "已人工审查"
-                : "Reviewed"
-              : lang === "zh"
-                ? "AI生成，待审查"
-                : "AI-generated, unreviewed"
-            : undefined
-        }
-      >
-        {renderedBlocks.ai ? (
+      {/* 4. AI content block — only show if there's content */}
+      {renderedBlocks.ai && (
+        <SectionBlock
+          icon={<Bot className="size-4" />}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {lang === "zh" ? "助手撰写" : "AI Content"}
+              <ReviewBadge status={entry.status} lang={lang} />
+            </span>
+          }
+        >
           <div
-            className="prose prose-sm dark:prose-invert max-w-none rounded-lg bg-ai-bg p-4"
+            className="prose prose-sm dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: renderedBlocks.ai }}
           />
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">
-            <Bot className="size-4 text-muted-foreground shrink-0" />
-            <p className="text-sm text-muted-foreground italic">
-              {lang === "zh" ? "待添加" : "Not yet available"}
-            </p>
-          </div>
-        )}
-      </SectionBlock>
+        </SectionBlock>
+      )}
 
-      {/* 5. References block */}
-      <SectionBlock
-        icon={<Link2 className="size-4" />}
-        title={lang === "zh" ? "参考文献" : "References"}
-      >
-        {renderedBlocks.ref ? (
+      {/* 5. References block — only show if there's content */}
+      {renderedBlocks.ref && (
+        <SectionBlock
+          icon={<Link2 className="size-4" />}
+          title={lang === "zh" ? "参考文献" : "References"}
+        >
           <div
             className="prose prose-sm dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: renderedBlocks.ref }}
           />
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">
-            <Link2 className="size-4 text-muted-foreground shrink-0" />
-            <p className="text-sm text-muted-foreground italic">
-              {lang === "zh" ? "暂无参考文献。" : "No references yet."}
-            </p>
-          </div>
-        )}
-      </SectionBlock>
+        </SectionBlock>
+      )}
 
       {/* 6. Backlinks (placeholder) */}
       <SectionBlock
