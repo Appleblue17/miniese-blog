@@ -176,17 +176,47 @@ function parseGenerateResponse(responseText: string): {
  * @returns The extracted JSON string, or null if none found.
  */
 function extractJson(text: string): string | null {
-  // Try to find JSON within markdown code blocks first
-  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim();
+  // Find the outermost JSON object by counting braces.
+  // This is more robust than regex when the content field contains ``` code blocks.
+  const startIdx = text.indexOf("{");
+  if (startIdx === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  let endIdx = -1;
+
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (ch === "\\" && inString) {
+      escapeNext = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
   }
 
-  // Try to find a JSON object directly in the text
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return jsonMatch[0];
-  }
+  if (endIdx === -1) return null;
 
-  return null;
+  return text.slice(startIdx, endIdx + 1);
 }
