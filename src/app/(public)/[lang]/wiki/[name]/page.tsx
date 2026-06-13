@@ -114,15 +114,19 @@ export default async function WikiEntryPage({ params }: Props) {
 
   return (
     <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
-      <div className="mb-6">
-        <Link
-          href={`/${lang}/wiki`}
-          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </Link>
+      <div className="flex items-start gap-4">
+        <div className="sticky top-24 shrink-0">
+          <Link
+            href={`/${lang}/wiki`}
+            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+        </div>
+        <div className="min-w-0 flex-1">
+          <WikiReader entry={entry} lang={lang} />
+        </div>
       </div>
-      <WikiReader entry={entry} lang={lang} />
     </div>
   );
 }

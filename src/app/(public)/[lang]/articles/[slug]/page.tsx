@@ -80,28 +80,32 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
-      <div className="mb-6">
-        <Link
-          href={`/${lang}/articles`}
-          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </Link>
+      <div className="flex items-start gap-4">
+        <div className="sticky top-24 shrink-0">
+          <Link
+            href={`/${lang}/articles`}
+            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+        </div>
+        <div className="min-w-0 flex-1">
+          <ArticleReader
+            title={data.article.title}
+            author={data.article.author}
+            publishedAt={data.article.publishedAt}
+            updatedAt={data.article.updatedAt}
+            tags={data.article.tags}
+            summary={data.article.summary}
+            html={data.html}
+            viewCount={0}
+            likes={0}
+            lang={lang}
+            changelog={data.article.changelog}
+            isAITranslated={data.article.isAITranslated}
+          />
+        </div>
       </div>
-      <ArticleReader
-        title={data.article.title}
-        author={data.article.author}
-        publishedAt={data.article.publishedAt}
-        updatedAt={data.article.updatedAt}
-        tags={data.article.tags}
-        summary={data.article.summary}
-        html={data.html}
-        viewCount={0}
-        likes={0}
-        lang={lang}
-        changelog={data.article.changelog}
-        isAITranslated={data.article.isAITranslated}
-      />
     </div>
   );
 }
