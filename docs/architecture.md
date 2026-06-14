@@ -4,7 +4,19 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-13
+**最后更新**：2026-06-14
+
+### v0.9.0 2026-06-14
+
+- 全篇：补充阶段 8 账号系统 + 评论系统的架构说明
+- §2.5：认证更新为 NextAuth.js v5（Credentials + 可选 OAuth）
+- §4.1：Comment 模型补充 userId 字段，关系说明补充 User ↔ Comment/Account/Session
+- §9：环境变量更新——移除 ADMIN_PASSWORD，新增 NEXTAUTH_SECRET/NEXTAUTH_URL/OAuth 变量
+- §10：开发顺序重排——阶段 8 改为账号系统+评论系统，新增阶段 12 Wiki 提议前端入口
+- §11.3：无语言前缀路由新增 /login、/register、/forgot、/reset、/verify；/admin 保护方式更新为 NextAuth.js session
+- §11.4：仪表盘路由新增 /admin/wiki/discoveries、/admin/ai-tasks、/admin/ai-tasks/[taskId]，移除废弃的 /admin/reviews
+- §11.5：API 路由新增认证相关（8 个端点）、评论相关（补充频率限制）、管理员 AI 任务列表/详情；词条 API 补充 undo 端点
+- §11.9：已实现 API 清单扩展为完整覆盖阶段 2-8
 
 ### v0.8.4 2026-06-13
 
@@ -153,7 +165,7 @@
 | 项目 | 技术 | 说明 |
 |------|------|------|
 | 邮件 | Resend SDK | 通知发送 |
-| 认证 | NextAuth.js | MVP 暂不实现，预留 |
+| 认证 | NextAuth.js v5 | Credentials（邮箱+密码）+ 可选 Google/GitHub OAuth，JWT session，Prisma 适配器 |
 | 文件存储 | 本地文件系统 | `content/` 目录 |
 
 ---
@@ -353,7 +365,8 @@ proposed → creating → unreviewed → reviewed
 |------|------|------|
 | id | String (UUID) | |
 | articleId | String | 所属文章 |
-| authorName | String | 评论者名称（邮箱留待后续） |
+| userId | String? | 发表评论的用户 ID（已登录用户） |
+| authorName | String | 评论者名称（来自用户信息或匿名输入） |
 | content | Text | 评论内容 |
 | isHidden | Boolean | 是否被 AI 初审隐藏 |
 | createdAt | DateTime | |
@@ -362,7 +375,9 @@ proposed → creating → unreviewed → reviewed
 
 - Article 自关联（draftOfId）：草稿 → 已发布文章，一对多（应用层约束为一对一）
 - Article ↔ WikiEntry：多对多，通过 ArticleWikiLink 关联
-- Article ↔ Comment：一对多
+- Article ↔ Comment：一对多（article → comment）
+- User ↔ Comment：一对多（user → comment，userId 可为空兼容匿名）
+- User ↔ Account/Session：一对多（NextAuth.js 适配器）
 
 ---
 
@@ -1241,11 +1256,20 @@ REDIS_URL="redis://localhost:6379"
 DEEPSEEK_API_KEY="sk-..."
 DEEPSEEK_BASE_URL="https://api.deepseek.com"
 
-# Resend（可选，MVP 可先不配置）
-RESEND_API_KEY="..."
+# Resend（可选，dev mode 打印日志不实际发送）
+RESEND_API_KEY="re_..."
 
-# 认证（MVP 简单密码保护）
-ADMIN_PASSWORD="your-secure-password"
+# 认证（NextAuth.js v5）
+NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Google OAuth（可选）
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+
+# GitHub OAuth（可选）
+GITHUB_CLIENT_ID="..."
+GITHUB_CLIENT_SECRET="..."
 
 # 站点配置
 SITE_NAME="Miniese's Blog"
@@ -1268,10 +1292,11 @@ SITE_URL="https://..."
 | 5 | 队列基础设施（Bull、Worker 框架） | Redis |
 | 6 | AI 审查功能（队列任务 + 前端集成） | 阶段 3、5 |
 | 7 | AI 翻译功能 | 阶段 3、5 |
-| 8 | AI 词条发现与生成 | 阶段 4、5 |
-| 9 | 仪表盘前端（所有管理界面） | 阶段 3-8 |
-| 10 | 读者对话窗口 | 阶段 3 |
-| 11 | 评论功能 | 阶段 3 |
+| 8 | 账号系统 + 评论系统（注册、登录、密码管理、邮箱验证、评论） | 阶段 1 |
+| 9 | AI 词条发现与生成 | 阶段 4、5 |
+| 10 | 仪表盘前端（所有管理界面） | 阶段 3-9 |
+| 11 | 读者对话窗口 | 阶段 3 |
+| 12 | Wiki 提议前端入口 | 阶段 8 |
 
 ---
 
@@ -1309,8 +1334,13 @@ SITE_URL="https://..."
 | `/` | 自动重定向到 `/{lang}` |
 | `/rss.xml` | RSS Feed（可按语言分离，MVP 先做默认语言） |
 | `/sitemap.xml` | 站点地图 |
+| `/login` | 登录页 |
+| `/register` | 注册页 |
+| `/forgot` | 忘记密码 |
+| `/reset` | 重置密码（通过邮件链接访问） |
+| `/verify` | 邮箱验证页 |
 | `/api/*` | 所有 API 路由 |
-| `/admin/*` | 仪表盘路由（HTTP Basic Auth 保护） |
+| `/admin/*` | 仪表盘路由（NextAuth.js session 保护） |
 
 ### 11.4 仪表盘路由（博主专用）
 
@@ -1323,7 +1353,9 @@ SITE_URL="https://..."
 | `/admin/articles/[id]/confirm` | 发布确认（步骤三：确认页） |
 | `/admin/wiki` | 词条管理 |
 | `/admin/wiki/proposals` | 词条提议审批 |
-| `/admin/reviews` | 审查报告 |
+| `/admin/wiki/discoveries` | 词条发现提案列表（批量操作） |
+| `/admin/ai-tasks` | AI 任务列表（审查/翻译/发现/生成） |
+| `/admin/ai-tasks/[taskId]` | AI 任务详情（审查报告 / 翻译详情） |
 | `/admin/notifications` | 通知中心 |
 | `/admin/settings` | 站点设置 |
 
@@ -1353,8 +1385,9 @@ SITE_URL="https://..."
 | PUT | `/api/wiki/[name]` | 更新词条（仅 `unreviewed`/`reviewed` 状态可编辑） | `?lang=zh` |
 | DELETE | `/api/wiki/[name]` | 删除词条 | `?lang=zh` |
 | POST | `/api/wiki/[name]/approve` | 审批通过（`proposed` → `creating`） | `?lang=zh` |
-| POST | `/api/wiki/[name]/complete` | AI 填充完成（`creating` → `unreviewed`，后续阶段实现） | `?lang=zh` |
+| POST | `/api/wiki/[name]/complete` | AI 填充完成（`creating` → `unreviewed`） | `?lang=zh` |
 | POST | `/api/wiki/[name]/review` | 人工审查通过（`unreviewed` → `reviewed`） | `?lang=zh` |
+| POST | `/api/wiki/[name]/undo` | 撤销（根据当前状态回退到对应步骤） | `?lang=zh` |
 | POST | `/api/wiki/proposals` | 提交词条申请（读者端） | 无需 |
 | POST | `/api/wiki/proposals/[id]/approve` | 审批提议 | 无需 |
 
@@ -1365,16 +1398,37 @@ SITE_URL="https://..."
 | POST | `/api/ai/review` | 提交审查任务 |
 | POST | `/api/ai/translate` | 提交翻译任务 |
 | POST | `/api/ai/generate` | 提交词条生成任务 |
+| POST | `/api/ai/discover` | 提交词条发现任务 |
 | GET | `/api/ai/status/[taskId]` | 查询任务状态 |
 | POST | `/api/chat` | 读者对话 |
+
+#### 认证相关
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/[...nextauth]` | NextAuth.js 认证端点（登录、登出、回调） |
+| POST | `/api/auth/register` | 注册（创建用户，发送验证邮件） |
+| POST | `/api/auth/verify` | 邮箱验证 |
+| POST | `/api/auth/forgot` | 忘记密码（发送重置链接） |
+| POST | `/api/auth/reset` | 重置密码 |
+| POST | `/api/auth/update-password` | 更新密码（已登录用户） |
+| POST | `/api/auth/update-profile` | 更新个人信息（用户名、邮箱） |
+| GET | `/api/auth/me` | 获取当前用户信息 |
 
 #### 评论相关
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/comments?articleId=xxx` | 获取评论列表 |
-| POST | `/api/comments` | 发表评论 |
+| POST | `/api/comments` | 发表评论（需登录，60s 频率限制） |
 | PUT | `/api/comments/[id]/hide` | 隐藏/显示评论（博主） |
+
+#### 管理员 AI 任务
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/admin/ai-tasks` | 获取 AI 任务列表 |
+| GET | `/api/admin/ai-tasks/[taskId]` | 获取 AI 任务详情 |
 
 ### 11.6 Proxy 实现
 
@@ -1453,7 +1507,7 @@ export const config = {
 
 ### 11.9 已实现 API 清单
 
-阶段 2.2、2.3 和 3.2 已完成的所有 API：
+完整覆盖阶段 2 到阶段 8 的所有 API：
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -1464,10 +1518,37 @@ export const config = {
 | POST | `/api/articles/preview` | 渲染 MD/Notesaw 内容为 HTML |
 | POST | `/api/articles/draft` | 保存/更新草稿（UI 元信息存入 frontmatter） |
 | POST | `/api/articles/publish` | 发布草稿（写入 DB + 渲染缓存） |
-| POST | `/api/articles/render` | 手动重新渲染文章（含 wiki 链接检测，可选 `preserveUpdatedAt` 参数保持修改时间不变） |
+| POST | `/api/articles/render` | 手动重新渲染文章（含 wiki 链接检测，可选 `preserveUpdatedAt`） |
 | POST | `/api/articles/delete` | 删除文章/草稿（删除记录 + 文件） |
 | POST | `/api/articles/create-draft` | 从已发布文章创建草稿（复制文件） |
 | GET | `/api/admin/articles` | 管理员文章列表（已发布+草稿+新草稿） |
+| GET | `/api/admin/ai-tasks` | AI 任务列表 |
+| GET | `/api/admin/ai-tasks/[taskId]` | AI 任务详情 |
+| GET | `/api/admin/discoveries` | 词条发现提案列表 |
+| POST | `/api/admin/discoveries/[id]/undo` | 撤销词条发现提案 |
+| POST | `/api/ai/review` | 提交审查任务 |
+| POST | `/api/ai/translate` | 提交翻译任务 |
+| POST | `/api/ai/generate` | 提交词条生成任务 |
+| POST | `/api/ai/discover` | 提交词条发现任务 |
+| GET | `/api/ai/status/[taskId]` | 查询任务状态 |
+| GET/POST | `/api/auth/[...nextauth]` | NextAuth.js 认证 |
+| POST | `/api/auth/register` | 注册 |
+| POST | `/api/auth/verify` | 邮箱验证 |
+| POST | `/api/auth/forgot` | 忘记密码 |
+| POST | `/api/auth/reset` | 重置密码 |
+| POST | `/api/auth/update-password` | 更新密码 |
+| POST | `/api/auth/update-profile` | 更新个人信息 |
+| GET | `/api/auth/me` | 获取当前用户 |
+| GET | `/api/comments?articleId=xxx` | 获取评论列表 |
+| POST | `/api/comments` | 发表评论 |
+| GET/POST | `/api/wiki` | 词条列表/创建 |
+| GET | `/api/wiki/[name]` | 词条详情 |
+| PUT/DELETE | `/api/wiki/[name]` | 更新/删除词条 |
+| POST | `/api/wiki/[name]/approve` | 审批通过 |
+| POST | `/api/wiki/[name]/review` | 审查通过 |
+| POST | `/api/wiki/[name]/undo` | 撤销操作 |
+| POST | `/api/wiki/proposals` | 读者提交词条申请 |
+| POST | `/api/wiki/proposals/[id]/approve` | 审批读者提议 |
 
 ---
 
