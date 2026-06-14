@@ -91,6 +91,7 @@ export default async function ArticlePage({ params }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <ArticleReader
+            articleId={data.article.id}
             title={data.article.title}
             author={data.article.author}
             publishedAt={data.article.publishedAt}

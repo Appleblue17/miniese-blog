@@ -20,6 +20,7 @@ import {
   Palette,
   ToggleLeft,
   Bell,
+  Bug,
   Terminal,
   Loader2,
   Check,
@@ -57,13 +58,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   prompts: { review: "", translate: "", discovery: "", generate: "" },
 };
 
-type TabId = "general" | "appearance" | "features" | "notifications" | "advanced";
+type TabId = "general" | "appearance" | "features" | "notifications" | "dev" | "advanced";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "general", label: "常规", icon: <Settings2 className="size-4" /> },
   { id: "appearance", label: "外观", icon: <Palette className="size-4" /> },
   { id: "features", label: "功能开关", icon: <ToggleLeft className="size-4" /> },
   { id: "notifications", label: "通知", icon: <Bell className="size-4" /> },
+  { id: "dev", label: "开发", icon: <Bug className="size-4" /> },
   { id: "advanced", label: "高级", icon: <Terminal className="size-4" /> },
 ];
 
@@ -1115,6 +1117,111 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ===== Dev ===== */}
+        {tab === "dev" && (
+          <div className="space-y-6 max-w-lg">
+            <SectionHeading>开发模式</SectionHeading>
+            <p className="text-xs text-muted-foreground">
+              开发模式开关控制测试辅助功能。启用后可用于本地开发和调试。
+            </p>
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-4">
+              <div>
+                <p className="text-sm font-medium">开发模式</p>
+                <p className="text-xs text-muted-foreground mt-0.5">启用开发模式开关</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!local.features.devMode}
+                  onClick={() =>
+                    updateLocal("features", "devMode", !local.features.devMode)
+                  }
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                    local.features.devMode ? "" : "bg-primary/20"
+                  }`}
+                  style={local.features.devMode ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                >
+                  <span
+                    className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                      local.features.devMode ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {local.features.devMode && (
+              <div className="space-y-4 pl-4 border-l-2 border-muted">
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div>
+                    <p className="text-sm font-medium">真实邮件发送</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      关闭时邮件将打印到控制台而非实际发送
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!local.features.realEmail}
+                      onClick={() =>
+                        updateLocal("features", "realEmail", !local.features.realEmail)
+                      }
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                        local.features.realEmail ? "" : "bg-primary/20"
+                      }`}
+                      style={local.features.realEmail ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                          local.features.realEmail ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div>
+                    <p className="text-sm font-medium">跳过邮箱验证</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      注册时自动标记邮箱已验证，无需验证邮件
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!local.features.skipEmailVerification}
+                      onClick={() =>
+                        updateLocal("features", "skipEmailVerification", !local.features.skipEmailVerification)
+                      }
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                        local.features.skipEmailVerification ? "" : "bg-primary/20"
+                      }`}
+                      style={local.features.skipEmailVerification ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                          local.features.skipEmailVerification ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800 p-3">
+              <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                <strong>注意：</strong>开发模式开关仅在本地开发环境中使用。在生产环境中启用开发模式可能带来安全风险。
+              </p>
+            </div>
           </div>
         )}
 

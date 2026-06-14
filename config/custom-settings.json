@@ -44,7 +44,10 @@
     "wikiDiscovery": true,
     "wikiGenerate": true,
     "comments": true,
-    "rss": true
+    "rss": true,
+    "devMode": false,
+    "realEmail": false,
+    "skipEmailVerification": false
   },
   "notifications": {
     "email": true,

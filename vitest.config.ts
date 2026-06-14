@@ -11,6 +11,11 @@ export default defineConfig({
     globals: true,
     environment: "node",
     fileParallelism: false,
+    server: {
+      deps: {
+        inline: ["next"],
+      },
+    },
     env: {
       DATABASE_URL: process.env.DATABASE_URL || "postgresql://dev:devpass@localhost:5432/miniese",
     },

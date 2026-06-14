@@ -4,12 +4,19 @@
  * Shows all published articles with their linked drafts below.
  * New drafts (no linked article) are shown as placeholder article rows.
  * Supports pagination with consistent styling to AdminWikiList.
+ *
+ * NOTE: This server component queries the database directly instead of
+ * calling the API route, because server-to-server fetch requests do not
+ * carry the user's session cookie and would be rejected by the proxy auth.
  */
 
 import Link from "next/link";
 import { PlusCircle, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import { ArticleRowActions } from "@/components/admin/ArticleRowActions";
+import { prisma } from "@/lib/db";
+import { readFile } from "fs/promises";
+import path from "path";
 
 export const metadata: Metadata = {
   title: "文章管理 | Miniese's Blog",
@@ -74,24 +81,155 @@ interface AdminArticlesResponse {
   totalPages: number;
 }
 
+async function getFileStats(contentPath: string) {
+  try {
+    const content = await readFile(path.join(process.cwd(), contentPath), "utf-8");
+    return {
+      charCount: content.length,
+      lineCount: content.split("\n").length,
+    };
+  } catch {
+    return { charCount: 0, lineCount: 0 };
+  }
+}
+
 async function fetchData(page: number): Promise<AdminArticlesResponse> {
   try {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/admin/articles?page=${page}&limit=${PAGE_SIZE}`, {
-      cache: "no-store",
+    const limit = PAGE_SIZE;
+    const skip = (page - 1) * limit;
+
+    // Get total count of published ORIGINAL articles (exclude translations)
+    const total = await prisma.article.count({
+      where: { status: "published", originalId: null },
     });
-    if (!res.ok)
-      return {
-        articles: [],
-        translations: [],
-        drafts: [],
-        newDrafts: [],
-        pendingTasks: {},
-        total: 0,
-        page: 1,
-        totalPages: 0,
-      };
-    return res.json();
+
+    // Get paginated published ORIGINAL articles (exclude translations)
+    const publishedArticles = await prisma.article.findMany({
+      where: { status: "published", originalId: null },
+      orderBy: { publishedAt: "desc" },
+      skip,
+      take: limit,
+    });
+
+    const linkedArticleIds = publishedArticles.map((a) => a.id);
+
+    // Get all translation versions linked to the current page's articles
+    const allTranslations = await prisma.article.findMany({
+      where: { originalId: { in: linkedArticleIds } },
+    });
+
+    // Get ALL drafts
+    const allDrafts = await prisma.article.findMany({
+      where: { status: { in: ["draft", "review"] } },
+    });
+
+    const drafts = allDrafts.filter(
+      (d) => d.draftOfId !== null && linkedArticleIds.includes(d.draftOfId),
+    );
+    const newDrafts = allDrafts.filter((d) => d.draftOfId === null);
+
+    // Get active AI tasks
+    const allArticleIds = [...linkedArticleIds, ...allTranslations.map((t) => t.id)];
+    const activeTasks = await prisma.aiTask.findMany({
+      where: {
+        articleId: { in: allArticleIds },
+        status: { in: ["pending", "processing"] },
+      },
+      select: { articleId: true, type: true },
+    });
+
+    const pendingTasks: Record<string, string[]> = {};
+    for (const task of activeTasks) {
+      if (!pendingTasks[task.articleId!]) {
+        pendingTasks[task.articleId!] = [];
+      }
+      pendingTasks[task.articleId!].push(task.type);
+    }
+
+    const articlesWithStats = await Promise.all(
+      publishedArticles.map(async (a) => {
+        const stats = await getFileStats(a.contentPath);
+        return {
+          id: a.id,
+          slug: a.slug,
+          title: a.title,
+          language: a.language,
+          status: a.status,
+          contentPath: a.contentPath,
+          summary: a.summary,
+          tags: a.tags,
+          author: a.author,
+          publishedAt: a.publishedAt?.toISOString() || null,
+          updatedAt: a.updatedAt.toISOString(),
+          changelog: a.changelog,
+          viewCount: a.viewCount,
+          isAITranslated: a.isAITranslated,
+          ...stats,
+        };
+      }),
+    );
+
+    const translationsWithStats = await Promise.all(
+      allTranslations.map(async (t) => {
+        const stats = await getFileStats(t.contentPath);
+        return {
+          id: t.id,
+          slug: t.slug,
+          title: t.title,
+          language: t.language,
+          status: t.status,
+          contentPath: t.contentPath,
+          updatedAt: t.updatedAt.toISOString(),
+          originalId: t.originalId,
+          isAITranslated: t.isAITranslated,
+          ...stats,
+        };
+      }),
+    );
+
+    const draftsWithStats = await Promise.all(
+      drafts.map(async (d) => {
+        const stats = await getFileStats(d.contentPath);
+        return {
+          id: d.id,
+          slug: d.slug,
+          title: d.title,
+          language: d.language,
+          status: d.status,
+          contentPath: d.contentPath,
+          updatedAt: d.updatedAt.toISOString(),
+          draftOfId: d.draftOfId,
+          ...stats,
+        };
+      }),
+    );
+
+    const newDraftsWithStats = await Promise.all(
+      newDrafts.map(async (d) => {
+        const stats = await getFileStats(d.contentPath);
+        return {
+          id: d.id,
+          slug: d.slug,
+          title: d.title,
+          language: d.language,
+          status: d.status,
+          contentPath: d.contentPath,
+          updatedAt: d.updatedAt.toISOString(),
+          ...stats,
+        };
+      }),
+    );
+
+    return {
+      articles: articlesWithStats,
+      translations: translationsWithStats,
+      drafts: draftsWithStats,
+      newDrafts: newDraftsWithStats,
+      pendingTasks,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   } catch {
     return {
       articles: [],

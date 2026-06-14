@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Send,
   AlertCircle,
@@ -18,13 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import matter from "gray-matter";
 import { FileUploader, type UploadResult } from "./FileUploader";
 import { computeDiff, type DiffLine } from "@/lib/diff";
@@ -82,6 +75,9 @@ export function PublishForm({
     author: "",
     summary: "",
   });
+  // Ref to always access the latest meta value (bypass stale closures)
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
 
   // Extra frontmatter fields (not managed by UI)
   const [extraFrontmatter, setExtraFrontmatter] = useState<Record<string, unknown>>({});
@@ -154,7 +150,7 @@ export function PublishForm({
     (async () => {
       try {
         const res = await fetch(
-          `/api/admin/reviews?articleId=${encodeURIComponent(draftId)}&limit=1`,
+          `/api/admin/ai-tasks?type=review&articleId=${encodeURIComponent(draftId)}&limit=1`,
         );
         if (!res.ok) return;
         const data = await res.json();
@@ -188,12 +184,23 @@ export function PublishForm({
     setFileName(result.fileName);
     setFileContent(result.fileContent);
 
+    // Language priority: frontmatter > filename pattern (.zh.md / .en.md) > empty
+    const inferLanguageFromFilename = (name: string): "zh" | "en" | "" => {
+      const match = name.match(/\.(zh|en)\.md$/i);
+      if (match) return match[1].toLowerCase() as "zh" | "en";
+      return "";
+    };
+
     // Parse frontmatter using gray-matter (already done in FileUploader, but re-parse here for extra fields)
     try {
       const parsed = matter(result.fileContent);
       const data = parsed.data as Record<string, unknown>;
 
-      const fileLanguage = (data.language === "en" ? "en" : data.language === "zh" ? "zh" : "") as "zh" | "en" | "";
+      const fileLanguage = (
+        data.language === "en" ? "en" :
+        data.language === "zh" ? "zh" :
+        inferLanguageFromFilename(result.fileName) || ""
+      ) as "zh" | "en" | "";
       const fileTitle = (data.title as string) || result.title;
       const fileAuthor = (data.author as string) || result.author || meta.author;
       const fileTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
@@ -274,15 +281,14 @@ export function PublishForm({
     }
   }, [fileContent, meta.fileType]);
 
-  const getMetaPayload = useCallback(() => meta, [meta]);
-
   const handleSaveDraft = useCallback(async () => {
     if (!fileName || !fileContent) return;
-    if (!meta.title.trim()) {
+    const currentMeta = metaRef.current;
+    if (!currentMeta.title.trim()) {
       setError("标题不能为空");
       return;
     }
-    if (!meta.language) {
+    if (!currentMeta.language) {
       setError("请选择语言");
       return;
     }
@@ -296,7 +302,7 @@ export function PublishForm({
         body: JSON.stringify({
           fileName,
           fileContent,
-          meta: getMetaPayload(),
+          meta: { ...currentMeta },
           draftOfId: publishedId || null,
         }),
       });
@@ -314,15 +320,16 @@ export function PublishForm({
     } finally {
       setSavingDraft(false);
     }
-  }, [fileName, fileContent, meta, publishedId, getMetaPayload]);
+  }, [fileName, fileContent, publishedId]);
 
   const handleSubmitReview = useCallback(async () => {
     if (!fileName || !fileContent) return;
-    if (!meta.title.trim()) {
+    const currentMeta = metaRef.current;
+    if (!currentMeta.title.trim()) {
       setError("标题不能为空");
       return;
     }
-    if (!meta.language) {
+    if (!currentMeta.language) {
       setError("请选择语言");
       return;
     }
@@ -344,7 +351,7 @@ export function PublishForm({
           body: JSON.stringify({
             fileName,
             fileContent,
-            meta: getMetaPayload(),
+            meta: { ...currentMeta },
             draftOfId: publishedId || null,
           }),
         });
@@ -378,21 +385,22 @@ export function PublishForm({
       setReviewSubmitted(true);
 
       // Redirect to task detail page
-      window.location.href = `/admin/reviews/${taskId}`;
+      window.location.href = `/admin/ai-tasks/${taskId}`;
     } catch {
       setError("提交审查请求失败");
     } finally {
       setSavingDraft(false);
     }
-  }, [fileName, fileContent, meta, publishedId, draftId, getMetaPayload]);
+  }, [fileName, fileContent, publishedId, draftId, reviewSubmitted]);
 
   const handleGoToConfirm = useCallback(async () => {
     if (!fileContent) return;
-    if (!meta.title.trim()) {
+    const currentMeta = metaRef.current;
+    if (!currentMeta.title.trim()) {
       setError("标题不能为空");
       return;
     }
-    if (!meta.language) {
+    if (!currentMeta.language) {
       setError("请选择语言");
       return;
     }
@@ -415,10 +423,15 @@ export function PublishForm({
     }
 
     setStep("confirm");
-  }, [fileContent, meta.title, publishedId]);
+  }, [fileContent, publishedId]);
 
   const handlePublish = useCallback(async () => {
     if (!fileContent) return;
+    const currentMeta = metaRef.current;
+    if (!currentMeta.language) {
+      setError("请选择语言");
+      return;
+    }
 
     setPublishing(true);
     setError(null);
@@ -427,8 +440,8 @@ export function PublishForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language: meta.language,
-          meta: getMetaPayload(),
+          language: currentMeta.language,
+          meta: { ...currentMeta },
           changelog: changelog || undefined,
           draftOfId: publishedId || null,
           fileContent,
@@ -448,7 +461,7 @@ export function PublishForm({
     } finally {
       setPublishing(false);
     }
-  }, [fileName, fileContent, meta, changelog, publishedId, getMetaPayload]);
+  }, [fileName, fileContent, changelog, publishedId, draftId]);
 
   // Stats
   const lineCount = fileContent ? fileContent.split("\n").length : 0;
@@ -491,36 +504,37 @@ export function PublishForm({
           <Label htmlFor="meta-language">
             语言 <span className="text-destructive">*</span>
           </Label>
-          <Select
+          <select
+            id="meta-language"
             value={meta.language}
-            onValueChange={(v) => setMeta((m) => ({ ...m, language: v as "zh" | "en" | "" }))}
+            onChange={(e) => {
+              setMeta((m) => ({ ...m, language: e.target.value as "zh" | "en" }));
+            }}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <SelectTrigger id="meta-language">
-              <SelectValue placeholder="选择语言" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="zh">中文</SelectItem>
-              <SelectItem value="en">English</SelectItem>
-            </SelectContent>
-          </Select>
+            <option value="" disabled>
+              选择语言
+            </option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="meta-filetype">文件格式</Label>
-          <Select
+          <select
+            id="meta-filetype"
             value={meta.fileType}
-            onValueChange={(v) => setMeta((m) => ({ ...m, fileType: v as "markdown" | "notesaw" }))}
+            onChange={(e) =>
+              setMeta((m) => ({ ...m, fileType: e.target.value as "markdown" | "notesaw" }))
+            }
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <SelectTrigger id="meta-filetype">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FILE_TYPES.map((ft) => (
-                <SelectItem key={ft.value} value={ft.value}>
-                  {ft.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {FILE_TYPES.map((ft) => (
+              <option key={ft.value} value={ft.value}>
+                {ft.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

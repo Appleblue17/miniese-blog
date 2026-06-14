@@ -33,10 +33,13 @@ export async function POST(request: NextRequest) {
 
     const resolvedMeta: ArticleMeta | null = meta || null;
 
-    if (!resolvedMeta) {
-      if (language !== "zh" && language !== "en") {
-        return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
-      }
+    // Validate language — must be a valid ArticleLanguage value
+    const resolvedLang = (resolvedMeta?.language || language) as string;
+    if (resolvedLang !== "zh" && resolvedLang !== "en") {
+      return NextResponse.json(
+        { error: "language must be 'zh' or 'en'." },
+        { status: 400 },
+      );
     }
 
     // Build file content with frontmatter from metadata
@@ -51,7 +54,6 @@ export async function POST(request: NextRequest) {
     const summary = (data.summary as string) || null;
     const tags = (data.tags as string[]) || [];
     const author = (data.author as string) || "博主";
-    const resolvedLang = resolvedMeta?.language || language;
 
     // Generate slug-based filename
     const slug = generateSlug(title, (data.slug as string) || undefined);

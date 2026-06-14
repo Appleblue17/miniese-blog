@@ -1,55 +1,61 @@
+/**
+ * @file proxy.ts — Next.js 16 proxy middleware.
+ *
+ * Responsibilities (in order):
+ * 1. Auth protection — Protect admin routes using NextAuth
+ * 2. Language redirect — Redirect language-less URLs to preferred language
+ *
+ * Next.js 16 deprecated "middleware.ts" in favor of "proxy.ts".
+ * See: https://nextjs.org/docs/messages/middleware-to-proxy
+ */
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const SUPPORTED_LANGUAGES = ["zh", "en"] as const;
 const DEFAULT_LANGUAGE = "zh";
 
-function basicAuth(request: NextRequest): NextResponse | null {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  // If ADMIN_PASSWORD is not set, allow access without auth (dev mode)
-  if (!adminPassword) {
-    return null;
-  }
-
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Basic ")) {
-    return unauthorized();
-  }
-
-  try {
-    const base64 = authHeader.slice(6);
-    const decoded = atob(base64);
-    const colonIndex = decoded.indexOf(":");
-    if (colonIndex === -1) return unauthorized();
-    const password = decoded.slice(colonIndex + 1);
-    if (password !== adminPassword) return unauthorized();
-  } catch {
-    return unauthorized();
-  }
-
-  return null;
-}
-
-function unauthorized(): NextResponse {
-  return new NextResponse("Unauthorized", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="Admin Dashboard"',
-    },
-  });
-}
-
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Admin routes — HTTP Basic Auth
-  if (pathname.startsWith("/admin")) {
-    const authResponse = basicAuth(request);
-    if (authResponse) return authResponse;
+  // ── Auth protection ──
+  // Protect admin routes using NextAuth
+  const isAdminPage = pathname.startsWith("/admin");
+  const isAdminApi = pathname.startsWith("/api/admin");
+
+  // Settings GET is public — non-admin users need appearance settings (body width, colors)
+  // for proper page rendering. Only PUT (update) requires admin auth.
+  const isSettingsGet = pathname === "/api/admin/settings" && request.method === "GET";
+
+  if ((isAdminPage || isAdminApi) && !isSettingsGet) {
+    const { auth } = await import("@/auth");
+    const session = await auth();
+
+    const isLoggedIn = !!session?.user;
+    const role = session?.user?.role;
+
+    if (!isLoggedIn || role !== "admin") {
+      if (isAdminApi) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Authenticated admin — pass through without language redirect
     return NextResponse.next();
   }
 
-  // 2. Other non-page routes — pass through
+  // ── Language redirect ──
+
+  // Auth pages live at root (/login, /register, etc.), no language prefix needed
+  const AUTH_PATHS = ["/login", "/register", "/forgot", "/reset", "/verify", "/settings"];
+  if (AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(p + "?"))) {
+    return NextResponse.next();
+  }
+
+  // Static assets / API — pass through
   if (
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
@@ -63,16 +69,24 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Already has language prefix — pass through
+  // Already has language prefix — pass through
   const firstSegment = pathname.split("/")[1];
   if (
     firstSegment &&
     SUPPORTED_LANGUAGES.includes(firstSegment as (typeof SUPPORTED_LANGUAGES)[number])
   ) {
+    // Auth pages (login, register, etc.) live at root like /login, not /zh/login
+    // Rewrite /zh/login → /login, /en/register → /register, etc.
+    const AUTH_PATHS = ["/login", "/register", "/forgot", "/reset", "/verify", "/settings"];
+    const restPath = "/" + pathname.split("/").slice(2).join("/");
+    if (AUTH_PATHS.includes(restPath)) {
+      const rewriteUrl = new URL(restPath, request.url);
+      return NextResponse.rewrite(rewriteUrl);
+    }
     return NextResponse.next();
   }
 
-  // 3. Determine preferred language
+  // Determine preferred language
   let preferredLang = request.cookies.get("preferred_lang")?.value;
   if (
     !preferredLang ||
@@ -82,7 +96,7 @@ export function proxy(request: NextRequest) {
     preferredLang = acceptLang.startsWith("zh") ? "zh" : DEFAULT_LANGUAGE;
   }
 
-  // 4. Redirect to language-prefixed path
+  // Redirect to language-prefixed path
   const newUrl = new URL(`/${preferredLang}${pathname}`, request.url);
   return NextResponse.redirect(newUrl);
 }

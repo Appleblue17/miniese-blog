@@ -339,3 +339,42 @@
 - **测试结果**：`npx tsc --noEmit` 编译通过，未新增测试
 - **遇到的问题**：
   - 预览区明度硬编码问题：之前的实现中，预览标题使用 `hsl(var(--primary-hue), var(--primary-sat), 55%)` 这种写法，明度部分未引用 CSS 变量，导致滑块的实时变化无法反映到预览中
+
+### 任务 阶段8：账号系统 + 评论系统 + UI 优化
+- **时间**：2026-06-13~2026-06-14
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **账号系统核心功能**：
+    - 用户注册/登录（NextAuth.js Credentials Provider + 可选 OAuth）
+    - 密码管理（忘记密码 / 重置密码 / 更新密码）
+    - 邮箱验证（Resend，dev mode 下打印验证码日志）
+    - 个人设置页面（`/settings`），支持更新用户名、邮箱、当前密码、新密码
+    - Admin 路由保护（`proxy.ts` 中间件检查 session 和角色）
+  - **登录页 Bug 修复**：
+    - `callbackUrl` 默认值从 `/admin` 改为 `/`
+    - `router.push` → `window.location.href` 确保 session 刷新生效
+    - 已登录用户进入登录页显示"已登录，正在跳转..."后自动跳转
+  - **评论系统**：
+    - API（`/api/comments`）— GET 获取评论、POST 创建评论
+    - 前端组件（`src/components/article/CommentSection.tsx`）：
+      - 精简输入框"写评论..."→ 点击展开完整表单
+      - 未登录用户显示"登录后发表评论"，点击跳转 `/login?callbackUrl=...`
+      - 已登录用户可提交评论
+      - 评论列表显示头像、用户名、相对时间
+    - 跨版本互通：通过 `originalId` 解析翻译组，中英文文章共享同一个评论线程
+    - 频率限制：同一用户跨翻译版本 60 秒内只能发 1 条
+    - 在 `ArticleReader` 中替换占位符，文章详情页传递 `articleId`
+  - **UI 优化**：
+    - `button.tsx` 添加 `cursor-pointer`（修复右上角 bar hover 无手形指针）
+    - 登录页"登录"按钮添加 `cursor-pointer`
+    - 评论区"写评论..."和"登录后发表评论"添加 `cursor-pointer`
+  - **清理废弃页面**：
+    - 删除 `src/app/(dashboard)/admin/reviews/`（列表页 + 详情页）
+    - 删除 `src/app/api/admin/reviews/`（列表 API + 详情 API）
+    - PublishForm.tsx：`/api/admin/reviews` → `/api/admin/ai-tasks`，`/admin/reviews/` → `/admin/ai-tasks/`
+- **测试结果**：`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - callbackUrl 来源判断：登录页最初默认跳转 `/admin`，但未登录用户访问公开页面被重定向到登录页时，goBack 应指向原页面而非 admin。修复为默认 `/`，通过 `?callbackUrl=` 参数控制跳转目标
+  - router.push 后 session 未刷新：`signIn` 后如果使用 `router.push`，客户端 session 状态可能未及时更新。改用 `window.location.href = callbackUrl` 触发全页刷新
+  - 评论频率限制跨翻译版本：同一用户在中英文文章各发一条应视为同一条（60s cooldown）。通过 `originalId` 解析翻译组的根文章 ID 实现
+  - Github Dark/Light 主题双 CSS 变量引用冗余问题：已在阶段 5.6 提前修复

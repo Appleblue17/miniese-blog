@@ -11,15 +11,16 @@ import {
   User,
   Tag,
   GitCommit,
-  MessageSquare,
   Copyright,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { TableOfContents } from "@/components/article/TableOfContents";
 import { WikiPreview } from "@/components/wiki/WikiPreview";
+import { CommentSection } from "@/components/article/CommentSection";
 
 interface ArticleReaderProps {
+  articleId: string;
   title: string;
   author: string;
   publishedAt: string | null;
@@ -57,6 +58,7 @@ function estimateReadingTime(html: string, lang: string): string {
 }
 
 export function ArticleReader({
+  articleId,
   title,
   author,
   publishedAt,
@@ -190,20 +192,8 @@ export function ArticleReader({
               </div>
             )}
 
-            {/* Comments placeholder */}
-            <div className="flex items-start gap-3 rounded-lg border border-dashed border-muted-foreground/30 p-6">
-              <MessageSquare className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="font-medium text-muted-foreground">
-                  {lang === "zh" ? "评论区" : "Comments"}
-                </p>
-                <p className="text-muted-foreground/60 mt-1">
-                  {lang === "zh"
-                    ? "评论功能开发中，敬请期待。"
-                    : "Comments are under development. Stay tuned."}
-                </p>
-              </div>
-            </div>
+            {/* Comments section */}
+            <CommentSection articleId={articleId} lang={lang} />
           </footer>
         </article>
       </div>
