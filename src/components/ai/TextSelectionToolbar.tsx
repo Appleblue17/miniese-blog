@@ -103,8 +103,8 @@ export function TextSelectionToolbar({
     setSelectedText(text);
     setSelectedRange(range);
     setPosition({
-      top: rect.top + window.scrollY - 8,
-      left: rect.left + rect.width / 2 + window.scrollX,
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
     });
     setProposeDone(false);
     setError(null);
@@ -125,8 +125,8 @@ export function TextSelectionToolbar({
       const rect = selectedRange.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
       setPosition({
-        top: rect.top + window.scrollY - 8,
-        left: rect.left + rect.width / 2 + window.scrollX,
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
       });
     };
     window.addEventListener("scroll", handleScroll, true);
