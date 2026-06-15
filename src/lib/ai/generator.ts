@@ -57,10 +57,10 @@ export async function generateWikiEntry(
   // Use the provided prompt (from settings) with placeholder substitution.
   // customGeneratePrompt is always provided by the worker (loaded from settings).
   const combinedPrompt = (customGeneratePrompt || "")
-    .replace(/\{\{term\}\}/g, term)
-    .replace(/\{\{definitionHint\}\}/g, definitionHint || "none")
-    .replace(/\{\{context\}\}/g, context || "none")
-    .replace(/\{\{language\}\}/g, language);
+    .replace(/\{\{term\}\}/g, () => term)
+    .replace(/\{\{definitionHint\}\}/g, () => definitionHint || "none")
+    .replace(/\{\{context\}\}/g, () => context || "none")
+    .replace(/\{\{language\}\}/g, () => language);
 
   console.log(`[Generator] Generating wiki entry for term: "${term}"`);
 

@@ -98,8 +98,8 @@ async function processChunk(chunkContent: string, language: string, customPrompt
   // Use the provided prompt (from settings) with placeholder substitution.
   // customPrompt is always provided by the worker (loaded from settings).
   const combinedPrompt = (customPrompt || "")
-    .replace(/\{\{content\}\}/g, chunkContent)
-    .replace(/\{\{language\}\}/g, language === "en" ? "English" : "Chinese");
+    .replace(/\{\{content\}\}/g, () => chunkContent)
+    .replace(/\{\{language\}\}/g, () => language === "en" ? "English" : "Chinese");
 
   const response = await callDeepSeek({
     prompt: combinedPrompt,

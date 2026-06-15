@@ -116,11 +116,16 @@ function buildChunkPrompt(
     return lines.join("\n");
   }
 
+  // IMPORTANT: Use function replacers, not string replacements.
+  // String.prototype.replace interprets special patterns in the replacement
+  // string: $$ → $, $& → matched text, $` → text before match, etc.
+  // If the text contains "$$" (e.g., KaTeX block math $$...$$), a string
+  // replacer would corrupt it by converting $$ → $.
   let prompt = customPrompt;
-  prompt = prompt.replace(/\{\{sourceLang\}\}/g, sourceLang);
-  prompt = prompt.replace(/\{\{targetLang\}\}/g, targetLang);
-  prompt = prompt.replace(/\{\{context\}\}/g, contextText);
-  prompt = prompt.replace(/\{\{target\}\}/g, targetText);
+  prompt = prompt.replace(/\{\{sourceLang\}\}/g, () => sourceLang);
+  prompt = prompt.replace(/\{\{targetLang\}\}/g, () => targetLang);
+  prompt = prompt.replace(/\{\{context\}\}/g, () => contextText);
+  prompt = prompt.replace(/\{\{target\}\}/g, () => targetText);
   return prompt;
 }
 
