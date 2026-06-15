@@ -347,8 +347,47 @@
 
 .markdown-body img {
   border-style: none;
-  max-width: 100%;
+  max-width: min(100%, var(--image-max-width, 800px));
   box-sizing: content-box;
+
+  /* Center images */
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+
+  /* Rounded corners + subtle shadow */
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .markdown-body img {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  }
+}
+
+[data-theme="dark"] .markdown-body img {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Constrain width to the configured ratio of the article body, if set */
+.markdown-body img:not([align]) {
+  width: var(--image-width-ratio, auto);
+}
+
+/* Left/right aligned images should not be forced to ratio */
+.markdown-body img[align="left"],
+.markdown-body img[align="right"] {
+  width: auto;
+}
+
+.markdown-body img.lightbox-trigger {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.markdown-body img.lightbox-trigger:hover {
+  opacity: 0.75;
 }
 
 .markdown-body code,

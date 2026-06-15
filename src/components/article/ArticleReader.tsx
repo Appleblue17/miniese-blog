@@ -92,8 +92,20 @@ export function ArticleReader({
   } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const langRef = useRef(lang);
+  const [captionIgnoreList, setCaptionIgnoreList] = useState<string[]>([]);
   // Keep langRef in sync with the latest lang prop
   langRef.current = lang;
+
+  // Load caption ignore list from settings
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const list = data?.appearance?.image?.captionIgnoreList;
+        if (Array.isArray(list)) setCaptionIgnoreList(list);
+      })
+      .catch(() => {});
+  }, []);
 
   // When lang changes, re-process failed images to update placeholder text
   useEffect(() => {
@@ -206,6 +218,9 @@ export function ArticleReader({
       if (!img.hasAttribute("loading")) {
         img.setAttribute("loading", "lazy");
       }
+
+      // Interactive cursor and dimming on hover
+      img.classList.add("lightbox-trigger");
 
       // Add error handler for image loading failures
       const errorHandler = async function onImgError() {
@@ -517,6 +532,9 @@ export function ArticleReader({
           onNext={handleLightboxNext}
           hasPrev={lightboxImage.index > 0}
           hasNext={lightboxImage.index < lightboxImage.images.length - 1}
+          currentIndex={lightboxImage.index}
+          totalImages={lightboxImage.images.length}
+          captionIgnoreList={captionIgnoreList}
         />
       )}
 

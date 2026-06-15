@@ -53,6 +53,12 @@ export function SettingsApplier() {
 interface AppearanceSettings {
   themeMode: string;
   bodyWidth: number;
+  image?: {
+    maxWidth?: number;
+    maxHeight?: number;
+    defaultWidthRatio?: number;
+    lightboxEnabled?: boolean;
+  };
   primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   backgroundImage: string;
@@ -93,6 +99,11 @@ function applySettings(a: AppearanceSettings, resolvedTheme: string) {
   root.style.setProperty("--accent-light-dark", `${accentDark}%`);
   root.style.setProperty("--accent-light-lightest", `${accentLightest}%`);
   root.style.setProperty("--body-width", `${a.bodyWidth}rem`);
+
+  // Image settings
+  const img = a.image ?? {};
+  root.style.setProperty("--image-max-width", `${img.maxWidth ?? 800}px`);
+  root.style.setProperty("--image-width-ratio", `${img.defaultWidthRatio ?? 60}%`);
 
   const textColor = isDark ? (a.markdownTextColorDark ?? "#f0f6fc") : (a.markdownTextColorLight ?? "#1f2328");
   root.style.setProperty("--markdown-text-color", textColor);

@@ -9,17 +9,20 @@
     "wikiPerPage": 20
   },
   "publish": {
-    "defaultAuthor": "博主"
+    "defaultAuthor": "Appleblue17"
   },
   "appearance": {
     "themeMode": "system",
-    "bodyWidth": 66,
+    "bodyWidth": 80,
     "image": {
       "maxWidth": 800,
       "maxHeight": 600,
-      "defaultWidthRatio": 60,
+      "defaultWidthRatio": 55,
       "lightboxEnabled": true,
-      "captionIgnoreList": []
+      "captionIgnoreList": [
+        "alt text",
+        "alt"
+      ]
     },
     "primary": {
       "lightHue": 200,
@@ -39,17 +42,17 @@
     },
     "backgroundImage": "",
     "backgroundOpacity": 10,
-    "markdownBgOpacity": 80,
+    "markdownBgOpacity": 60,
     "markdownTextColorLight": "#1f2328",
     "markdownTextColorDark": "#f0f6fc",
-    "markdownBgColorLight": "#ffffff",
+    "markdownBgColorLight": "#e3e8ed",
     "markdownBgColorDark": "#0d1117"
   },
   "features": {
     "aiReview": true,
     "autoTranslate": true,
-    "wikiDiscovery": true,
-    "wikiGenerate": true,
+    "wikiDiscovery": false,
+    "wikiGenerate": false,
     "comments": true,
     "rss": true,
     "devMode": false,
@@ -60,18 +63,22 @@
     "email": true,
     "adminEmail": "",
     "onComment": true,
-    "onDiscovery": true,
+    "onDiscovery": false,
     "onTranslate": true
   },
   "compilers": {
     "markdown": {
       "name": "Markdown",
-      "extensions": [".md"],
+      "extensions": [
+        ".md"
+      ],
       "enabled": true
     },
     "notesaw": {
       "name": "Notesaw",
-      "extensions": [".md"],
+      "extensions": [
+        ".md"
+      ],
       "enabled": true
     }
   },

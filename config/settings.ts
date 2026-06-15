@@ -29,6 +29,7 @@ export interface AppSettings {
       maxHeight: number;
       defaultWidthRatio: number;
       lightboxEnabled: boolean;
+      captionIgnoreList: string[];
     };
     primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };

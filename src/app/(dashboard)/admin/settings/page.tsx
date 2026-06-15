@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -41,7 +41,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog" },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
   appearance: {
-    themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true },
+    themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     backgroundImage: "", backgroundOpacity: 10, markdownBgOpacity: 80,
@@ -295,6 +295,11 @@ export default function SettingsPage() {
 
     // Sync markdown bg opacity
     document.documentElement.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
+
+    // Sync image settings
+    const img = a.image ?? {};
+    document.documentElement.style.setProperty("--image-max-width", `${img.maxWidth ?? 800}px`);
+    document.documentElement.style.setProperty("--image-width-ratio", `${img.defaultWidthRatio ?? 60}%`);
   }, [local?.appearance]);
 
   const updateLocal = useCallback(
@@ -955,6 +960,24 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">Caption 忽略列表</label>
+                <p className="text-xs text-muted-foreground mb-2">当图片的 alt 文本匹配列表中的内容时，灯箱中不显示 caption。每行一个，精确匹配。</p>
+                <div className="flex items-start gap-2">
+                  <CaptionIgnoreTextarea
+                    initial={(a.image?.captionIgnoreList ?? []).join("\n")}
+                    onChange={(text) => {
+                      const list = text.split("\n").map((s) => s.trimEnd());
+                      updateLocal("appearance", "image", { ...a.image, captionIgnoreList: list });
+                    }}
+                  />
+                  <ResetButton
+                    isDefault={JSON.stringify(a.image?.captionIgnoreList ?? []) === JSON.stringify(DEFAULT_SETTINGS.appearance.image.captionIgnoreList)}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, captionIgnoreList: DEFAULT_SETTINGS.appearance.image.captionIgnoreList })}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Preview */}
@@ -1385,5 +1408,41 @@ export default function SettingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * A textarea for caption ignore list that uses its own state instead of being
+ * a fully controlled component, so newlines and spaces work naturally.
+ */
+function CaptionIgnoreTextarea({
+  initial,
+  onChange,
+}: {
+  initial: string;
+  onChange: (text: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const ref = useRef(initial);
+  // Sync when initial changes from outside (e.g. reset)
+  if (initial !== ref.current) {
+    ref.current = initial;
+    // Only update if user hasn't edited
+    if (value === ref.current) {
+      setValue(initial);
+    }
+  }
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => {
+        const text = e.target.value;
+        setValue(text);
+        onChange(text);
+      }}
+      rows={3}
+      placeholder={"alt text"}
+      className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y"
+    />
   );
 }

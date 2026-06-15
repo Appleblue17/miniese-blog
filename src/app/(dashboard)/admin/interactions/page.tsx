@@ -414,7 +414,7 @@ function UsersTab() {
                     ) : (
                       <Shield className="size-3 mr-1" />
                     )}
-                    {isAdmin ? "取消管理" : "设为主理人"}
+                    {isAdmin ? "取消管理" : "设为管理员"}
                   </Button>
                 </td>
               </tr>
