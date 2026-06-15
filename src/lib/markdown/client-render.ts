@@ -29,11 +29,21 @@ function createProcessor() {
 /**
  * Renders Markdown string to HTML string in the browser.
  * Uses a lazy singleton processor for efficiency.
+ *
+ * Supports both standard $...$ / $$...$$ and LaTeX-style \(...\) / \[...\]
+ * math delimiters by normalizing the latter to the former.
  */
 export async function renderChatMarkdown(markdown: string): Promise<string> {
   if (!processor) {
     processor = createProcessor();
   }
-  const result = await processor.process(markdown);
+
+  // Normalize \(...\) to $...$ and \[...\] to $$...$$
+  // Must replace \[ before \( to avoid partial matches
+  const normalized = markdown
+    .replace(/\\\[([\s\S]*?)\\\]/g, "$$\n$1\n$$")
+    .replace(/\\\(([\s\S]*?)\\\)/g, "$$$1$");
+
+  const result = await processor.process(normalized);
   return String(result);
 }
