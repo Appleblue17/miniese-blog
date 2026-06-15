@@ -17,7 +17,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { readFile } from "fs/promises";
+import path from "path";
 import { prisma } from "@/lib/db";
+import { renderMarkdown } from "@/lib/markdown/renderer";
+import { detectWikiLinks } from "@/lib/markdown/linkDetector";
+import { parseFrontmatter } from "@/lib/articles/frontmatter";
+import type { ContentType } from "@/lib/markdown/renderer";
 
 /**
  * Rewrites relative image src paths in rendered HTML to absolute API paths.
@@ -98,10 +104,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
+    // Check if renderedContent has heading IDs (rehype-slug), and re-render if missing
+    let content = article.renderedContent;
+    if (content && !/<h[1-3][^>]*\bid\s*=/.test(content)) {
+      try {
+        const filePath = path.join(process.cwd(), article.contentPath);
+        const rawContent = await readFile(filePath, "utf-8");
+        const { content: mdBody } = parseFrontmatter(rawContent);
+        const pipeline: ContentType = article.contentType || "markdown";
+        const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
+        content = await renderMarkdown(linkedContent, pipeline);
+
+        // Persist the re-rendered content so subsequent requests don't re-render
+        await prisma.article.update({
+          where: { id: article.id },
+          data: { renderedContent: content },
+        });
+      } catch {
+        // If re-rendering fails, fall back to the original renderedContent
+        console.warn(`[rehype-slug] Failed to re-render article ${article.id}, using cached.`);
+      }
+    }
+
     // Rewrite relative image paths to absolute API paths
-    const html = article.renderedContent
-      ? rewriteImagePaths(article.renderedContent, article.id)
-      : "";
+    const html = content ? rewriteImagePaths(content, article.id) : "";
 
     return NextResponse.json({
       article: {
