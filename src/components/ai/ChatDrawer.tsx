@@ -267,7 +267,10 @@ export function ChatDrawer({
     }
   };
 
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   const handleClear = () => {
+    setShowClearConfirm(false);
     setMessages([]);
     setRenderedHtml({});
     setInput("");
@@ -328,10 +331,10 @@ export function ChatDrawer({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleClear}
+                onClick={() => setShowClearConfirm(true)}
                 className="text-xs text-muted-foreground"
               >
-                {t("清空", "Clear")}
+                {t("清空历史/记忆", "Clear History/Memory")}
               </Button>
             )}
             <Button
@@ -447,9 +450,9 @@ export function ChatDrawer({
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed break-words ${
+                    className={`max-w-[80%] rounded-xl px-3 text-sm leading-relaxed break-words ${
                       msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground py-2"
                         : "bg-muted prose prose-sm dark:prose-invert max-w-none"
                     }`}
                   >
@@ -480,6 +483,33 @@ export function ChatDrawer({
             </div>
           )}
         </div>
+
+        {/* Clear confirmation */}
+        {showClearConfirm && (
+          <div className="mx-4 mb-2 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-lg">
+            <span className="text-muted-foreground">
+              {t("确定清空所有对话历史？此操作将让 Miniese 忘记本次对话，且不可撤销。", "Clear all conversation history? This will make Miniese forget this conversation, and it cannot be undone.")}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowClearConfirm(false)}
+                className="text-xs h-7"
+              >
+                {t("取消", "Cancel")}
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleClear}
+                className="text-xs h-7"
+              >
+                {t("清空", "Clear")}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
