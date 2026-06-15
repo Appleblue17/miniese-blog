@@ -6,14 +6,14 @@ import { renderMarkdown } from "./renderer";
 // ============================================================================
 
 describe("renderMarkdown (standard markdown)", () => {
-  it("renders an h1 heading", async () => {
+  it("renders an h1 heading with id", async () => {
     const html = await renderMarkdown("# Hello", "markdown");
-    expect(html).toContain("<h1>Hello</h1>");
+    expect(html).toContain("<h1 id=\"hello\">Hello</h1>");
   });
 
-  it("renders an h2 heading", async () => {
+  it("renders an h2 heading with id", async () => {
     const html = await renderMarkdown("## Subtitle", "markdown");
-    expect(html).toContain("<h2>Subtitle</h2>");
+    expect(html).toContain("<h2 id=\"subtitle\">Subtitle</h2>");
   });
 
   it("renders bold text", async () => {
@@ -200,7 +200,7 @@ describe("renderMarkdown (Notesaw)", () => {
 
   it("renders standard markdown inside Notesaw mode", async () => {
     const html = await renderMarkdown("# Title\n\nJust a paragraph.", "notesaw");
-    expect(html).toContain("<h1>Title</h1>");
+    expect(html).toContain("<h1 id=\"title\">Title</h1>");
     expect(html).toContain("<p>Just a paragraph.</p>");
   });
 

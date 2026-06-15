@@ -20,6 +20,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkRehype from "remark-rehype";
 import rehypeKatex from "rehype-katex";
+import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 
 import noteParsePlugin, { noteBoxParsePlugin } from "../../../packages/notesaw/parser";
@@ -65,7 +66,7 @@ export async function renderMarkdown(content: string, contentType: ContentType):
  * Standard Markdown rendering pipeline.
  *
  * Uses: remark-parse → remark-gfm → remark-math → remark-rehype →
- * rehype-katex → rehype-stringify
+ * rehype-slug → rehype-katex → rehype-stringify
  */
 async function renderStandardMarkdown(content: string): Promise<string> {
   const result = await unified()
@@ -73,6 +74,7 @@ async function renderStandardMarkdown(content: string): Promise<string> {
     .use(remarkGfm)
     .use(remarkMath)
     .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeSlug)
     .use(rehypeKatex)
     .use(rehypeStringify, { allowDangerousHtml: true })
     .process(content);
@@ -84,7 +86,7 @@ async function renderStandardMarkdown(content: string): Promise<string> {
  * Notesaw rendering pipeline.
  *
  * Uses: noteParsePlugin → noteBoxParsePlugin → remark-rehype →
- * rehype-katex → noteTransformPlugin → rehype-stringify
+ * rehype-slug → rehype-katex → noteTransformPlugin → rehype-stringify
  *
  * The custom noteParsePlugin is a drop-in replacement for remark-parse that
  * additionally understands Notesaw block syntax (@label { ... }).
@@ -94,6 +96,7 @@ async function renderNotesaw(content: string): Promise<string> {
     .use(noteParsePlugin)
     .use(noteBoxParsePlugin)
     .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeSlug)
     .use(rehypeKatex)
     .use(noteTransformPlugin)
     .use(rehypeStringify, { allowDangerousHtml: true })

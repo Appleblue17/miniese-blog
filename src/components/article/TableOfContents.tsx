@@ -2,11 +2,14 @@
  * @file TableOfContents - Extracts headings from rendered HTML and displays a side navigation.
  *
  * Features:
- * - Parse h1/h2/h3 from HTML string to generate TOC, decode HTML entities
+ * - Parse h1/h2/h3 (with existing `id` attribute from rehype-slug) from HTML string
  * - Click to smooth-scroll to the corresponding heading
  * - Highlight the currently visible section on scroll
  * - Auto-scroll TOC to keep active item visible
  * - Visual hierarchy via indent, font size, weight, and color
+ *
+ * Note: Heading IDs are generated server-side by rehype-slug in the markdown
+ * renderer pipeline. This component uses those IDs directly.
  */
 
 "use client";
@@ -21,6 +24,7 @@ interface TocItem {
 
 interface TableOfContentsProps {
   html: string;
+  lang?: string;
 }
 
 /**
@@ -38,49 +42,39 @@ function decodeHtmlEntities(text: string): string {
 }
 
 /**
- * Generate a stable anchor ID from heading text.
- * Uses a running counter to avoid duplicates.
- */
-function generateId(text: string, seen: Map<string, number>): string {
-  const base = text
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^\w\u4e00-\u9fff-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  const key = base || "heading";
-  const count = seen.get(key) || 0;
-  seen.set(key, count + 1);
-  return count === 0 ? key : `${key}-${count}`;
-}
-
-/**
- * Parse h1/h2/h3 tags from HTML and extract heading text + generate anchor IDs.
+ * Parse h1/h2/h3 tags from HTML and extract heading text + anchor IDs.
+ *
+ * Headings are expected to have an `id` attribute (added by rehype-slug during
+ * server-side rendering). If the id is missing, the heading is skipped.
  */
 function parseHeadings(html: string): TocItem[] {
   const items: TocItem[] = [];
-  const headingRegex = /<h([1-3])(?:\s[^>]*)?>(.*?)<\/h\1>/gi;
-  const seenIds = new Map<string, number>();
+  const headingRegex = /<h([1-3])(\s[^>]*)?>(.*?)<\/h\1>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = headingRegex.exec(html)) !== null) {
     const level = parseInt(match[1], 10);
-    const rawText = match[2];
+    const attrs = match[2] || "";
+    const rawText = match[3];
+
+    // Extract id from attributes
+    const idMatch = attrs.match(/\bid\s*=\s*"([^"]*)"/i);
+    if (!idMatch) continue; // skip headings without an id
+
+    const id = idMatch[1];
+    if (!id) continue;
+
     // Strip inner HTML tags and decode entities
     const text = decodeHtmlEntities(rawText.replace(/<[^>]*>/g, "").trim());
     if (!text) continue;
 
-    items.push({
-      id: generateId(text, seenIds),
-      text,
-      level,
-    });
+    items.push({ id, text, level });
   }
 
   return items;
 }
 
-export function TableOfContents({ html }: TableOfContentsProps) {
+export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
   const [headings, setHeadings] = useState<TocItem[]>([]);
@@ -88,45 +82,32 @@ export function TableOfContents({ html }: TableOfContentsProps) {
   const activeBtnRef = useRef<HTMLButtonElement | null>(null);
   const isScrollingRef = useRef(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const headingElsRef = useRef<HTMLElement[]>([]);
+  const activeIdRef = useRef(activeId);
 
-  // Parse headings and inject IDs
+  const t = (zh: string, en: string) => (lang === "zh" ? zh : en);
+
+  // Keep ref in sync
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+
+  // Parse headings from HTML (runs once on mount and when html changes)
   useEffect(() => {
     const parsed = parseHeadings(html);
     setHeadings(parsed);
-
-    if (parsed.length === 0) return;
-
-    const article = document.querySelector("article");
-    if (!article) return;
-
-    // Scan all h1-h3 elements in order and assign IDs sequentially
-    const allHeadings = article.querySelectorAll("h1, h2, h3");
-    let headingIdx = 0;
-
-    allHeadings.forEach((el) => {
-      if (headingIdx >= parsed.length) return;
-      const expected = parsed[headingIdx];
-      const elText = decodeHtmlEntities((el.textContent || "").trim());
-      if (elText === expected.text) {
-        el.id = expected.id;
-        headingIdx++;
-      }
-    });
-
-    // Collect heading elements for scroll-based active tracking
-    headingElsRef.current = parsed
-      .map((h) => document.getElementById(h.id))
-      .filter(Boolean) as HTMLElement[];
   }, [html]);
 
   // Scroll-based active heading tracking
+  // Uses only refs for activeId to avoid rebinding scroll listener on every change
   useEffect(() => {
-    const headingEls = headingElsRef.current;
-    if (headingEls.length === 0) return;
-
     function updateActiveHeading() {
       if (isScrollingRef.current) return;
+
+      const article = document.querySelector("article");
+      if (!article) return;
+
+      const headingEls = Array.from(article.querySelectorAll<HTMLElement>("h1[id], h2[id], h3[id]"));
+      if (headingEls.length === 0) return;
 
       const scrollTop = window.scrollY;
       const offset = 100; // navbar offset
@@ -141,8 +122,9 @@ export function TableOfContents({ html }: TableOfContentsProps) {
         }
       }
 
-      if (current && current.id !== activeId) {
-        setActiveId(current.id);
+      const currentId = current?.id || "";
+      if (currentId && currentId !== activeIdRef.current) {
+        setActiveId(currentId);
       }
     }
 
@@ -165,7 +147,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
     return () => {
       window.removeEventListener("scroll", onScroll);
     };
-  }, [activeId]);
+  }, []);
 
   // Auto-scroll TOC to keep active button visible
   useEffect(() => {
@@ -230,7 +212,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
         className="hidden xl:block sticky top-24 w-56 shrink-0 max-h-[calc(100vh-8rem)] overflow-y-auto"
       >
         <h4 className="text-xs font-semibold mb-3 text-muted-foreground uppercase tracking-wider">
-          Table of Contents
+          {t("目录", "Contents")}
         </h4>
         <ul className="space-y-0.5">
           {headings.map((item) => (
@@ -260,12 +242,12 @@ export function TableOfContents({ html }: TableOfContentsProps) {
         </ul>
       </nav>
 
-      {/* Mobile: collapsible TOC button */}
-      <div className="xl:hidden fixed bottom-20 right-4 z-50">
+      {/* Mobile: collapsible TOC button — bottom-left to avoid Chat button overlap */}
+      <div className="xl:hidden fixed bottom-6 left-6 z-50">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm text-primary-foreground shadow-lg min-h-[44px]"
+          className="flex items-center justify-center gap-2 rounded-full border border-border bg-background/80 backdrop-blur-sm px-4 py-3 text-sm text-foreground shadow-lg min-h-[44px] hover:bg-accent transition-colors"
         >
           <svg
             className="size-4"
@@ -276,7 +258,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
           </svg>
-          Contents
+          {t("目录", "Contents")}
         </button>
       </div>
 
@@ -287,7 +269,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
           <div className="relative w-full max-h-[60vh] overflow-y-auto rounded-t-2xl bg-background p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Table of Contents
+                {t("目录", "Contents")}
               </h4>
               <button
                 type="button"
