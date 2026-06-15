@@ -5,8 +5,6 @@
  */
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { readFile } from "fs/promises";
 import path from "path";
 import matter from "gray-matter";
@@ -107,14 +105,6 @@ export default async function EditDraftPage({ params }: Props) {
 
   return (
     <div className="py-8">
-      <div className="mb-6 px-4">
-        <Link
-          href="/admin/articles"
-          className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
-          <ArrowLeft className="size-5" />
-        </Link>
-      </div>
       <PublishForm
         draftId={draft.id}
         publishedId={draft.draftOfId || undefined}

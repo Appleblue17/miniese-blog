@@ -3,9 +3,11 @@
  *
  * Serves an image file from an article's images/ directory.
  * Checks access permissions:
- *   - Published articles: checks article.accessGroup + article.defaultImageAccessGroup
- *   - Published articles with image-specific overrides: checks ArticleImageOverride
- *   - Draft articles: only accessible to admin (no public access)
+ *   - Draft articles: only accessible to admin
+ *   - Published articles:
+ *     1. Image-specific override (ArticleImageOverride) if exists
+ *     2. Otherwise falls back to article's defaultImageAccessGroup
+ *     3. If both are empty → public access
  *
  * Returns the raw image file with appropriate Content-Type.
  *
@@ -50,7 +52,7 @@ export async function GET(
       select: {
         contentPath: true,
         status: true,
-        accessGroup: true,
+        defaultImageAccessGroup: true,
       },
     });
 
@@ -60,7 +62,7 @@ export async function GET(
 
     // Check access control
     if (article.status === "draft") {
-      // Draft articles: only accessible to admin (identified by NextAuth session)
+      // Draft articles: only accessible to admin
       const session = await auth();
       const isAdmin = session?.user?.roles?.includes("admin") ?? false;
       if (!isAdmin) {
@@ -69,22 +71,35 @@ export async function GET(
         });
       }
     } else if (article.status === "published") {
-      // Published articles: check access restrictions
-      const articleGroups = article.accessGroup || [];
-
-      // Check if there's an image-specific override
+      // Determine effective access group for this image:
+      // 1. Image-specific override if exists
+      // 2. Otherwise use article's defaultImageAccessGroup
       const override = await prisma.articleImageOverride.findUnique({
         where: { articleId_filename: { articleId, filename: safeFilename } },
       });
 
       const effectiveGroups = override
         ? override.accessGroup
-        : articleGroups;
+        : article.defaultImageAccessGroup || [];
 
-      // If there are restriction groups, check for a valid access token
-      if (effectiveGroups.length > 0) {
-        const accessToken = request.nextUrl.searchParams.get("token");
-        if (!accessToken) {
+      // If access is restricted (non-public), check user session
+      if (effectiveGroups.length > 0 && !effectiveGroups.includes("public")) {
+        const session = await auth();
+
+        // Admin can always access
+        const isAdmin = session?.user?.roles?.includes("admin") ?? false;
+        if (isAdmin) {
+          // fall through — allow
+        } else if (effectiveGroups.includes("school")) {
+          // School-restricted: require user with "school" role
+          const hasSchoolAccess = session?.user?.roles?.includes("school") ?? false;
+          if (!hasSchoolAccess) {
+            return new NextResponse("This image is restricted to school users.", {
+              status: 403,
+            });
+          }
+        } else {
+          // Other unknown groups — deny
           return new NextResponse("This image requires access authorization.", {
             status: 403,
           });

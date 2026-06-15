@@ -3,8 +3,9 @@
  *
  * Image management API for articles.
  *
- * GET  /api/articles/images/[id] — List images in the article's images/ directory
- * POST /api/articles/images/[id] — Upload an image file
+ * GET    /api/articles/images/[id] — List images + defaultAccessGroup + per-image overrides
+ * POST   /api/articles/images/[id] — Upload an image file
+ * PATCH  /api/articles/images/[id] — Update image access override or article defaultAccessGroup
  * DELETE /api/articles/images/[id]?filename=xxx — Delete an image
  *
  * Authentication: Requires admin password (via session or header)
@@ -37,6 +38,10 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 /**
  * GET — List images in the article's images/ directory.
+ *
+ * Returns image metadata along with access permission info:
+ *   - defaultAccessGroup: the article's default image access group
+ *   - overrides: map of filename -> image-specific access group override
  */
 export async function GET(
   request: NextRequest,
@@ -47,11 +52,24 @@ export async function GET(
 
     const article = await prisma.article.findUnique({
       where: { id },
-      select: { contentPath: true },
+      select: {
+        contentPath: true,
+        defaultImageAccessGroup: true,
+      },
     });
 
     if (!article) {
       return NextResponse.json({ error: "Article not found." }, { status: 404 });
+    }
+
+    // Fetch per-image access overrides
+    const overrides = await prisma.articleImageOverride.findMany({
+      where: { articleId: id },
+      select: { filename: true, accessGroup: true },
+    });
+    const overrideMap: Record<string, string[]> = {};
+    for (const ov of overrides) {
+      overrideMap[ov.filename] = ov.accessGroup;
     }
 
     const articleDir = path.dirname(path.join(process.cwd(), article.contentPath));
@@ -62,10 +80,10 @@ export async function GET(
       files = await readdir(imagesDir);
     } catch {
       // images/ directory does not exist yet
-      return NextResponse.json({ images: [] });
+      return NextResponse.json({ images: [], defaultAccessGroup: article.defaultImageAccessGroup || [] });
     }
 
-    // Filter to image files and get metadata
+    // Filter to image files and get metadata with access info
     const images = await Promise.all(
       files
         .filter((f) => {
@@ -80,14 +98,22 @@ export async function GET(
           } catch {
             // ignore
           }
-          return { filename, size };
+          return {
+            filename,
+            size,
+            // Use per-image override if present, otherwise inherit default
+            accessGroup: overrideMap[filename] ?? null,
+          };
         }),
     );
 
     // Sort by filename
     images.sort((a, b) => a.filename.localeCompare(b.filename));
 
-    return NextResponse.json({ images });
+    return NextResponse.json({
+      images,
+      defaultAccessGroup: article.defaultImageAccessGroup || [],
+    });
   } catch (error) {
     console.error("List images error:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
@@ -181,6 +207,88 @@ export async function POST(
     });
   } catch (error) {
     console.error("Upload image error:", error);
+    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH — Update access settings for the article or a single image.
+ *
+ * Two modes:
+ *   1. Per-image override: { filename: string, accessGroup: string[] }
+ *      Setting accessGroup to an empty array removes the override.
+ *   2. Default access group: { defaultImageAccessGroup: string[] }
+ *      Updates the article's default image access group.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { filename, accessGroup, defaultImageAccessGroup } = body;
+
+    // Validate that the article exists
+    const article = await prisma.article.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!article) {
+      return NextResponse.json({ error: "Article not found." }, { status: 404 });
+    }
+
+    // Mode 1: Update per-image access override
+    if (filename !== undefined) {
+      if (!filename) {
+        return NextResponse.json({ error: "filename is required." }, { status: 400 });
+      }
+
+      if (!Array.isArray(accessGroup)) {
+        return NextResponse.json({ error: "accessGroup must be an array of strings." }, { status: 400 });
+      }
+
+      const safeFilename = path.basename(filename);
+
+      if (accessGroup.length === 0) {
+        // Remove override — inherit default
+        try {
+          await prisma.articleImageOverride.delete({
+            where: { articleId_filename: { articleId: id, filename: safeFilename } },
+          });
+        } catch {
+          // Override may not exist — that's fine
+        }
+      } else {
+        // Upsert override
+        await prisma.articleImageOverride.upsert({
+          where: { articleId_filename: { articleId: id, filename: safeFilename } },
+          update: { accessGroup },
+          create: { articleId: id, filename: safeFilename, accessGroup },
+        });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Mode 2: Update article's default image access group
+    if (defaultImageAccessGroup !== undefined) {
+      if (!Array.isArray(defaultImageAccessGroup)) {
+        return NextResponse.json({ error: "defaultImageAccessGroup must be an array of strings." }, { status: 400 });
+      }
+
+      await prisma.article.update({
+        where: { id },
+        data: { defaultImageAccessGroup },
+      });
+
+      return NextResponse.json({ success: true, defaultImageAccessGroup });
+    }
+
+    return NextResponse.json({ error: "Provide either 'filename' or 'defaultImageAccessGroup'." }, { status: 400 });
+  } catch (error) {
+    console.error("Update access error:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

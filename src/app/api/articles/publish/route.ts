@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       draftOfId,
       fileContent: directContent,
       draftId,
+      defaultImageAccessGroup,
     } = body;
 
     // --- Validation ---
@@ -299,6 +300,7 @@ export async function POST(request: NextRequest) {
           tags: frontmatter.tags || [],
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
+          defaultImageAccessGroup: defaultImageAccessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
@@ -326,6 +328,7 @@ export async function POST(request: NextRequest) {
           tags: frontmatter.tags || [],
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
+          defaultImageAccessGroup: defaultImageAccessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
@@ -354,6 +357,7 @@ export async function POST(request: NextRequest) {
           tags: frontmatter.tags || [],
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
+          defaultImageAccessGroup: defaultImageAccessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
@@ -427,6 +431,7 @@ async function triggerAutoTranslate(params: {
         summary: true,
         author: true,
         accessGroup: true,
+        defaultImageAccessGroup: true,
         contentType: true,
       },
     });
@@ -456,6 +461,7 @@ async function triggerAutoTranslate(params: {
         tags: sourceArticle.tags || [],
         author: sourceArticle.author || "博主",
         accessGroup: sourceArticle.accessGroup || [],
+        defaultImageAccessGroup: sourceArticle.defaultImageAccessGroup || [],
         summary: sourceArticle.summary,
         contentType: sourceArticle.contentType || "markdown",
         isAITranslated: true,

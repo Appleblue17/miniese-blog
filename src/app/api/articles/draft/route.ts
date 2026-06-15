@@ -25,7 +25,7 @@ const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fileName: _fileName, fileContent, language, draftOfId, meta } = body;
+    const { fileName: _fileName, fileContent, language, draftOfId, draftId, meta } = body;
 
     if (!fileContent) {
       return NextResponse.json({ error: "fileContent is required." }, { status: 400 });
@@ -63,7 +63,50 @@ export async function POST(request: NextRequest) {
 
     let draft;
 
-    if (draftOfId) {
+    // If draftId is provided, update that existing draft directly
+    if (draftId) {
+      const existingDraft = await prisma.article.findUnique({
+        where: { id: draftId },
+      });
+
+      if (!existingDraft) {
+        return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+      }
+
+      // Clean up old draft directory if dir name changed
+      if (existingDraft.contentPath) {
+        const oldDirName = existingDraft.contentPath.split("/")[3];
+        if (oldDirName && oldDirName !== dirName) {
+          const oldDir = path.join(DRAFTS_DIR, oldDirName);
+          try {
+            await rm(oldDir, { recursive: true, force: true });
+          } catch {
+            // Old dir may not exist
+          }
+        }
+      }
+
+      // Ensure draft directory exists
+      const draftDir = path.join(DRAFTS_DIR, dirName);
+      await mkdir(draftDir, { recursive: true });
+      await mkdir(path.join(draftDir, "images"), { recursive: true });
+
+      const articleFilePath = path.join(draftDir, "article.md");
+      await writeFile(articleFilePath, finalContent, "utf-8");
+
+      draft = await prisma.article.update({
+        where: { id: draftId },
+        data: {
+          title,
+          contentPath: `content/articles/drafts/${dirName}/article.md`,
+          summary,
+          tags,
+          author,
+          language: resolvedLang,
+          status: "draft",
+        },
+      });
+    } else if (draftOfId) {
       // Check for existing draft for this published article
       const existingDraft = await prisma.article.findFirst({
         where: { draftOfId, status: { in: ["draft", "review"] } },

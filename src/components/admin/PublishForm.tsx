@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import matter from "gray-matter";
 import { FileUploader, type UploadResult } from "./FileUploader";
 import { ImageManager } from "./ImageManager";
+import { ImageValidationStatus } from "./ImageValidationStatus";
+import { generateSlug } from "@/lib/articles/frontmatter";
 import { computeDiff, type DiffLine } from "@/lib/diff";
 
 const FILE_TYPES = [
@@ -98,8 +100,28 @@ export function PublishForm({
   // UI state
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [published, setPublished] = useState<{ slug: string; url: string } | null>(null);
+
+  // Duplicate draft detection state
+  const [duplicateDraft, setDuplicateDraft] = useState<{
+    id: string;
+    title: string;
+    updatedAt: string;
+    slug: string;
+    fileName: string;
+    fileContent: string;
+    meta: {
+      title: string;
+      language: "zh" | "en";
+      fileType: "markdown" | "notesaw";
+      tags: string[];
+      author: string;
+      summary: string;
+    };
+  } | null>(null);
+  const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false);
 
   // Load default author from settings and apply initial values
   useEffect(() => {
@@ -185,24 +207,21 @@ export function PublishForm({
   } | null>(null);
 
   const handleUpload = useCallback(async (result: UploadResult) => {
-    setFileName(result.fileName);
-    setFileContent(result.fileContent);
+    setError(null);
 
-    // Language priority: frontmatter > filename pattern (.zh.md / .en.md) > empty
+    // Parse frontmatter to extract metadata for draft creation
     const inferLanguageFromFilename = (name: string): "zh" | "en" | "" => {
       const match = name.match(/\.(zh|en)\.md$/i);
       if (match) return match[1].toLowerCase() as "zh" | "en";
       return "";
     };
 
-    // Parse frontmatter using gray-matter (already done in FileUploader, but re-parse here for extra fields)
     let parsedTitle = "";
     let parsedLanguage: "zh" | "en" | "" = "";
     let parsedFileType: "markdown" | "notesaw" = "markdown";
     let parsedAuthor = "";
     let parsedTags: string[] = [];
     let parsedSummary = "";
-    let extra: Record<string, unknown> = {};
 
     try {
       const parsed = matter(result.fileContent);
@@ -214,86 +233,137 @@ export function PublishForm({
         inferLanguageFromFilename(result.fileName) || ""
       ) as "zh" | "en" | "";
       parsedTitle = (data.title as string) || result.title;
-      parsedAuthor = (data.author as string) || result.author || meta.author;
+      parsedAuthor = (data.author as string) || result.author || "博主";
       parsedTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
       parsedSummary = (data.summary as string) || result.summary;
       parsedFileType = (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw";
-
-      // Collect extra frontmatter
-      const managedKeys = new Set([
-        "title",
-        "language",
-        "fileType",
-        "contentType",
-        "tags",
-        "author",
-        "summary",
-        "slug",
-        "accessGroup",
-        "changelog",
-      ]);
-      for (const [key, value] of Object.entries(data)) {
-        if (!managedKeys.has(key)) {
-          extra[key] = value;
-        }
-      }
     } catch {
       parsedTitle = result.title || "";
       parsedLanguage = (result.language === "en" || result.language === "zh" ? result.language : "") as "zh" | "en" | "";
-      parsedAuthor = result.author || meta.author;
+      parsedAuthor = result.author || "博主";
       parsedTags = result.tags;
       parsedSummary = result.summary || "";
     }
 
-    setMeta({
-      title: parsedTitle,
-      language: parsedLanguage,
+    if (!parsedLanguage) {
+      setError("无法确定语言，请在文件名中使用 .zh.md 或 .en.md 后缀。");
+      return;
+    }
+
+    const title = parsedTitle || "未命名文章";
+    const slug = generateSlug(title);
+
+    // Check for duplicate drafts
+    setDuplicateCheckInProgress(true);
+    try {
+      const checkRes = await fetch(
+        `/api/articles/draft/check-duplicate?slug=${encodeURIComponent(slug)}`,
+      );
+      const checkData = await checkRes.json();
+
+      if (checkData.exists) {
+        // Show confirmation dialog
+        setDuplicateDraft({
+          id: checkData.draft.id,
+          title: checkData.draft.title,
+          updatedAt: checkData.draft.updatedAt,
+          slug,
+          fileName: result.fileName,
+          fileContent: result.fileContent,
+          meta: {
+            title,
+            language: parsedLanguage as "zh" | "en",
+            fileType: parsedFileType,
+            tags: parsedTags,
+            author: parsedAuthor,
+            summary: parsedSummary,
+          },
+        });
+        setDuplicateCheckInProgress(false);
+        return;
+      }
+    } catch {
+      // If check fails, proceed anyway
+    }
+    setDuplicateCheckInProgress(false);
+
+    // No duplicate — create draft directly
+    await createDraftAndRedirect(result.fileName, result.fileContent, {
+      title,
+      language: parsedLanguage as "zh" | "en",
       fileType: parsedFileType,
       tags: parsedTags,
       author: parsedAuthor,
       summary: parsedSummary,
     });
-    setExtraFrontmatter(extra);
+  }, []);
 
-    setPreviewHtml(null);
-    setShowPreview(false);
-    setError(null);
-    setPublished(null);
-    // Reset review state — re-uploading a file should allow re-trigger
-    setReviewTaskId(null);
-    setReviewSubmitted(false);
-
-    // Auto-create draft if not already existing, so ImageManager is available immediately
-    // Use ref to check current draftId at the time of execution (avoid stale closures)
-    const currentDraftId = draftIdRef.current;
-    if (!existingDraftId && !currentDraftId && parsedTitle && parsedLanguage) {
-      try {
-        const res = await fetch("/api/articles/draft", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: result.fileName,
-            fileContent: result.fileContent,
-            meta: {
-              title: parsedTitle,
-              language: parsedLanguage,
-              fileType: parsedFileType,
-              tags: parsedTags,
-              author: parsedAuthor,
-              summary: parsedSummary,
-            },
-          }),
-        });
-        const data = await res.json();
-        if (res.ok && data.draft?.id) {
-          setDraftId(data.draft.id);
-        }
-      } catch {
-        // Silent fail — draft creation is optional for image management
-        // User can still manually save draft later
+  // Helper to create draft and redirect
+  const createDraftAndRedirect = async (
+    fileName: string,
+    fileContent: string,
+    meta: {
+      title: string;
+      language: "zh" | "en";
+      fileType: "markdown" | "notesaw";
+      tags: string[];
+      author: string;
+      summary: string;
+    },
+  ) => {
+    try {
+      const res = await fetch("/api/articles/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName, fileContent, meta }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "创建草稿失败");
+        return;
       }
+
+      // Redirect to the draft editor
+      window.location.href = `/admin/articles/${data.draft.id}/edit`;
+    } catch {
+      setError("创建草稿请求失败");
     }
-  }, [meta.author, existingDraftId]);
+  };
+
+  // Handle confirmed overwrite of existing draft
+  const handleOverwriteDraft = useCallback(async () => {
+    if (!duplicateDraft) return;
+
+    setError(null);
+    try {
+      const res = await fetch("/api/articles/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: duplicateDraft.fileName,
+          fileContent: duplicateDraft.fileContent,
+          meta: duplicateDraft.meta,
+          draftId: duplicateDraft.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "覆盖草稿失败");
+        return;
+      }
+
+      setDuplicateDraft(null);
+      // Redirect to the draft editor
+      window.location.href = `/admin/articles/${data.draft.id}/edit`;
+    } catch {
+      setError("覆盖草稿请求失败");
+    }
+  }, [duplicateDraft]);
+
+  // Cancel duplicate overwrite
+  const handleCancelOverwrite = useCallback(() => {
+    setDuplicateDraft(null);
+  }, []);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!fileContent) return;
@@ -341,6 +411,7 @@ export function PublishForm({
           fileName,
           fileContent,
           meta: { ...currentMeta },
+          draftId: draftId || undefined,
           draftOfId: publishedId || null,
         }),
       });
@@ -351,8 +422,10 @@ export function PublishForm({
       }
       setDraftId(data.draft.id);
 
-      // Redirect to admin articles list with a success flag
-      window.location.href = "/admin/articles?draft_saved=1";
+      // Show success indicator briefly
+      setDraftSaved(true);
+      setError(null);
+      setTimeout(() => setDraftSaved(false), 2000);
     } catch {
       setError("保存草稿请求失败");
     } finally {
@@ -474,6 +547,20 @@ export function PublishForm({
     setPublishing(true);
     setError(null);
     try {
+      // Fetch defaultImageAccessGroup from the draft record if available
+      let defaultImageAccessGroup: string[] | undefined;
+      if (draftId) {
+        try {
+          const draftRes = await fetch(`/api/articles/images/${draftId}`);
+          if (draftRes.ok) {
+            const draftData = await draftRes.json();
+            defaultImageAccessGroup = draftData.defaultAccessGroup;
+          }
+        } catch {
+          // Non-fatal — proceed without
+        }
+      }
+
       const res = await fetch("/api/articles/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -484,6 +571,7 @@ export function PublishForm({
           draftOfId: publishedId || null,
           fileContent,
           ...(draftId ? { draftId } : {}),
+          defaultImageAccessGroup: defaultImageAccessGroup || [],
         }),
       });
       const data = await res.json();
@@ -696,93 +784,101 @@ export function PublishForm({
   // --- Step 1: Upload ---
   if (step === "upload") {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">发布文章</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            上传 Markdown 文件，编辑元信息，然后发布或保存为草稿
-          </p>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              window.location.href = "/admin/articles";
+            }}
+            className="size-9 shrink-0"
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">新建文章</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              上传 Markdown 文件，将自动创建草稿并进入编辑页面
+            </p>
+          </div>
         </div>
 
-        {/* File upload */}
-        <Card className="p-6">
-          <FileUploader onUpload={handleUpload} />
-        </Card>
+        {/* File upload (hidden when duplicate confirmation is shown) */}
+        {!duplicateDraft && (
+          <Card className="p-6">
+            <FileUploader onUpload={handleUpload} />
+          </Card>
+        )}
 
-        {fileContent && (
-          <>
-            {/* Metadata editor */}
-            <Card className="p-6">
-              <h3 className="text-sm font-medium mb-4">元信息</h3>
-              {renderMetaEditor()}
-            </Card>
+        {/* Duplicate check in progress */}
+        {duplicateCheckInProgress && (
+          <div className="flex items-center justify-center gap-2 rounded-lg bg-muted/30 p-6 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            正在检查是否有同名草稿...
+          </div>
+        )}
 
-            {/* Preview */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium">预览</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshPreview}
-                  disabled={previewLoading}
-                >
-                  {previewLoading ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      渲染中
-                    </>
-                  ) : (
-                    "刷新预览"
-                  )}
-                </Button>
+        {/* Duplicate draft confirmation dialog */}
+        {duplicateDraft && (
+          <Card className="p-6 border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="rounded-full bg-amber-100 dark:bg-amber-900/50 p-2 shrink-0">
+                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400" />
               </div>
-
-              {showPreview && previewHtml ? (
-                <div className="markdown-body rounded-lg border p-4">
-                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center rounded-lg border border-dashed p-12 text-sm text-muted-foreground">
-                  点击「刷新预览」查看渲染结果
-                </div>
-              )}
-            </Card>
-
-            {/* Image Manager (shown in upload step if draft already exists) */}
-            {draftId && (
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium">图片管理</h3>
-                </div>
-                <ImageManager articleId={draftId} isDraft={true} />
-              </Card>
-            )}
-
-            {/* Action buttons — only save as draft or go to confirm, no review here */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
-                {savingDraft ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                存为草稿
-              </Button>
-
-              <Button onClick={handleGoToConfirm} disabled={!fileContent}>
-                <Send className="size-4" />
-                下一步 · 确认发布
-              </Button>
+              <div>
+                <h3 className="font-medium text-amber-800 dark:text-amber-300">
+                  发现同名草稿
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  已存在与「{duplicateDraft.title}」同名的草稿，最后更新于{" "}
+                  {new Date(duplicateDraft.updatedAt).toLocaleString("zh-CN", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  。
+                </p>
+              </div>
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                <AlertCircle className="size-4 shrink-0" />
-                {error}
-              </div>
-            )}
-          </>
+            <div className="rounded-lg bg-muted/30 p-3 mb-4 text-sm space-y-1">
+              <p>
+                <span className="text-muted-foreground">已有草稿标题：</span>
+                <span className="font-medium">{duplicateDraft.title}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">上传文章标题：</span>
+                <span className="font-medium">{duplicateDraft.meta.title}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">语言：</span>
+                <span>{duplicateDraft.meta.language === "zh" ? "中文" : "English"}</span>
+              </p>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              覆盖将替换已有草稿的内容。要继续吗？
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={handleCancelOverwrite}>
+                取消，修改文章名
+              </Button>
+              <Button variant="default" onClick={handleOverwriteDraft}>
+                覆盖已有草稿
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {error}
+          </div>
         )}
       </div>
     );
@@ -792,20 +888,20 @@ export function PublishForm({
   if (step === "review") {
     return (
       <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
-              setError(null);
-              setStep("upload");
+              window.location.href = "/admin/articles";
             }}
+            className="size-9"
           >
-            <ArrowLeft className="size-4" />
+            <ArrowLeft className="size-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">编辑草稿</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               修改元信息，预览效果，然后提交审查或继续发布
             </p>
           </div>
@@ -830,18 +926,6 @@ export function PublishForm({
               >
                 <Download className="size-3.5" />
                 下载
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setError(null);
-                  setStep("upload");
-                }}
-                className="gap-1.5 text-xs"
-              >
-                <Upload className="size-3.5" />
-                重新上传
               </Button>
             </div>
           </div>
@@ -883,11 +967,12 @@ export function PublishForm({
           )}
         </Card>
 
-        {/* Image Manager */}
+        {/* Image Manager + Validation */}
         {draftId && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium">图片管理</h3>
+              <ImageValidationStatus articleId={draftId} content={fileContent} />
             </div>
             <ImageManager articleId={draftId} isDraft={true} />
           </Card>
@@ -906,8 +991,14 @@ export function PublishForm({
             ) : (
               <Save className="size-4" />
             )}
-            存为草稿
+            保存修改
           </Button>
+          {draftSaved && (
+            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400 sm:order-2">
+              <Check className="size-3" />
+              已保存
+            </span>
+          )}
           <Button
             variant="secondary"
             onClick={handleSubmitReview}
@@ -936,7 +1027,7 @@ export function PublishForm({
   // --- Step 3: Confirm ---
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
@@ -944,12 +1035,13 @@ export function PublishForm({
             setError(null);
             setStep("review");
           }}
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
+          className="size-9"
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">确认发布</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             查看元信息和变更内容，填写 changelog，确认后发布
           </p>
         </div>

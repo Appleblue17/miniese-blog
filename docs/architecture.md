@@ -4,7 +4,18 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-14
+**最后更新**：2026-06-15
+
+### v0.9.1 2026-06-15
+
+- §3 目录结构：补充 `src/app/api/articles/draft/check-duplicate/` API 路由
+- §3 目录结构：补充 `src/components/admin/ImageValidationStatus.tsx`
+- §3 目录结构：补充 `src/app/api/articles/images/[id]/verify/` API 路由
+- §11.5：补充 `GET /api/articles/draft/check-duplicate` API
+- §11.5：补充 `GET /api/articles/images/[id]/verify` API
+- §4.1：Article 模型补充说明——无 `createdAt` 字段，仅 `updatedAt`
+- §3.1 上传/发布流程：补充上传时检测重名草稿流程
+- §11.2：PublishForm 返回按钮统一说明——三个步骤顶部 `size-9` 按钮
 
 ### v0.9.0 2026-06-14
 
@@ -208,7 +219,10 @@ miniese-blog/
 │   │   │   │   ├── publish/    # POST 发布
 │   │   │   │   ├── render/     # POST 手动重新渲染（含 wiki 链接检测，支持 preserveUpdatedAt）
 │   │   │   │   ├── draft/      # POST 保存草稿
-│   │   │   │   ├── content/    # GET 获取文件内容
+│   │   │   │   ├── draft/check-duplicate/ # GET 检查草稿 slug 是否已存在
+│   │   │   │   ├── content/    # GET 获取文章文件内容
+│   │   │   │   ├── images/     # 图片管理
+│   │   │   │   │   └── [id]/verify/ # POST 验证图片引用
 │   │   │   │   ├── delete/     # POST 删除文章/草稿
 │   │   │   │   └── create-draft/ # POST 从已发布文章创建草稿
 │   │   │   ├── wiki/
@@ -260,6 +274,21 @@ miniese-blog/
 ├── next.config.js
 └── tsconfig.json
 ```
+
+### 3.1 上传/发布流程三步骤
+
+发布流程分为三步（上传页 → 草稿页 → 确认页），详见 §6.5.5。
+
+#### 重名草稿检测
+
+在步骤一（上传页）用户填写标题后，前端自动执行重名草稿检测：
+
+1. 解析标题 → 调用 `generateSlug()` 生成 slug
+2. 调用 `GET /api/articles/draft/check-duplicate?slug=xxx` 查询草稿目录中是否有同名草稿
+3. 如果检测到同名草稿：
+   - 显示确认对话框（黄色警告卡片），展示已有草稿标题、上传文章标题、语言、最后更新时间
+   - 提供两个选项：「取消，修改文章名」关闭对话框返回编辑；「覆盖已有草稿」传 `draftId` 覆盖内容后跳转编辑页
+4. 检测失败时（API 异常）静默放行，不阻塞上传流程
 
 ---
 
@@ -1370,6 +1399,7 @@ SITE_URL="https://..."
 | POST | `/api/articles/publish` | 发布文章 | 从 frontmatter 读 |
 | GET | `/api/articles` | 文章列表 | `?lang=zh` 必填 |
 | GET | `/api/articles/[slug]` | 文章详情 | `?lang=zh` 必填 |
+| GET | `/api/articles/draft/check-duplicate` | 检测草稿 slug 是否已存在 | `?slug=` 必填 |
 | PUT | `/api/articles/[slug]` | 更新文章（v2） | `?lang=zh` |
 | DELETE | `/api/articles/[slug]` | 删除文章（v2） | `?lang=zh` |
 
@@ -1521,6 +1551,8 @@ export const config = {
 | POST | `/api/articles/render` | 手动重新渲染文章（含 wiki 链接检测，可选 `preserveUpdatedAt`） |
 | POST | `/api/articles/delete` | 删除文章/草稿（删除记录 + 文件） |
 | POST | `/api/articles/create-draft` | 从已发布文章创建草稿（复制文件） |
+| GET | `/api/articles/draft/check-duplicate` | 检测草稿 slug 是否已存在 |
+| POST | `/api/articles/images/[id]/verify` | 验证图片引用 |
 | GET | `/api/admin/articles` | 管理员文章列表（已发布+草稿+新草稿） |
 | GET | `/api/admin/ai-tasks` | AI 任务列表 |
 | GET | `/api/admin/ai-tasks/[taskId]` | AI 任务详情 |

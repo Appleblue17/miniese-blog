@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
         tags: true,
         author: true,
         status: true,
+        defaultImageAccessGroup: true,
       },
     });
 
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         status: "draft",
         author: article.author,
         draftOfId: article.id,
+        defaultImageAccessGroup: article.defaultImageAccessGroup || [],
       },
     });
 

@@ -27,15 +27,21 @@ import {
   Loader2,
   AlertCircle,
   X,
-  FileImage,
   ExternalLink,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
+/** Access group option for the permission dropdown */
+const ACCESS_GROUP_OPTIONS = [
+  { value: "", label: "默认 (无)", group: "inherit" },
+  { value: "public", label: "无（公开）" },
+  { value: "school", label: "校内" },
+];
 
 interface ImageInfo {
   filename: string;
   size: number;
+  /** Per-image accessGroup override, or null if inheriting default */
+  accessGroup: string[] | null;
 }
 
 interface ImageManagerProps {
@@ -50,6 +56,9 @@ export function ImageManager({ articleId, isDraft = true }: ImageManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [defaultAccessGroup, setDefaultAccessGroup] = useState<string[]>([]);
+  const [savingAccessIndex, setSavingAccessIndex] = useState<number | null>(null);
+  const [savingDefault, setSavingDefault] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Load images on mount
@@ -68,6 +77,7 @@ export function ImageManager({ articleId, isDraft = true }: ImageManagerProps) {
       }
       const data = await res.json();
       setImages(data.images || []);
+      setDefaultAccessGroup(data.defaultAccessGroup || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load images");
     } finally {
@@ -160,6 +170,63 @@ export function ImageManager({ articleId, isDraft = true }: ImageManagerProps) {
     [articleId],
   );
 
+  /** Update access group for a single image. Empty/null = inherit default. */
+  const handleAccessChange = useCallback(
+    async (filename: string, newAccessGroup: string[], index: number) => {
+      setSavingAccessIndex(index);
+      setError(null);
+      try {
+        const res = await fetch(`/api/articles/images/${articleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename, accessGroup: newAccessGroup }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to update access");
+        }
+        // Update local state
+        setImages((prev) =>
+          prev.map((img, i) =>
+            i === index
+              ? { ...img, accessGroup: newAccessGroup.length > 0 ? newAccessGroup : null }
+              : img,
+          ),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update access");
+      } finally {
+        setSavingAccessIndex(null);
+      }
+    },
+    [articleId],
+  );
+
+  /** Update the article's default image access group. */
+  const handleDefaultAccessChange = useCallback(
+    async (newGroup: string[]) => {
+      setSavingDefault(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/articles/images/${articleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ defaultImageAccessGroup: newGroup }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to update default access");
+        }
+        setDefaultAccessGroup(newGroup);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update default access");
+      } finally {
+        setSavingDefault(false);
+      }
+    },
+    [articleId],
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -193,6 +260,22 @@ export function ImageManager({ articleId, isDraft = true }: ImageManagerProps) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  /** Compute the display label for an image's effective access group */
+  const getAccessLabel = (img: ImageInfo): string => {
+    const group = img.accessGroup ?? defaultAccessGroup;
+    if (group.length === 0 || group.includes("public")) return "无（公开）";
+    if (group.includes("school")) return "校内";
+    return group.join(", ");
+  };
+
+  /** Resolve the current access group value for the dropdown */
+  const getAccessValue = (img: ImageInfo): string => {
+    const group = img.accessGroup;
+    if (!group) return ""; // inherit
+    if (group.includes("school")) return "school";
+    return "public";
   };
 
   return (
@@ -279,73 +362,132 @@ export function ImageManager({ articleId, isDraft = true }: ImageManagerProps) {
             <p className="text-xs mt-1">上传图片后，可以复制 Markdown 引用到文章中</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {images.map((img, index) => {
-              const imageUrl = `/api/images/${articleId}/${encodeURIComponent(img.filename)}`;
-              return (
-                <div
-                  key={img.filename}
-                  className="group relative rounded-lg border border-border overflow-hidden bg-muted/20"
+          <>
+            {/* Default access group editor */}
+            {images.length > 0 && (
+              <div className="flex items-center gap-2 mb-3 rounded-lg border border-border bg-muted/10 px-3 py-2">
+                <span className="text-xs text-muted-foreground shrink-0">默认权限：</span>
+                <select
+                  value={defaultAccessGroup.includes("school") ? "school" : "public"}
+                  disabled={savingDefault}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleDefaultAccessChange(val === "school" ? ["school"] : []);
+                  }}
+                  className="text-xs rounded border border-border bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:opacity-50"
                 >
-                  {/* Thumbnail */}
-                  <div className="aspect-square flex items-center justify-center bg-muted/10 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageUrl}
-                      alt={img.filename}
-                      className="size-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
+                  <option value="public">无（公开）</option>
+                  <option value="school">校内</option>
+                </select>
+                {savingDefault && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  没有单独设置权限的图片将使用此默认值
+                </span>
+              </div>
+            )}
 
-                  {/* File info */}
-                  <div className="p-2">
-                    <p className="text-xs truncate" title={img.filename}>
-                      {img.filename}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatSize(img.size)}
-                    </p>
-                  </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {images.map((img, index) => {
+                const imageUrl = `/api/images/${articleId}/${encodeURIComponent(img.filename)}`;
+                const isOverridden = img.accessGroup !== null;
+                const currentVal = getAccessValue(img);
+                const isSaving = savingAccessIndex === index;
+                return (
+                  <div
+                    key={img.filename}
+                    className="relative rounded-lg border border-border overflow-hidden bg-muted/20"
+                  >
+                    {/* Thumbnail with hover actions */}
+                    <div className="group relative aspect-square flex items-center justify-center bg-muted/10 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt={img.filename}
+                        className="size-full object-cover"
+                        loading="lazy"
+                      />
 
-                  {/* Action overlay on hover */}
-                  <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyMarkdown(img.filename, index)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100 transition-colors shadow-sm"
-                      title="复制 Markdown 引用"
-                    >
-                      {copiedIndex === index ? (
-                        <Check className="size-3.5 text-green-600" />
-                      ) : (
-                        <Copy className="size-3.5" />
-                      )}
-                      {copiedIndex === index ? "已复制" : "引用"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => window.open(imageUrl, "_blank")}
-                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100 transition-colors shadow-sm"
-                      title="在新标签页中查看"
-                    >
-                      <ExternalLink className="size-3.5" />
-                      查看
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(img.filename)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-gray-100 transition-colors shadow-sm"
-                      title="删除图片"
-                    >
-                      <Trash2 className="size-3.5" />
-                      删除
-                    </button>
+                      {/* Hover action overlay (only on thumbnail area) */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMarkdown(img.filename, index)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100 transition-colors shadow-sm"
+                          title="复制 Markdown 引用"
+                        >
+                          {copiedIndex === index ? (
+                            <Check className="size-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                          {copiedIndex === index ? "已复制" : "引用"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.open(imageUrl, "_blank")}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100 transition-colors shadow-sm"
+                          title="在新标签页中查看"
+                        >
+                          <ExternalLink className="size-3.5" />
+                          查看
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(img.filename)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-gray-100 transition-colors shadow-sm"
+                          title="删除图片"
+                        >
+                          <Trash2 className="size-3.5" />
+                          删除
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* File info (always visible, no hover overlay covers this) */}
+                    <div className="p-2 space-y-1">
+                      <p className="text-xs truncate" title={img.filename}>
+                        {img.filename}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatSize(img.size)}
+                      </p>
+                      {/* Permission badge and dropdown */}
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium
+                            ${isOverridden
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            }`}
+                        >
+                          {getAccessLabel(img)}
+                        </span>
+                        {isOverridden && (
+                          <span className="text-[9px] text-muted-foreground">(覆盖)</span>
+                        )}
+                        {isSaving && <Loader2 className="size-3 animate-spin text-muted-foreground ml-auto" />}
+                      </div>
+                      {/* Permission dropdown */}
+                      <select
+                        value={currentVal}
+                        disabled={isSaving}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const newGroup = val === "school" ? ["school"] : val === "public" ? ["public"] : [];
+                          handleAccessChange(img.filename, newGroup, index);
+                        }}
+                        className="w-full text-[10px] rounded border border-border bg-background px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring/50 disabled:opacity-50"
+                      >
+                        <option value="">默认</option>
+                        <option value="public">无（公开）</option>
+                        <option value="school">校内</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

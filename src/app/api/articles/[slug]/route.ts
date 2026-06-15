@@ -42,7 +42,17 @@ function rewriteImagePaths(html: string, articleId: string): string {
         return _match;
       }
       const newSrc = `/api/images/${articleId}/${src}`;
-      return `<img${beforeAttrs}src="${newSrc}"${afterAttrs}>`;
+
+      // Build responsive attributes
+      let responsiveAttrs = afterAttrs;
+      if (!/sizes\s*=/i.test(afterAttrs)) {
+        responsiveAttrs += ` sizes="(max-width: 768px) 100vw, (max-width: 1024px) 60vw, 50vw"`;
+      }
+      if (!/loading\s*=/i.test(afterAttrs)) {
+        responsiveAttrs += ` loading="lazy"`;
+      }
+
+      return `<img${beforeAttrs}src="${newSrc}"${responsiveAttrs}>`;
     },
   );
 }

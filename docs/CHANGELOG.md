@@ -6,6 +6,13 @@
 
 ### Added
 
+#### 重名草稿检测和返回按钮统一
+- 新增 `GET /api/articles/draft/check-duplicate` API：上传前检测草稿 slug 是否已存在
+- PublishForm 上传流程新增重名草稿确认对话框（黄色警告卡片），支持覆盖已有草稿
+- 三个步骤标题左侧统一返回按钮（`size-9` ArrowLeft 图标）：
+  - 上传页 → `/admin/articles`，草稿页 → `/admin/articles`，确认页 → 返回步骤二
+- 移除 `/admin/articles/new` 和 `/admin/articles/[id]/edit` 页面级冗余返回按钮
+
 #### AI 聊天对话窗口
 - 新增 `/api/chat` 端点：SSE 流式响应，直接调用 DeepSeek API，支持文章上下文注入
 - 新增 `ChatButton` 组件：右下角浮动聊天入口

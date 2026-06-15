@@ -15,6 +15,11 @@
 - 阶段 5.4：词条发现引擎（discoverWikiCandidates，自动触发发布/翻译后）
 - 阶段 5.3：行级增量翻译引擎（translator2.ts，detectChanges→splitRange→context→AI）
 - 阶段 5.2：增量审查引擎（reviewer.ts，复用通用 pipeline + draftOfId 解析）
+- 阶段 9（Phase 9）：图片管理前端集成——PublishForm 上传页新建流程简化、Step 2 后退按钮修复、保存按钮加回
+- 阶段 9：Draft API 支持 `draftId` 参数直接更新草稿
+- 阶段 9：图片验证 API（`GET /api/articles/images/[id]/verify`）+ ImageValidationStatus 组件
+- 阶段 9：图片 URL 相对路径修复（Server-side 重写 + Client-side fallback）
+- 阶段 9：上传时检测重名草稿（`GET /api/articles/draft/check-duplicate`）+ 确认对话框
 
 ### Changed
 - 阶段 8：认证从 MVP 简单密码保护升级为 NextAuth.js v5（Credentials + 可选 OAuth）
@@ -23,6 +28,7 @@
 - 阶段 5.6：预览区明度硬编码修复（改为 CSS 变量引用）
 - 阶段 5.3：翻译详情页 UI 重写（上下文嵌入 card，全局 Eye/EyeOff 控制）
 - 阶段 5.2：发布流程审查集成（审查按钮仅出现在草稿编辑页）
+- 阶段 9：PublishForm 返回按钮统一——三个步骤顶部带紧凑返回按钮（`size-9`），移除编辑页和新建页的重复返回 Link
 
 ### Fixed
 - 阶段 8：登录页 callbackUrl 默认值（`/admin` → `/`）

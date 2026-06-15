@@ -27,6 +27,13 @@ import { TextSelectionToolbar } from "@/components/ai/TextSelectionToolbar";
 import { Lightbox } from "@/components/ui/Lightbox";
 import type { SelectionInfo } from "@/types/ai";
 
+// Extend HTMLImageElement to hold a reference to the error handler for cleanup
+declare global {
+  interface HTMLImageElement {
+    _minieseErrorHandler?: EventListenerOrEventListenerObject;
+  }
+}
+
 interface ArticleReaderProps {
   articleId: string;
   title: string;
@@ -91,6 +98,80 @@ export function ArticleReader({
     index: number;
   } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef(lang);
+  // Keep langRef in sync with the latest lang prop
+  langRef.current = lang;
+
+  // When lang changes, re-process failed images to update placeholder text
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    // Only run on lang changes (skip initial mount — error handlers handle that)
+    // Find all existing image error placeholders and update their text
+    const currentLang = langRef.current;
+    const placeholders = el.querySelectorAll<HTMLElement>(
+      '[data-img-error-placeholder="true"]',
+    );
+
+    for (const ph of placeholders) {
+      const errorType = ph.getAttribute("data-error-type") as
+        | "not_found"
+        | "forbidden"
+        | "unknown"
+        | null;
+      const isLoggedIn = ph.getAttribute("data-user-logged-in") === "true";
+      if (!errorType) continue;
+
+      let titleText: string;
+      let descHtml = "";
+
+      if (errorType === "not_found") {
+        titleText = currentLang === "zh" ? "图片未找到" : "Image not found";
+        descHtml = ph.getAttribute("data-alt") || "";
+      } else if (errorType === "forbidden") {
+        const highlighted = currentLang === "zh" ? "校内" : "school";
+        titleText = currentLang === "zh"
+          ? `查看本图需要<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span>权限`
+          : `<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span> access required for this image`;
+        if (!isLoggedIn) {
+          descHtml = currentLang === "zh"
+            ? '请<a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">登录</a>以使用校内账号查看'
+            : 'Please <a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">log in</a> with a school account to view';
+        } else {
+          descHtml = currentLang === "zh"
+            ? "此图片需要校内权限"
+            : "This image requires school access";
+        }
+      } else {
+        titleText = currentLang === "zh" ? "图片加载失败" : "Image failed to load";
+        descHtml = ph.getAttribute("data-alt") || "";
+      }
+
+      // Update title paragraph (first <p>)
+      const titleP = ph.querySelector("p");
+      if (titleP) {
+        titleP.innerHTML = titleText;
+      }
+
+      // Update desc paragraph — the second <p> if it exists
+      const ps = ph.querySelectorAll("p");
+      const descP = ps.length > 1 ? ps[1] : null;
+      if (descHtml) {
+        if (descP) {
+          descP.innerHTML = descHtml;
+        } else {
+          const newDesc = document.createElement("p");
+          newDesc.className = "text-xs text-muted-foreground/60 mt-1.5";
+          newDesc.innerHTML = descHtml;
+          ph.appendChild(newDesc);
+        }
+      } else {
+        if (descP) descP.remove();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   // Fix relative image paths on the client as a fallback
   // (server-side rewrite in /api/articles/[slug] handles the primary case)
@@ -107,8 +188,120 @@ export function ArticleReader({
       if (!/^(https?:\/\/|\/|data:)/i.test(src)) {
         img.setAttribute("src", `/api/images/${articleId}/${src}`);
       }
+
+      // Add responsive sizes attribute for better mobile performance
+      if (!img.hasAttribute("sizes")) {
+        img.setAttribute("sizes", "(max-width: 768px) 100vw, (max-width: 1024px) 60vw, 50vw");
+      }
+      // Add loading="lazy" if not present
+      if (!img.hasAttribute("loading")) {
+        img.setAttribute("loading", "lazy");
+      }
+
+      // Remove old error handler and re-bind (handles language switches
+      // where img elements are recreated by React's reconciliation)
+      img.removeEventListener("error", img._minieseErrorHandler as EventListener);
+      // Clean up any existing placeholder
+      const existingPlaceholder = img.nextElementSibling;
+      if (
+        existingPlaceholder?.getAttribute("data-img-error-placeholder") === "true"
+      ) {
+        existingPlaceholder.remove();
+      }
+
+      // Force image reload on lang switch by appending a cache-busting param.
+      // Without this, a previously-failed image won't retry loading and the
+      // newly bound error handler will never fire.
+      const baseSrc = img.getAttribute("src") || "";
+      if (baseSrc) {
+        const separator = baseSrc.includes("?") ? "&" : "?";
+        // Strip any previous cache-busting param to keep URL clean
+        const cleanSrc = baseSrc.replace(/[?&]_t=\d+/g, "");
+        img.setAttribute("src", `${cleanSrc}${separator}_t=${Date.now()}`);
+      }
+
+      // Add error handler for image loading failures
+      // Shows a friendly placeholder distinguishing:
+      // - 404 → image not found
+      // - 403 → permission denied (with login link if not logged in)
+      const errorHandler = async function onImgError() {
+        // Only handle once to avoid infinite loop
+        img.removeEventListener("error", errorHandler);
+        img.style.display = "none";
+
+        // Determine the error type by re-fetching the image with a HEAD request
+        let errorType: "not_found" | "forbidden" | "unknown" = "unknown";
+        let isLoggedIn = false;
+        try {
+          const checkRes = await fetch(img.src, { method: "HEAD" });
+          if (checkRes.status === 404) {
+            errorType = "not_found";
+          } else if (checkRes.status === 403) {
+            errorType = "forbidden";
+          }
+        } catch {
+          // Fall back to generic message
+        }
+
+        // Check login status (independent of HEAD result)
+        try {
+          const meRes = await fetch("/api/auth/me");
+          const meData = await meRes.json();
+          isLoggedIn = meData.user !== null && meData.user !== undefined;
+        } catch {
+          // Fall back — assume not logged in
+        }
+
+        // Read current lang from ref (handles language switch without re-running effect)
+        const currentLang = langRef.current;
+        let titleText: string;
+        let descText = "";
+
+        if (errorType === "not_found") {
+          titleText = currentLang === "zh" ? "图片未找到" : "Image not found";
+          descText = img.getAttribute("alt") || "";
+        } else if (errorType === "forbidden") {
+          const highlighted = currentLang === "zh" ? "校内" : "school";
+          titleText = currentLang === "zh"
+            ? `查看本图需要<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span>权限`
+            : `<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span> access required for this image`;
+          if (!isLoggedIn) {
+            // Unauthenticated: show prompt with inline "log in" link
+            descText = currentLang === "zh"
+              ? '请<a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">登录</a>以使用校内账号查看'
+              : 'Please <a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">log in</a> with a school account to view';
+          } else {
+            // Authenticated but insufficient permissions: show generic message
+            descText = currentLang === "zh"
+              ? "此图片需要校内权限"
+              : "This image requires school access";
+          }
+        } else {
+          titleText = currentLang === "zh" ? "图片加载失败" : "Image failed to load";
+          descText = img.getAttribute("alt") || "";
+        }
+
+        // Create and insert a placeholder element
+        const placeholder = document.createElement("div");
+        placeholder.className =
+          "flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center";
+        placeholder.setAttribute("data-img-error-placeholder", "true");
+        placeholder.setAttribute("data-error-type", errorType);
+        placeholder.setAttribute("data-user-logged-in", isLoggedIn ? "true" : "false");
+        placeholder.setAttribute("data-alt", img.getAttribute("alt") || "");
+        placeholder.innerHTML = `
+          <svg class="size-10 mb-3 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+          </svg>
+          <p class="text-sm text-muted-foreground">${titleText}</p>
+          ${descText ? `<p class="text-xs text-muted-foreground/60 mt-1.5">${descText}</p>` : ""}
+        `;
+        img.parentNode?.insertBefore(placeholder, img.nextSibling);
+      };
+      img.addEventListener("error", errorHandler);
+      img._minieseErrorHandler = errorHandler;
     }
-  }, [html, articleId]);
+  }, [html, articleId, lang]);
 
   // Inject click handlers for images in rendered content
   useEffect(() => {
