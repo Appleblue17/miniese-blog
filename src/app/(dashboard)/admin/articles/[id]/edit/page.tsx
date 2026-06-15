@@ -52,8 +52,8 @@ export default async function EditDraftPage({ params }: Props) {
   let initialMeta:
     | {
         title: string;
-        language: "zh" | "en";
-        fileType: "markdown" | "notesaw";
+        language: "zh" | "en" | "";
+        fileType: "markdown" | "notesaw" | "";
         tags: string[];
         author: string;
         summary: string;
@@ -82,8 +82,8 @@ export default async function EditDraftPage({ params }: Props) {
 
       initialMeta = {
         title: (data.title as string) || "",
-        language: (data.language === "en" ? "en" : "zh") as "zh" | "en",
-        fileType: (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw",
+        language: (data.language === "en" ? "en" : data.language === "zh" ? "zh" : "") as "zh" | "en" | "",
+        fileType: "", // Force manual selection — do not read from frontmatter
         tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
         author: (data.author as string) || "博主",
         summary: (data.summary as string) || "",
