@@ -78,7 +78,7 @@ describe("Settings API", () => {
       appearance: {
         themeMode: "dark",
         bodyWidth: 80,
-        image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true },
+        image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: [] },
         primary: { lightHue: 210, darkHue: 250, lightSaturation: 65, darkSaturation: 65, lightLightness: 55, darkLightness: 65 },
         accent: { lightHue: 300, darkHue: 290, lightSaturation: 60, darkSaturation: 60, lightLightness: 55, darkLightness: 65 },
         backgroundImage: "",

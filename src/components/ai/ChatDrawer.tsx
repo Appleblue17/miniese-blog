@@ -25,6 +25,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { renderChatMarkdown } from "@/lib/markdown/client-render";
 import type { SelectionInfo } from "@/types/ai";
 
 interface ChatMessage {
@@ -87,6 +88,7 @@ export function ChatDrawer({
   lang = "zh",
 }: ChatDrawerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [renderedHtml, setRenderedHtml] = useState<Record<number, string>>({});
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -213,6 +215,18 @@ export function ChatDrawer({
       } finally {
         setStreaming(false);
         abortRef.current = null;
+
+        // Render the last assistant message to Markdown HTML
+        setMessages((prev) => {
+          const lastIdx = prev.length - 1;
+          const last = prev[lastIdx];
+          if (last && last.role === "assistant" && last.content) {
+            renderChatMarkdown(last.content).then((html) => {
+              setRenderedHtml((prevHtml) => ({ ...prevHtml, [lastIdx]: html }));
+            });
+          }
+          return prev;
+        });
       }
     },
     [input, messages, streaming, selection, t],
@@ -253,6 +267,7 @@ export function ChatDrawer({
 
   const handleClear = () => {
     setMessages([]);
+    setRenderedHtml({});
     setInput("");
     setError(null);
   };
@@ -399,19 +414,27 @@ export function ChatDrawer({
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed break-words ${
                       msg.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                        : "bg-muted prose prose-sm dark:prose-invert max-w-none"
                     }`}
                   >
-                    {msg.content || (streaming && i === messages.length - 1 ? (
-                      <span className="inline-flex gap-1">
-                        <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </span>
-                    ) : null)}
+                    {msg.role === "assistant" ? (
+                      renderedHtml[i] ? (
+                        <div dangerouslySetInnerHTML={{ __html: renderedHtml[i] }} />
+                      ) : msg.content ? (
+                        <span className="whitespace-pre-wrap">{msg.content}</span>
+                      ) : streaming && i === messages.length - 1 ? (
+                        <span className="inline-flex gap-1">
+                          <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="size-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </span>
+                      ) : null
+                    ) : (
+                      <span className="whitespace-pre-wrap">{msg.content}</span>
+                    )}
                   </div>
                   {msg.role === "user" && (
                     <div className="size-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
