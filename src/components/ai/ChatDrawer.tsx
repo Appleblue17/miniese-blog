@@ -303,11 +303,8 @@ export function ChatDrawer({
 
   return (
     <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {/* No overlay — drawer stays open until closed via X button or Escape key.
+          This allows users to select article text while chatting. */}
 
       {/* Drawer */}
       <div
