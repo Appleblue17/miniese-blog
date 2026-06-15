@@ -27,13 +27,6 @@ import { TextSelectionToolbar } from "@/components/ai/TextSelectionToolbar";
 import { Lightbox } from "@/components/ui/Lightbox";
 import type { SelectionInfo } from "@/types/ai";
 
-// Extend HTMLImageElement to hold a reference to the error handler for cleanup
-declare global {
-  interface HTMLImageElement {
-    _minieseErrorHandler?: EventListenerOrEventListenerObject;
-  }
-}
-
 interface ArticleReaderProps {
   articleId: string;
   title: string;
@@ -174,16 +167,32 @@ export function ArticleReader({
   }, [lang]);
 
   // Fix relative image paths on the client as a fallback
-  // (server-side rewrite in /api/articles/[slug] handles the primary case)
+  // (server-side rewrite in /api/articles/[slug] handles the primary case).
+  // Uses a MutationObserver to handle images added after the effect runs
+  // (e.g. during client-side navigation with React hydration).
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
-    // Rewrite any relative image src paths to absolute API paths
-    const images = el.querySelectorAll("img");
-    for (const img of images) {
+    let observer: MutationObserver | null = null;
+
+    /** Process all <img> elements in the container */
+    function processImages() {
+      if (!el) return;
+      const images = el.querySelectorAll("img");
+      for (const img of images) {
+        processOneImage(img);
+      }
+    }
+
+    /** Process a single <img> element: rewrite src, bind error handler */
+    function processOneImage(img: HTMLImageElement) {
+      // Skip if already processed by this effect
+      if (img.getAttribute("data-miniese-processed") === "true") return;
+      img.setAttribute("data-miniese-processed", "true");
+
       const src = img.getAttribute("src");
-      if (!src) continue;
+      if (!src) return;
       // Only rewrite relative paths (no protocol, no leading /, no data URI)
       if (!/^(https?:\/\/|\/|data:)/i.test(src)) {
         img.setAttribute("src", `/api/images/${articleId}/${src}`);
@@ -198,34 +207,8 @@ export function ArticleReader({
         img.setAttribute("loading", "lazy");
       }
 
-      // Remove old error handler and re-bind (handles language switches
-      // where img elements are recreated by React's reconciliation)
-      img.removeEventListener("error", img._minieseErrorHandler as EventListener);
-      // Clean up any existing placeholder
-      const existingPlaceholder = img.nextElementSibling;
-      if (
-        existingPlaceholder?.getAttribute("data-img-error-placeholder") === "true"
-      ) {
-        existingPlaceholder.remove();
-      }
-
-      // Force image reload on lang switch by appending a cache-busting param.
-      // Without this, a previously-failed image won't retry loading and the
-      // newly bound error handler will never fire.
-      const baseSrc = img.getAttribute("src") || "";
-      if (baseSrc) {
-        const separator = baseSrc.includes("?") ? "&" : "?";
-        // Strip any previous cache-busting param to keep URL clean
-        const cleanSrc = baseSrc.replace(/[?&]_t=\d+/g, "");
-        img.setAttribute("src", `${cleanSrc}${separator}_t=${Date.now()}`);
-      }
-
       // Add error handler for image loading failures
-      // Shows a friendly placeholder distinguishing:
-      // - 404 → image not found
-      // - 403 → permission denied (with login link if not logged in)
       const errorHandler = async function onImgError() {
-        // Only handle once to avoid infinite loop
         img.removeEventListener("error", errorHandler);
         img.style.display = "none";
 
@@ -252,7 +235,7 @@ export function ArticleReader({
           // Fall back — assume not logged in
         }
 
-        // Read current lang from ref (handles language switch without re-running effect)
+        // Read current lang from ref (handles language switch)
         const currentLang = langRef.current;
         let titleText: string;
         let descText = "";
@@ -266,12 +249,10 @@ export function ArticleReader({
             ? `查看本图需要<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span>权限`
             : `<span class="font-semibold text-amber-600 dark:text-amber-400">${highlighted}</span> access required for this image`;
           if (!isLoggedIn) {
-            // Unauthenticated: show prompt with inline "log in" link
             descText = currentLang === "zh"
               ? '请<a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">登录</a>以使用校内账号查看'
               : 'Please <a href="/login" class="underline underline-offset-2 hover:text-primary/80 font-medium">log in</a> with a school account to view';
           } else {
-            // Authenticated but insufficient permissions: show generic message
             descText = currentLang === "zh"
               ? "此图片需要校内权限"
               : "This image requires school access";
@@ -298,9 +279,48 @@ export function ArticleReader({
         `;
         img.parentNode?.insertBefore(placeholder, img.nextSibling);
       };
+
       img.addEventListener("error", errorHandler);
-      img._minieseErrorHandler = errorHandler;
+
+      // If the image has already loaded (or failed) before we bound the
+      // handler, check its status now.
+      if (img.complete) {
+        if (img.naturalWidth === 0) {
+          // Already failed — invoke handler immediately
+          errorHandler();
+        }
+        // else: loaded successfully, nothing to do
+      }
     }
+
+    // Initial processing
+    processImages();
+
+    // Watch for new images added to the container (handles React hydration
+    // and client-side navigation where DOM is rebuilt)
+    observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as Element;
+            if (element.tagName === "IMG") {
+              processOneImage(element as HTMLImageElement);
+            } else {
+              element.querySelectorAll("img").forEach(processOneImage);
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(el, { childList: true, subtree: true });
+
+    return () => {
+      if (observer) observer.disconnect();
+      // Note: we intentionally do NOT remove event listeners or clear
+      // placeholders on cleanup, because in StrictMode the remount will
+      // re-process and overwrite. Keeping placeholders avoids flicker.
+    };
   }, [html, articleId, lang]);
 
   // Inject click handlers for images in rendered content
