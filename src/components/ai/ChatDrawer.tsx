@@ -93,9 +93,11 @@ export function ChatDrawer({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectionCollapsed, setSelectionCollapsed] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(384); // default max-w-md = 384px (24rem)
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const dragRef = useRef(false);
 
   const t = (zh: string, en: string) => (lang === "zh" ? zh : en);
 
@@ -272,6 +274,31 @@ export function ChatDrawer({
     setError(null);
   };
 
+  // Draggable width — attach/detach global mouse events
+  const handleDragStart = useCallback(() => {
+    dragRef.current = true;
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      // Distance from right edge of viewport
+      const newWidth = window.innerWidth - e.clientX;
+      setDrawerWidth(Math.max(320, Math.min(700, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      dragRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, []);
+
   if (!open) return null;
 
   return (
@@ -283,7 +310,16 @@ export function ChatDrawer({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-border bg-background shadow-xl">
+      <div
+        className="fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-background shadow-xl"
+        style={{ width: drawerWidth }}
+      >
+        {/* Drag handle */}
+        <div
+          onMouseDown={handleDragStart}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 transition-colors z-20"
+          title={t("拖拽调整宽度", "Drag to resize")}
+        />
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
