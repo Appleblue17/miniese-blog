@@ -27,13 +27,13 @@ export default async function HomePage({ params }: Props) {
   const { lang } = await params;
 
   return (
-    <div className="mx-auto px-4 py-12" style={{ maxWidth: "var(--body-width, 48rem)" }}>
+    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12" style={{ maxWidth: "var(--body-width, 48rem)" }}>
       {/* Hero */}
       <section className="mb-12">
-        <h1 className="text-4xl font-bold tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
           {lang === "zh" ? "Miniese's Blog" : "Miniese's Blog"}
         </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
+        <p className="mt-3 text-base sm:text-lg text-muted-foreground">
           {lang === "zh"
             ? "个人博客与知识库，AI 驱动的写作助手"
             : "A personal blog and knowledge base with AI-powered content assistance"}

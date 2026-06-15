@@ -256,6 +256,48 @@
   word-wrap: break-word;
 }
 
+/* Responsive font sizes and spacing for markdown body */
+@media (max-width: 639px) {
+  .markdown-body {
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 0 1em;
+  }
+  .markdown-body h1 {
+    font-size: 1.375em;
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+  }
+  .markdown-body h2 {
+    font-size: 1.2em;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+  }
+  .markdown-body h3 {
+    font-size: 1.05em;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+  }
+  .markdown-body p {
+    margin-bottom: 0.6em;
+  }
+  .markdown-body blockquote,
+  .markdown-body ul,
+  .markdown-body ol,
+  .markdown-body dl,
+  .markdown-body table,
+  .markdown-body pre,
+  .markdown-body details {
+    margin-bottom: 0.75em;
+  }
+  .markdown-body hr {
+    margin: 1em 0;
+  }
+  .markdown-body li {
+    margin-bottom: 0.2em;
+  }
+}
+
 .markdown-body .octicon {
   display: inline-block;
   fill: currentColor;
@@ -373,6 +415,13 @@
 /* Constrain width to the configured ratio of the article body, if set */
 .markdown-body img:not([align]) {
   width: var(--image-width-ratio, auto);
+}
+
+/* On mobile and tablet portrait (< 1024px), images should fill full width */
+@media (max-width: 1023px) {
+  .markdown-body img:not([align]) {
+    width: 100%;
+  }
 }
 
 /* Left/right aligned images should not be forced to ratio */

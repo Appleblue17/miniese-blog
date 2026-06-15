@@ -113,17 +113,29 @@ export default async function WikiEntryPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
-      <div className="flex items-start gap-4">
-        <div className="sticky top-24 shrink-0">
-          <Link
-            href={`/${lang}/wiki`}
-            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <ArrowLeft className="size-5" />
-          </Link>
-        </div>
+    <div
+      className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12"
+      style={{ maxWidth: "var(--body-width, 48rem)" }}
+    >
+      <div className="flex items-start gap-3">
+        <Link
+          href={`/${lang}/wiki`}
+          className="hidden xl:inline-flex items-center justify-center rounded-lg -ml-12 mt-1 size-9 shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          aria-label={lang === "zh" ? "返回知识库" : "Back to wiki"}
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
         <div className="min-w-0 flex-1">
+          <div className="lg:ml-0 ml-12 xl:hidden mb-4">
+            <Link
+              href={`/${lang}/wiki`}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label={lang === "zh" ? "返回知识库" : "Back to wiki"}
+            >
+              <ArrowLeft className="size-4" />
+              {lang === "zh" ? "返回" : "Back"}
+            </Link>
+          </div>
           <WikiReader entry={entry} lang={lang} />
         </div>
       </div>

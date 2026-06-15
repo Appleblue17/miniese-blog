@@ -91,7 +91,7 @@ export default function RootLayout({
           <SettingsApplier />
           <Navbar />
           <ActionBar />
-          <div className="md:pl-56 flex flex-col min-h-full">
+          <div className="xl:pl-56 flex flex-col min-h-full">
             <main className="flex-1">{children}</main>
             <Footer />
           </div>

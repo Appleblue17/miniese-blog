@@ -34,7 +34,7 @@ export default async function WikiListPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
+    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12" style={{ maxWidth: "var(--body-width, 48rem)" }}>
       <WikiList lang={lang} />
     </div>
   );

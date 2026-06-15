@@ -29,7 +29,7 @@ export function Navbar() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 md:hidden size-11"
+        className="fixed top-3 left-3 z-50 xl:hidden size-11 rounded-full border border-border bg-background/80 backdrop-blur-sm shadow-sm"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label={mobileOpen ? (lang === "zh" ? "关闭菜单" : "Close menu") : (lang === "zh" ? "打开菜单" : "Open menu")}
       >
@@ -42,7 +42,7 @@ export function Navbar() {
           fixed top-0 left-0 z-40 h-full w-56 border-r border-border bg-background
           flex flex-col p-4 transition-transform duration-200
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0
+          xl:translate-x-0
         `}
       >
         {/* Logo */}
@@ -99,7 +99,7 @@ export function Navbar() {
       {/* Overlay for mobile */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          className="fixed inset-0 z-30 bg-black/30 xl:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}

@@ -79,33 +79,50 @@ export default async function ArticlePage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
-      {/* Back button — on desktop, sticky left sidebar; on mobile, inline top */}
-      <div className="mb-4 md:mb-0 md:sticky md:top-24 md:float-left md:-ml-12 md:mr-2">
+    <div
+      className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12"
+      style={{ maxWidth: "var(--body-width, 48rem)" }}
+    >
+      {/* Back button — on desktop, positioned to the left of the container using negative margin;
+          on mobile, inline at the top. Uses a flex layout to avoid float overlap issues. */}
+      <div className="flex items-start gap-3">
         <Link
           href={`/${lang}/articles`}
-          className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors min-h-[44px] min-w-[44px]"
+          className="hidden xl:inline-flex items-center justify-center rounded-lg -ml-12 mt-1 size-9 shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           aria-label={lang === "zh" ? "返回文章列表" : "Back to articles"}
         >
           <ArrowLeft className="size-5" />
         </Link>
-      </div>
-      <div className="min-w-0">
-        <ArticleReader
-          articleId={data.article.id}
-          title={data.article.title}
-          author={data.article.author}
-          publishedAt={data.article.publishedAt}
-          updatedAt={data.article.updatedAt}
-          tags={data.article.tags}
-          summary={data.article.summary}
-          html={data.html}
-          viewCount={0}
-          likes={0}
-          lang={lang}
-          changelog={data.article.changelog}
-          isAITranslated={data.article.isAITranslated}
-        />
+        <div className="min-w-0 flex-1">
+          {/* Mobile back button — positioned at the top of the content area,
+              safe from the navbar hamburger (top-left) and ActionBar (top-right) */}
+          <div className="lg:ml-0 ml-12 xl:hidden mb-4">
+            <Link
+              href={`/${lang}/articles`}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label={lang === "zh" ? "返回文章列表" : "Back to articles"}
+            >
+              <ArrowLeft className="size-4" />
+              {lang === "zh" ? "返回" : "Back"}
+            </Link>
+          </div>
+
+          <ArticleReader
+            articleId={data.article.id}
+            title={data.article.title}
+            author={data.article.author}
+            publishedAt={data.article.publishedAt}
+            updatedAt={data.article.updatedAt}
+            tags={data.article.tags}
+            summary={data.article.summary}
+            html={data.html}
+            viewCount={0}
+            likes={0}
+            lang={lang}
+            changelog={data.article.changelog}
+            isAITranslated={data.article.isAITranslated}
+          />
+        </div>
       </div>
     </div>
   );
