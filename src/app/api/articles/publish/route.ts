@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
           accessGroup: frontmatter.accessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
+          contentType: pipeline,
         },
       });
 
@@ -256,6 +257,7 @@ export async function POST(request: NextRequest) {
           accessGroup: frontmatter.accessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
+          contentType: pipeline,
           publishedAt: new Date(),
         },
       });
@@ -299,6 +301,7 @@ export async function POST(request: NextRequest) {
           accessGroup: frontmatter.accessGroup || [],
           changelog: changelog || null,
           author: frontmatter.author || "博主",
+          contentType: pipeline,
           publishedAt: new Date(),
         },
       });
