@@ -433,6 +433,7 @@ async function triggerAutoTranslate(params: {
         accessGroup: true,
         defaultImageAccessGroup: true,
         contentType: true,
+        contentPath: true,
       },
     });
 
@@ -446,6 +447,26 @@ async function triggerAutoTranslate(params: {
     await mkdir(targetArticleDir, { recursive: true });
     const imagesDir = path.join(targetArticleDir, "images");
     await mkdir(imagesDir, { recursive: true });
+
+    // Copy images from source article's images/ directory
+    const sourceArticleDir = path.dirname(
+      path.join(process.cwd(), sourceArticle.contentPath),
+    );
+    const sourceImagesDir = path.join(sourceArticleDir, "images");
+    try {
+      const sourceFiles = await readdir(sourceImagesDir);
+      if (sourceFiles.length > 0) {
+        await cp(sourceImagesDir, imagesDir, { recursive: true });
+        console.log(
+          `[Publish] Copied ${sourceFiles.length} image(s) from source to translation "${slug}"`,
+        );
+      }
+    } catch {
+      // Source images directory may not exist — that's fine
+      console.log(
+        `[Publish] No images to copy for translation "${slug}"`,
+      );
+    }
 
     const targetFilePath = `content/articles/${targetLanguage}/${slug}/article.md`;
     const targetFullPath = path.join(process.cwd(), targetFilePath);
@@ -470,6 +491,23 @@ async function triggerAutoTranslate(params: {
       },
       select: { id: true, isAITranslated: true },
     });
+
+    // Copy per-image access overrides from source article
+    const sourceOverrides = await prisma.articleImageOverride.findMany({
+      where: { articleId: sourceArticleId },
+    });
+    if (sourceOverrides.length > 0) {
+      await prisma.articleImageOverride.createMany({
+        data: sourceOverrides.map((ov) => ({
+          articleId: translationArticle.id,
+          filename: ov.filename,
+          accessGroup: ov.accessGroup,
+        })),
+      });
+      console.log(
+        `[Publish] Copied ${sourceOverrides.length} image access override(s) to translation "${slug}"`,
+      );
+    }
 
     console.log(
       `[Publish] Created translation "${slug}" (${targetLanguage}) ` +
