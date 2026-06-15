@@ -431,15 +431,17 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   // 10. Re-render the target article's Markdown content to HTML
   //    The public page reads `renderedContent` from the database,
   //    so we need to update it after writing the translated file.
+  //    Use the source article's contentType — the content format
+  //    (Notesaw vs Markdown) is preserved through translation.
   try {
-    const targetArticleFull = await prisma.article.findUnique({
-      where: { id: targetArticleIdStr },
+    const sourceArticleFull = await prisma.article.findUnique({
+      where: { id: articleIdStr },
       select: { contentType: true },
     });
 
     const renderedContent = await fs.readFile(targetPath, "utf-8");
     const { content: mdBody } = parseFrontmatter(renderedContent);
-    const pipeline = (targetArticleFull?.contentType as "markdown" | "notesaw") || "markdown";
+    const pipeline = (sourceArticleFull?.contentType as "markdown" | "notesaw") || "markdown";
 
     const linkedContent = await detectWikiLinks({
       lang: targetLang,

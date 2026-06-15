@@ -388,7 +388,7 @@ async function triggerAutoTranslate(params: {
     // No translation exists — create one linked to the source article
     const sourceArticle = await prisma.article.findUnique({
       where: { id: sourceArticleId },
-      select: { title: true, tags: true, summary: true, author: true, accessGroup: true },
+      select: { title: true, tags: true, summary: true, author: true, accessGroup: true, contentType: true },
     });
 
     if (!sourceArticle) {
@@ -416,6 +416,7 @@ async function triggerAutoTranslate(params: {
         author: sourceArticle.author || "博主",
         accessGroup: sourceArticle.accessGroup || [],
         summary: sourceArticle.summary,
+        contentType: sourceArticle.contentType || "markdown",
         isAITranslated: true,
         originalId: sourceArticleId,
         publishedAt: new Date(),
