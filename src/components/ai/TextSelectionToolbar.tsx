@@ -70,14 +70,16 @@ export function TextSelectionToolbar({
 
     // Clear if nothing selected
     if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-      // Delay hiding so the toolbar doesn't disappear before click registers
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = setTimeout(() => {
-        setSelectedText("");
-        setSelectedRange(null);
-        setPosition(null);
-        setError(null);
-      }, 200);
+        // Only clear if the user didn't just click the toolbar
+        if (!toolbarRef.current?.contains(document.activeElement)) {
+          setSelectedText("");
+          setSelectedRange(null);
+          setPosition(null);
+          setError(null);
+        }
+      }, 300);
       return;
     }
 
@@ -89,9 +91,8 @@ export function TextSelectionToolbar({
       (range.commonAncestorContainer as Element).querySelector?.(".katex");
 
     const text = hasKatex ? extractTextFromRange(range).trim() : selection.toString().trim();
-    if (text.length > 500) return; // Too long, don't show toolbar
+    if (text.length > 500) return;
 
-    // Cancel hide timeout if selection is back
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
@@ -103,7 +104,7 @@ export function TextSelectionToolbar({
     setSelectedRange(range);
     setPosition({
       top: rect.top + window.scrollY - 8,
-      left: rect.left + rect.width / 2,
+      left: rect.left + rect.width / 2 + window.scrollX,
     });
     setProposeDone(false);
     setError(null);
@@ -116,6 +117,21 @@ export function TextSelectionToolbar({
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
   }, [handleSelectionChange]);
+
+  // Re-position on scroll to follow the selection
+  useEffect(() => {
+    if (!selectedRange) return;
+    const handleScroll = () => {
+      const rect = selectedRange.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+      setPosition({
+        top: rect.top + window.scrollY - 8,
+        left: rect.left + rect.width / 2 + window.scrollX,
+      });
+    };
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [selectedRange]);
 
       // Close when pressing Escape
   useEffect(() => {
