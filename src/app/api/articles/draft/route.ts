@@ -2,8 +2,8 @@
  * @file POST /api/articles/draft
  *
  * Saves an uploaded file as a draft (creates or updates database record).
- * File is named after the article slug (derived from meta.title), not the
- * upload filename. When title changes, the old file is cleaned up.
+ * Uses directory structure: content/articles/drafts/{slugDir}/article.md + images/
+ * When title changes, the old directory is cleaned up.
  *
  * Request body: { fileName, fileContent, meta, draftOfId? }
  *   - meta: { title, language, fileType, tags, author, summary }
@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { writeFile, mkdir, rm } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { buildFrontmatter, generateSlug } from "@/lib/articles/frontmatter";
@@ -55,14 +55,11 @@ export async function POST(request: NextRequest) {
     const tags = (data.tags as string[]) || [];
     const author = (data.author as string) || "博主";
 
-    // Generate slug-based filename
+    // Generate slug-based directory name
     const slug = generateSlug(title, (data.slug as string) || undefined);
-    const draftFileName = slug ? `${slug}.md` : `draft-${Date.now()}.md`;
+    const dirName = slug || `draft-${Date.now()}`;
 
-    // Save file to drafts directory
     await mkdir(DRAFTS_DIR, { recursive: true });
-    const filePath = path.join(DRAFTS_DIR, draftFileName);
-    await writeFile(filePath, finalContent, "utf-8");
 
     let draft;
 
@@ -73,23 +70,33 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingDraft) {
-        // Clean up old draft file if filename changed
+        // Clean up old draft directory if dir name changed
         if (existingDraft.contentPath) {
-          const oldFileName = existingDraft.contentPath.split("/").pop();
-          if (oldFileName && oldFileName !== draftFileName) {
+          const oldDirName = existingDraft.contentPath.split("/")[3]; // content/articles/drafts/{dirName}/article.md
+          if (oldDirName && oldDirName !== dirName) {
+            const oldDir = path.join(DRAFTS_DIR, oldDirName);
             try {
-              await unlink(path.join(DRAFTS_DIR, oldFileName));
+              await rm(oldDir, { recursive: true, force: true });
             } catch {
-              // Old file may not exist
+              // Old dir may not exist
             }
           }
         }
+
+        // Ensure draft directory exists
+        const draftDir = path.join(DRAFTS_DIR, dirName);
+        await mkdir(draftDir, { recursive: true });
+        // Ensure images subdirectory exists
+        await mkdir(path.join(draftDir, "images"), { recursive: true });
+
+        const articleFilePath = path.join(draftDir, "article.md");
+        await writeFile(articleFilePath, finalContent, "utf-8");
 
         draft = await prisma.article.update({
           where: { id: existingDraft.id },
           data: {
             title,
-            contentPath: `content/articles/drafts/${draftFileName}`,
+            contentPath: `content/articles/drafts/${dirName}/article.md`,
             summary,
             tags,
             author,
@@ -98,12 +105,20 @@ export async function POST(request: NextRequest) {
           },
         });
       } else {
+        // Create new draft directory
+        const draftDir = path.join(DRAFTS_DIR, dirName);
+        await mkdir(draftDir, { recursive: true });
+        await mkdir(path.join(draftDir, "images"), { recursive: true });
+
+        const articleFilePath = path.join(draftDir, "article.md");
+        await writeFile(articleFilePath, finalContent, "utf-8");
+
         draft = await prisma.article.create({
           data: {
             slug: `draft-${Date.now()}`,
             title,
             language: resolvedLang,
-            contentPath: `content/articles/drafts/${draftFileName}`,
+            contentPath: `content/articles/drafts/${dirName}/article.md`,
             summary,
             tags,
             status: "draft",
@@ -113,13 +128,20 @@ export async function POST(request: NextRequest) {
         });
       }
     } else {
-      // New article draft
+      // New article draft — create directory structure
+      const draftDir = path.join(DRAFTS_DIR, dirName);
+      await mkdir(draftDir, { recursive: true });
+      await mkdir(path.join(draftDir, "images"), { recursive: true });
+
+      const articleFilePath = path.join(draftDir, "article.md");
+      await writeFile(articleFilePath, finalContent, "utf-8");
+
       draft = await prisma.article.create({
         data: {
           slug: `draft-${Date.now()}`,
           title,
           language: resolvedLang,
-          contentPath: `content/articles/drafts/${draftFileName}`,
+          contentPath: `content/articles/drafts/${dirName}/article.md`,
           summary,
           tags,
           status: "draft",

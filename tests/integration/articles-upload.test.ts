@@ -41,9 +41,12 @@ describe("POST /api/articles/upload", () => {
     expect(data.success).toBe(true);
     expect(data.fileName).toBe("test-article.md");
 
-    // Verify the file was actually written
-    const filePath = path.join(DRAFTS_DIR, "test-article.md");
+    // Verify the file was actually written using the new directory structure
+    const articleDir = path.join(DRAFTS_DIR, "test-article");
+    const filePath = path.join(articleDir, "article.md");
     expect(existsSync(filePath)).toBe(true);
+    // Also verify images directory was created
+    expect(existsSync(path.join(articleDir, "images"))).toBe(true);
   });
 
   it("returns 400 when no file is provided", async () => {

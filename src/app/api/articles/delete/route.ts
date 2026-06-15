@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { unlink } from "fs/promises";
+import { rm } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 
@@ -51,11 +51,11 @@ export async function POST(request: NextRequest) {
 
       for (const t of translations) {
         if (t.contentPath) {
-          const filePath = path.join(process.cwd(), t.contentPath);
+          const articleDir = path.dirname(path.join(process.cwd(), t.contentPath));
           try {
-            await unlink(filePath);
+            await rm(articleDir, { recursive: true, force: true });
           } catch {
-            // File may not exist
+            // May not exist
           }
         }
       }
@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
 
       for (const draft of drafts) {
         if (draft.contentPath) {
-          const filePath = path.join(process.cwd(), draft.contentPath);
+          const articleDir = path.dirname(path.join(process.cwd(), draft.contentPath));
           try {
-            await unlink(filePath);
+            await rm(articleDir, { recursive: true, force: true });
           } catch {
-            // File may not exist
+            // May not exist
           }
         }
       }
@@ -86,13 +86,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Delete the article's own file
+    // Delete the article's own directory (with images/)
     if (article.contentPath) {
-      const filePath = path.join(process.cwd(), article.contentPath);
+      const articleDir = path.dirname(path.join(process.cwd(), article.contentPath));
       try {
-        await unlink(filePath);
+        await rm(articleDir, { recursive: true, force: true });
       } catch {
-        // File may not exist
+        // May not exist
       }
     }
 

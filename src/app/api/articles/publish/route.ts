@@ -2,36 +2,37 @@
  * @file POST /api/articles/publish
  *
  * Publishes a draft article:
- * 1. Reads content (from provided fileContent or filesystem)
+ * 1. Reads content from filesystem (directory structure) or direct input
  * 2. Uses meta to build frontmatter if provided, or parses frontmatter
  * 3. Generates/validates slug (unique per language)
  * 4. Renders Markdown to HTML via `renderMarkdown()`
- * 5. Writes file to `content/articles/{lang}/{slug}.md` with buildFrontmatter
+ * 5. Moves entire draft directory to `content/articles/{lang}/{slug}/` (with images/)
  * 6. Creates (or updates) database record
  *
+ * Directory structure:
+ *   Draft:   content/articles/drafts/{slugDir}/article.md + images/
+ *   Published: content/articles/{lang}/{slug}/article.md + images/
+ *
  * Request body: { fileName, language, meta, slug?, changelog?, draftOfId?, fileContent?, draftId? }
- *   - meta: { title, language, fileType, tags, author, summary }
- *   - If meta is provided, uses it to build frontmatter (overriding file content)
- *   - If meta is not provided, parses frontmatter from file content (legacy)
- *   - draftId: optional — if provided, the draft record will be linked to the
- *     newly created published article (draftOfId set to article.id)
  *
  * Response: { success: true, article: { id, slug, url } }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, mkdir, writeFile, unlink } from "fs/promises";
+import { readFile, mkdir, writeFile, rename, rm, cp, readdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown/renderer";
 import { detectWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter, buildFrontmatter, generateSlug } from "@/lib/articles/frontmatter";
 import { addJob } from "@/lib/queue/producer";
+import { validateImageReferences, extractImageReferences } from "@/lib/articles/images";
 import type { ArticleMeta, ArticleFrontmatter } from "@/lib/articles/frontmatter";
 import type { ContentType } from "@/lib/markdown/renderer";
 
 const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
-const PUBLISHED_DIR = (lang: string) => path.join(process.cwd(), "content", "articles", lang);
+const PUBLISHED_DIR = (lang: string) =>
+  path.join(process.cwd(), "content", "articles", lang);
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,11 +51,28 @@ export async function POST(request: NextRequest) {
     // --- Validation ---
 
     if (!directContent && !_fileName) {
-      return NextResponse.json({ error: "fileContent or fileName is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "fileContent or fileName is required." },
+        { status: 400 },
+      );
     }
 
     if (language !== "zh" && language !== "en") {
-      return NextResponse.json({ error: "language must be 'zh' or 'en'." }, { status: 400 });
+      return NextResponse.json(
+        { error: "language must be 'zh' or 'en'." },
+        { status: 400 },
+      );
+    }
+
+    // --- Determine draft directory name ---
+    // _FileName can be "my-article/article.md" or "my-article.md" (legacy)
+    let draftDirName: string;
+    if (_fileName && _fileName.includes("/")) {
+      draftDirName = _fileName.split("/")[0];
+    } else if (_fileName) {
+      draftDirName = _fileName.replace(/\.md$/i, "");
+    } else {
+      draftDirName = `draft-${Date.now()}`;
     }
 
     // --- Read content (from direct input or filesystem) ---
@@ -65,14 +83,15 @@ export async function POST(request: NextRequest) {
     if (directContent) {
       raw = directContent;
     } else {
-      const draftPath = path.join(DRAFTS_DIR, _fileName);
+      // Read from drafts/{draftDirName}/article.md
+      const draftArticlePath = path.join(DRAFTS_DIR, draftDirName, "article.md");
       try {
-        raw = await readFile(draftPath, "utf-8");
+        raw = await readFile(draftArticlePath, "utf-8");
         fromFileSystem = true;
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code === "ENOENT") {
           return NextResponse.json(
-            { error: `Draft file not found: ${_fileName}` },
+            { error: `Draft not found: ${draftDirName}/article.md` },
             { status: 404 },
           );
         }
@@ -82,13 +101,11 @@ export async function POST(request: NextRequest) {
 
     // --- Build final content with frontmatter ---
 
-    // Use meta if provided, otherwise parse from raw content
     let finalContent: string;
     let frontmatter: ArticleFrontmatter;
 
     if (meta) {
       finalContent = buildFrontmatter(raw, meta as ArticleMeta);
-      // Parse the result to extract frontmatter for DB
       const parsed = parseFrontmatter(finalContent);
       frontmatter = parsed.frontmatter;
     } else {
@@ -102,9 +119,6 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Guard: draft must not be published via the wrong flow ---
-    // If a draft is already linked to a published article (draftOfId is set),
-    // it must be published with draftOfId (not from the "new article" flow).
-    // This prevents orphaned draft records after publishing.
     if (draftId && !draftOfId) {
       const draftRecord = await prisma.article.findUnique({
         where: { id: draftId },
@@ -133,17 +147,15 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Check slug+language uniqueness ---
-    // When draftOfId is provided, the existing published article is being updated,
-    // so exclude it from the uniqueness check.
-    // When only draftId is provided (new article from draft), check against
-    // existing published articles.
     if (draftOfId) {
       const existing = await prisma.article.findFirst({
         where: { slug, language, id: { not: draftOfId } },
       });
       if (existing) {
         return NextResponse.json(
-          { error: `Article with slug "${slug}" and language "${language}" already exists.` },
+          {
+            error: `Article with slug "${slug}" and language "${language}" already exists.`,
+          },
           { status: 409 },
         );
       }
@@ -153,70 +165,135 @@ export async function POST(request: NextRequest) {
       });
       if (existing) {
         return NextResponse.json(
-          { error: `Article with slug "${slug}" and language "${language}" already exists.` },
+          {
+            error: `Article with slug "${slug}" and language "${language}" already exists.`,
+          },
           { status: 409 },
         );
       }
     }
 
-    // --- Render HTML with wiki link detection ---
-    // Parse body from finalContent for rendering
+    // Pre-compute target directory for image validation and later moves
+    const targetDir = PUBLISHED_DIR(language);
+    const targetArticleDir = path.join(targetDir, slug);
+    const targetArticlePath = path.join(targetArticleDir, "article.md");
+
+    // --- Validate image references ---
     const { content: mdBody } = parseFrontmatter(finalContent);
+
+    // Determine the source directory for image reference validation
+    let sourceDir: string;
+    if (fromFileSystem) {
+      sourceDir = path.join(DRAFTS_DIR, draftDirName);
+    } else if (draftId) {
+      // Use the draft's contentPath to find its images/ directory
+      const draftRecord = await prisma.article.findUnique({
+        where: { id: draftId },
+        select: { contentPath: true },
+      });
+      if (draftRecord) {
+        sourceDir = path.dirname(path.join(process.cwd(), draftRecord.contentPath));
+      } else {
+        sourceDir = targetArticleDir;
+      }
+    } else {
+      sourceDir = targetArticleDir;
+    }
+
+    const validationResult = await validateImageReferences(mdBody, sourceDir);
+    if (!validationResult.valid && validationResult.missing.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Missing image files referenced in article: ${validationResult.missing.join(", ")}`,
+          missingImages: validationResult.missing,
+        },
+        { status: 400 },
+      );
+    }
+
     const pipeline: ContentType =
       frontmatter.contentType === "notesaw" || frontmatter.fileType === "notesaw"
         ? "notesaw"
         : "markdown";
 
-    // First detect wiki links in the Markdown content, then render
-    // This allows the renderer to produce proper <a> tags in the HTML output
     const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
     const html = await renderMarkdown(linkedContent, pipeline);
 
     let oldSourceContent = "";
 
-    // --- Write file to published directory ---
+    // --- Move directory to published location ---
+    // Published: content/articles/{lang}/{slug}/article.md + images/
 
-    const targetDir = PUBLISHED_DIR(language);
-    await mkdir(targetDir, { recursive: true });
-    const targetPath = path.join(targetDir, `${slug}.md`);
-
-    // --- Capture old content BEFORE overwriting (for update case) ---
+    // For updates, capture old content before overwriting
     if (draftOfId) {
       try {
-        oldSourceContent = await readFile(targetPath, "utf-8");
+        oldSourceContent = await readFile(targetArticlePath, "utf-8");
       } catch {
-        // File may not exist yet (first publish), that's fine
         oldSourceContent = "";
       }
     }
 
     if (fromFileSystem) {
-      // If reading from filesystem, we need to write the new content
-      // (which includes the updated frontmatter) instead of renaming
-      await writeFile(targetPath, finalContent, "utf-8");
-      // Remove old draft file
+      // Write updated frontmatter to the draft's article.md first
+      const draftArticlePath = path.join(DRAFTS_DIR, draftDirName, "article.md");
+      await writeFile(draftArticlePath, finalContent, "utf-8");
+
+      // Move the entire draft directory to published location
+      // First ensure target parent dir exists
+      await mkdir(targetDir, { recursive: true });
+
+      // If target already exists (update), remove it first
       try {
-        await unlink(path.join(DRAFTS_DIR, _fileName));
+        await rm(targetArticleDir, { recursive: true, force: true });
       } catch {
-        // Draft file may already have been removed
+        // May not exist
       }
+
+      // Rename the entire directory (includes images/)
+      await rename(path.join(DRAFTS_DIR, draftDirName), targetArticleDir);
     } else {
-      await writeFile(targetPath, finalContent, "utf-8");
+      // Direct content (no filesystem draft) — create directory structure
+      await mkdir(targetArticleDir, { recursive: true });
+      const imagesDir = path.join(targetArticleDir, "images");
+      await mkdir(imagesDir, { recursive: true });
+      await writeFile(targetArticlePath, finalContent, "utf-8");
+
+      // Copy images from draft directory if available
+      if (draftId) {
+        const draftRecord = await prisma.article.findUnique({
+          where: { id: draftId },
+          select: { contentPath: true },
+        });
+        if (draftRecord) {
+          const draftImagesDir = path.join(
+            path.dirname(path.join(process.cwd(), draftRecord.contentPath)),
+            "images",
+          );
+          try {
+            const files = await readdir(draftImagesDir);
+            if (files.length > 0) {
+              await cp(draftImagesDir, imagesDir, { recursive: true });
+            }
+          } catch {
+            // Draft images directory may not exist — that's fine
+          }
+        }
+      }
     }
+
+    // Compute contentPath for DB
+    const contentPath = `content/articles/${language}/${slug}/article.md`;
 
     let article;
 
     if (draftOfId) {
       // --- Update existing published article ---
-      // The published article's ID stays the same. Any AiTask records
-      // from the draft (e.g., review results) are migrated to the
-      // published article, so incremental review can find them later.
       article = await prisma.article.update({
         where: { id: draftOfId },
         data: {
           slug,
           title: frontmatter.title,
-          contentPath: `content/articles/${language}/${slug}.md`,
+          contentPath,
           renderedContent: html,
           summary: frontmatter.summary || null,
           tags: frontmatter.tags || [],
@@ -234,22 +311,16 @@ export async function POST(request: NextRequest) {
           where: { articleId: draftId },
           data: { articleId: article.id },
         });
-
-        // Delete the draft record
-        await prisma.article.delete({
-          where: { id: draftId },
-        });
+        await prisma.article.delete({ where: { id: draftId } });
       }
     } else if (draftId) {
       // --- Create new published article from a draft (first-time publish) ---
-      // The published article gets a new ID. Migrate draft's AiTask records
-      // (e.g., review results) so incremental review works on subsequent runs.
       article = await prisma.article.create({
         data: {
           slug,
           title: frontmatter.title,
           language,
-          contentPath: `content/articles/${language}/${slug}.md`,
+          contentPath,
           renderedContent: html,
           summary: frontmatter.summary || null,
           tags: frontmatter.tags || [],
@@ -268,24 +339,8 @@ export async function POST(request: NextRequest) {
         data: { articleId: article.id },
       });
 
-      // Clean up draft file
-      const draftRecord = await prisma.article.findUnique({
-        where: { id: draftId },
-        select: { contentPath: true },
-      });
-      if (draftRecord?.contentPath) {
-        const draftFilePath = path.join(process.cwd(), draftRecord.contentPath);
-        try {
-          await unlink(draftFilePath);
-        } catch {
-          // Draft file may not exist
-        }
-      }
-
-      // Delete the draft record
-      await prisma.article.delete({
-        where: { id: draftId },
-      });
+      // Clean up draft record (directory already renamed)
+      await prisma.article.delete({ where: { id: draftId } });
     } else {
       // --- Create new published article (no draft, direct publish) ---
       article = await prisma.article.create({
@@ -293,7 +348,7 @@ export async function POST(request: NextRequest) {
           slug,
           title: frontmatter.title,
           language,
-          contentPath: `content/articles/${language}/${slug}.md`,
+          contentPath,
           renderedContent: html,
           summary: frontmatter.summary || null,
           tags: frontmatter.tags || [],
@@ -307,9 +362,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // --- Trigger auto-translation if sibling article exists ---
-
-    // Fire-and-forget: don't block the publish response on translation job creation
+    // --- Trigger auto-translation ---
     triggerAutoTranslate({
       sourceArticleId: article.id,
       sourceLanguage: language,
@@ -319,7 +372,7 @@ export async function POST(request: NextRequest) {
       console.error("Auto-translate trigger failed (non-fatal):", err);
     });
 
-    // --- Trigger auto term generation (always runs on publish) ---
+    // --- Trigger auto term generation ---
     triggerAutoGenerate(article.id, slug, language).catch((err) => {
       console.error("Auto-generate trigger failed (non-fatal):", err);
     });
@@ -339,21 +392,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Attempts to auto-trigger translation for a published article.
- *
- * If no translation version exists in the target language, creates one
- * automatically (empty placeholder) linked to the source article via originalId.
- * Then submits a translate job.
- *
- * Translation versions:
- * - Are bound to the original article via originalId
- * - Cannot be manually edited (isAITranslated=true)
- * - Do not appear as independent articles in listings
- * - Share the same slug as the original article
- *
- * This function is fire-and-forget — errors are logged but not propagated.
- *
- * @param params - The source article info and old content
+ * Triggers auto-translation after publish.
  */
 async function triggerAutoTranslate(params: {
   sourceArticleId: string;
@@ -362,24 +401,16 @@ async function triggerAutoTranslate(params: {
   oldSourceContent: string;
 }): Promise<void> {
   const { sourceArticleId, sourceLanguage, slug, oldSourceContent } = params;
-
-  // Determine target language
   const targetLanguage = sourceLanguage === "zh" ? "en" : "zh";
   const targetLang = targetLanguage as "zh" | "en";
   const targetDir = path.join(process.cwd(), "content", "articles", targetLanguage);
 
-  // Look up translation version by originalId + language
-  // (translation versions are bound to the original article)
   let translationArticle = await prisma.article.findFirst({
-    where: {
-      originalId: sourceArticleId,
-      language: targetLang,
-    },
+    where: { originalId: sourceArticleId, language: targetLang },
     select: { id: true, isAITranslated: true },
   });
 
   if (translationArticle) {
-    // Translation already exists — guard against overwriting manual modifications
     if (!translationArticle.isAITranslated) {
       console.log(
         `[Publish] Skipping auto-translate: translation for article "${slug}" ` +
@@ -388,10 +419,16 @@ async function triggerAutoTranslate(params: {
       return;
     }
   } else {
-    // No translation exists — create one linked to the source article
     const sourceArticle = await prisma.article.findUnique({
       where: { id: sourceArticleId },
-      select: { title: true, tags: true, summary: true, author: true, accessGroup: true, contentType: true },
+      select: {
+        title: true,
+        tags: true,
+        summary: true,
+        author: true,
+        accessGroup: true,
+        contentType: true,
+      },
     });
 
     if (!sourceArticle) {
@@ -399,15 +436,16 @@ async function triggerAutoTranslate(params: {
       return;
     }
 
-    // Create the target directory
-    await mkdir(targetDir, { recursive: true });
+    // Create target directory structure
+    const targetArticleDir = path.join(targetDir, slug);
+    await mkdir(targetArticleDir, { recursive: true });
+    const imagesDir = path.join(targetArticleDir, "images");
+    await mkdir(imagesDir, { recursive: true });
 
-    // Create an empty placeholder file (will be overwritten by the worker)
-    const targetFilePath = `content/articles/${targetLanguage}/${slug}.md`;
+    const targetFilePath = `content/articles/${targetLanguage}/${slug}/article.md`;
     const targetFullPath = path.join(process.cwd(), targetFilePath);
     await writeFile(targetFullPath, "", "utf-8");
 
-    // Create the DB record with originalId pointing to source article
     translationArticle = await prisma.article.create({
       data: {
         slug,
@@ -433,12 +471,6 @@ async function triggerAutoTranslate(params: {
     );
   }
 
-  console.log(
-    `[Publish] Triggering auto-translate for article ${sourceArticleId} ` +
-      `(${sourceLanguage} → ${targetLanguage})`,
-  );
-
-  // Submit the translation job
   await addJob("translate", {
     articleId: sourceArticleId,
     targetArticleId: translationArticle.id,
@@ -450,25 +482,11 @@ async function triggerAutoTranslate(params: {
 
 /**
  * Triggers AI term discovery for a newly published article.
- *
- * Creates a "discover" task that will scan the article content and
- * discover potential wiki terms, storing them as WikiDiscovery records
- * for the blogger to review in the dashboard.
- *
- * This function is fire-and-forget.
- *
- * @param articleId - The ID of the published article
- * @param articleSlug - The slug of the published article
- * @param articleLang - The language code ("zh" | "en")
  */
 async function triggerAutoGenerate(
   articleId: string,
   articleSlug: string,
   articleLang: string,
 ): Promise<void> {
-  await addJob("discover", {
-    articleId,
-    articleSlug,
-    articleLang,
-  });
+  await addJob("discover", { articleId, articleSlug, articleLang });
 }

@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import {
   Calendar,
   Clock,
@@ -24,6 +24,7 @@ import { CommentSection } from "@/components/article/CommentSection";
 import { ChatButton } from "@/components/ai/ChatButton";
 import { ChatDrawer } from "@/components/ai/ChatDrawer";
 import { TextSelectionToolbar } from "@/components/ai/TextSelectionToolbar";
+import { Lightbox } from "@/components/ui/Lightbox";
 import type { SelectionInfo } from "@/types/ai";
 
 interface ArticleReaderProps {
@@ -81,6 +82,85 @@ export function ArticleReader({
 }: ArticleReaderProps) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSelection, setChatSelection] = useState<SelectionInfo | undefined>(undefined);
+
+  // Lightbox state
+  const [lightboxImage, setLightboxImage] = useState<{
+    src: string;
+    alt: string;
+    images: { src: string; alt: string }[];
+    index: number;
+  } | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Fix relative image paths on the client as a fallback
+  // (server-side rewrite in /api/articles/[slug] handles the primary case)
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    // Rewrite any relative image src paths to absolute API paths
+    const images = el.querySelectorAll("img");
+    for (const img of images) {
+      const src = img.getAttribute("src");
+      if (!src) continue;
+      // Only rewrite relative paths (no protocol, no leading /, no data URI)
+      if (!/^(https?:\/\/|\/|data:)/i.test(src)) {
+        img.setAttribute("src", `/api/images/${articleId}/${src}`);
+      }
+    }
+  }, [html, articleId]);
+
+  // Inject click handlers for images in rendered content
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    const handleImageClick = (e: Event) => {
+      const img = e.target as HTMLImageElement;
+      if (!img || img.tagName !== "IMG") return;
+
+      // Collect all images in the article for navigation
+      const allImages = Array.from(el.querySelectorAll("img"));
+      const images = allImages.map((imgEl) => ({
+        src: imgEl.getAttribute("src") || "",
+        alt: imgEl.getAttribute("alt") || "",
+      }));
+      const index = images.findIndex((imgInfo) => imgInfo.src === img.getAttribute("src"));
+      if (index === -1) return;
+
+      setLightboxImage({
+        src: img.getAttribute("src") || "",
+        alt: img.getAttribute("alt") || "",
+        images,
+        index,
+      });
+    };
+
+    el.addEventListener("click", handleImageClick);
+    return () => el.removeEventListener("click", handleImageClick);
+  }, [html]);
+
+  const handleLightboxClose = useCallback(() => {
+    setLightboxImage(null);
+  }, []);
+
+  const handleLightboxPrev = useCallback(() => {
+    setLightboxImage((prev) => {
+      if (!prev) return null;
+      const newIndex = prev.index - 1;
+      if (newIndex < 0) return prev;
+      return { ...prev, src: prev.images[newIndex].src, alt: prev.images[newIndex].alt, index: newIndex };
+    });
+  }, []);
+
+  const handleLightboxNext = useCallback(() => {
+    setLightboxImage((prev) => {
+      if (!prev) return null;
+      const newIndex = prev.index + 1;
+      if (newIndex >= prev.images.length) return prev;
+      return { ...prev, src: prev.images[newIndex].src, alt: prev.images[newIndex].alt, index: newIndex };
+    });
+  }, []);
 
   /**
    * Given a text node within the article, compute the heading path
@@ -214,6 +294,19 @@ export function ArticleReader({
         lang={lang}
       />
 
+      {/* Lightbox */}
+      {lightboxImage && (
+        <Lightbox
+          src={lightboxImage.src}
+          alt={lightboxImage.alt}
+          onClose={handleLightboxClose}
+          onPrev={handleLightboxPrev}
+          onNext={handleLightboxNext}
+          hasPrev={lightboxImage.index > 0}
+          hasNext={lightboxImage.index < lightboxImage.images.length - 1}
+        />
+      )}
+
       {/* Main content + TOC sidebar */}
       <div className="flex gap-8">
         <div className="min-w-0 flex-1">
@@ -286,7 +379,7 @@ export function ArticleReader({
             </header>
 
             {/* Rendered content */}
-            <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+            <div ref={contentRef} className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
 
             {/* Divider before footer */}
             <hr className="border-border" />

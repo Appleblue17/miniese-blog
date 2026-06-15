@@ -24,6 +24,12 @@ export interface AppSettings {
   appearance: {
     themeMode: "light" | "dark" | "system";
     bodyWidth: number;
+    image: {
+      maxWidth: number;
+      maxHeight: number;
+      defaultWidthRatio: number;
+      lightboxEnabled: boolean;
+    };
     primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     backgroundImage: string;

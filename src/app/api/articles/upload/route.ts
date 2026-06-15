@@ -83,11 +83,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save file to drafts directory
+    // Save file to drafts directory — use directory structure
+    // content/articles/drafts/{slug}/article.md
     await mkdir(DRAFTS_DIR, { recursive: true });
-    const fileName = file.name;
-    const filePath = path.join(DRAFTS_DIR, fileName);
-    await writeFile(filePath, buffer);
+
+    // Generate a directory name from file name (strip .md)
+    const dirName = file.name.replace(/\.md$/i, "");
+    const draftDir = path.join(DRAFTS_DIR, dirName);
+    await mkdir(draftDir, { recursive: true });
+
+    const articleFilePath = path.join(draftDir, "article.md");
+    await writeFile(articleFilePath, buffer);
+
+    // Create images directory
+    const imagesDir = path.join(draftDir, "images");
+    await mkdir(imagesDir, { recursive: true });
+
+    // The contentPath stored in DB — no leading slash
+    const contentPath = `content/articles/drafts/${dirName}/article.md`;
 
     let draftId: string | undefined;
 
@@ -104,7 +117,7 @@ export async function POST(request: NextRequest) {
             where: { id: existingDraft.id },
             data: {
               title: frontmatter.title || existingDraft.title,
-              contentPath: `content/articles/drafts/${fileName}`,
+              contentPath,
               summary: frontmatter.summary || existingDraft.summary,
               tags: frontmatter.tags || existingDraft.tags,
               author: frontmatter.author || existingDraft.author,
@@ -120,7 +133,7 @@ export async function POST(request: NextRequest) {
               slug: `draft-${Date.now()}`,
               title: frontmatter.title || "未命名文章",
               language,
-              contentPath: `content/articles/drafts/${fileName}`,
+              contentPath,
               summary: frontmatter.summary || null,
               tags: frontmatter.tags || [],
               status: "draft",
@@ -138,7 +151,7 @@ export async function POST(request: NextRequest) {
             slug: `draft-${Date.now()}`,
             title: frontmatter.title || "未命名文章",
             language,
-            contentPath: `content/articles/drafts/${fileName}`,
+            contentPath,
             summary: frontmatter.summary || null,
             tags: frontmatter.tags || [],
             status: "draft",
@@ -152,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      fileName,
+      fileName: file.name,
       fileContent: raw,
       meta,
       extraFrontmatter,

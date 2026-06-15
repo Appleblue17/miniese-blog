@@ -41,7 +41,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog" },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
   appearance: {
-    themeMode: "system", bodyWidth: 66,
+    themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     backgroundImage: "", backgroundOpacity: 10, markdownBgOpacity: 80,
@@ -863,6 +863,95 @@ export default function SettingsPage() {
                   <ResetButton
                     isDefault={(a.markdownTextColorDark ?? "#f0f6fc") === DEFAULT_SETTINGS.appearance.markdownTextColorDark}
                     onReset={() => resetField("appearance", "markdownTextColorDark")}
+                  />
+                </div>
+              </div>
+
+              <SectionHeading>图片设置</SectionHeading>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">图片最大宽度 (px)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={200}
+                    max={2000}
+                    value={a.image?.maxWidth ?? 800}
+                    onChange={(e) => updateLocal("appearance", "image", { ...a.image, maxWidth: Number(e.target.value) })}
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={(a.image?.maxWidth ?? 800) === DEFAULT_SETTINGS.appearance.image.maxWidth}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, maxWidth: DEFAULT_SETTINGS.appearance.image.maxWidth })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">图片最大高度 (px)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={200}
+                    max={2000}
+                    value={a.image?.maxHeight ?? 600}
+                    onChange={(e) => updateLocal("appearance", "image", { ...a.image, maxHeight: Number(e.target.value) })}
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={(a.image?.maxHeight ?? 600) === DEFAULT_SETTINGS.appearance.image.maxHeight}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, maxHeight: DEFAULT_SETTINGS.appearance.image.maxHeight })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">默认宽度比例 ({a.image?.defaultWidthRatio ?? 60}%)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={30}
+                    max={100}
+                    value={a.image?.defaultWidthRatio ?? 60}
+                    onChange={(e) => updateLocal("appearance", "image", { ...a.image, defaultWidthRatio: Number(e.target.value) })}
+                    className="flex-1 accent-foreground"
+                  />
+                  <ResetButton
+                    isDefault={(a.image?.defaultWidthRatio ?? 60) === DEFAULT_SETTINGS.appearance.image.defaultWidthRatio}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, defaultWidthRatio: DEFAULT_SETTINGS.appearance.image.defaultWidthRatio })}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>30%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div>
+                  <p className="text-sm font-medium">启用灯箱效果</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">点击图片放大查看</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={a.image?.lightboxEnabled ?? true}
+                    onClick={() => updateLocal("appearance", "image", { ...a.image, lightboxEnabled: !(a.image?.lightboxEnabled ?? true) })}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                      (a.image?.lightboxEnabled ?? true) ? "" : "bg-primary/20"
+                    }`}
+                    style={(a.image?.lightboxEnabled ?? true) ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                        (a.image?.lightboxEnabled ?? true) ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <ResetButton
+                    isDefault={(a.image?.lightboxEnabled ?? true) === DEFAULT_SETTINGS.appearance.image.lightboxEnabled}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, lightboxEnabled: DEFAULT_SETTINGS.appearance.image.lightboxEnabled })}
                   />
                 </div>
               </div>

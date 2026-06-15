@@ -2,7 +2,7 @@
  * @file POST /api/articles/create-draft
  *
  * Creates a draft from an existing published article.
- * Copies the content file to the drafts directory and creates a draft record.
+ * Copies the entire article directory (including images/) to drafts/.
  *
  * Request body: { articleId }
  *
@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, cp } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 
@@ -60,21 +60,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Read the published content file
-    let content = "";
-    try {
-      content = await readFile(path.join(process.cwd(), article.contentPath), "utf-8");
-    } catch {
-      return NextResponse.json({ error: "Published article file not found." }, { status: 500 });
-    }
-
-    // Write to drafts directory
+    // Copy entire article directory (with images/) to drafts/
     const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
     await mkdir(DRAFTS_DIR, { recursive: true });
 
-    const draftFileName = `${article.slug}-draft.md`;
-    const filePath = path.join(DRAFTS_DIR, draftFileName);
-    await writeFile(filePath, content, "utf-8");
+    // Source: content/articles/{lang}/{slug}/
+    // Dest: content/articles/drafts/{slug}-draft/
+    const sourceDir = path.dirname(path.join(process.cwd(), article.contentPath));
+    const draftDirName = `${article.slug}-draft`;
+    const draftDir = path.join(DRAFTS_DIR, draftDirName);
+
+    try {
+      await cp(sourceDir, draftDir, { recursive: true });
+    } catch {
+      return NextResponse.json(
+        { error: "Published article directory not found." },
+        { status: 500 },
+      );
+    }
+
+    const contentPath = `content/articles/drafts/${draftDirName}/article.md`;
 
     // Create draft database record
     const draft = await prisma.article.create({
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest) {
         slug: `draft-${Date.now()}`,
         title: article.title,
         language: article.language,
-        contentPath: `content/articles/drafts/${draftFileName}`,
+        contentPath,
         summary: article.summary,
         tags: article.tags,
         status: "draft",

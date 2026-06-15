@@ -14,6 +14,12 @@
   "appearance": {
     "themeMode": "system",
     "bodyWidth": 66,
+    "image": {
+      "maxWidth": 800,
+      "maxHeight": 600,
+      "defaultWidthRatio": 60,
+      "lightboxEnabled": true
+    },
     "primary": {
       "lightHue": 200,
       "darkHue": 260,

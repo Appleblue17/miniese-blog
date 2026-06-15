@@ -8,10 +8,44 @@
  *   lang - Language code "zh" or "en" (required)
  *
  * Response: { article: { ...metadata }, html: string }
+ *
+ * Image URL resolution:
+ *   Markdown images like ![alt](image.png) are rendered as <img src="image.png">
+ *   (relative paths). This route rewrites them to absolute paths pointing to
+ *   the dedicated image serving API: /api/images/{articleId}/{filename}.
+ *   This ensures images load correctly regardless of the page URL structure.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+
+/**
+ * Rewrites relative image src paths in rendered HTML to absolute API paths.
+ *
+ * Transforms: <img src="image.png" ...> → <img src="/api/images/{articleId}/image.png" ...>
+ * Only rewrites paths that are relative (no protocol, no leading slash).
+ *
+ * @param html - The rendered HTML content
+ * @param articleId - The article UUID for constructing API paths
+ * @returns HTML with absolute image paths
+ */
+function rewriteImagePaths(html: string, articleId: string): string {
+  return html.replace(
+    /<img([^>]+)src\s*=\s*"([^"]+)"([^>]*)>/gi,
+    (_match, beforeAttrs: string, src: string, afterAttrs: string) => {
+      // Skip if src is already absolute (has protocol or starts with /)
+      if (/^(https?:\/\/|\/)/i.test(src)) {
+        return _match;
+      }
+      // Skip if src is a data URI
+      if (src.startsWith("data:")) {
+        return _match;
+      }
+      const newSrc = `/api/images/${articleId}/${src}`;
+      return `<img${beforeAttrs}src="${newSrc}"${afterAttrs}>`;
+    },
+  );
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
@@ -54,6 +88,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
+    // Rewrite relative image paths to absolute API paths
+    const html = article.renderedContent
+      ? rewriteImagePaths(article.renderedContent, article.id)
+      : "";
+
     return NextResponse.json({
       article: {
         id: article.id,
@@ -69,7 +108,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         isAITranslated: article.isAITranslated,
         originalId: article.originalId,
       },
-      html: article.renderedContent || "",
+      html,
     });
   } catch (error) {
     console.error("Get article error:", error);

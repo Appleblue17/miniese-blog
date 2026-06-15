@@ -75,6 +75,7 @@ model Article {
   accessGroup String[]
   publishedAt DateTime?
   updatedAt   DateTime        @updatedAt
+  defaultImageAccessGroup String[] @default([])
   changelog        String?
   renderedContent  String?
   author           String          @default("博主")
@@ -93,14 +94,26 @@ model Article {
   draftOf   Article?  @relation("DraftRelation", fields: [draftOfId], references: [id])
   drafts    Article[] @relation("DraftRelation")
 
-  wikiLinks   ArticleWikiLink[]
-  comments    Comment[]
-  aiTasks     AiTask[]
-  discoveries WikiDiscovery[]
-  proposals   WikiProposal[]
+  wikiLinks          ArticleWikiLink[]
+  imageOverrides     ArticleImageOverride[]
+  comments           Comment[]
+  aiTasks            AiTask[]
+  discoveries        WikiDiscovery[]
+  proposals          WikiProposal[]
 
   @@unique([slug, language])
   @@unique([originalId, language])
+}
+
+model ArticleImageOverride {
+  id          String   @id @default(cuid())
+  articleId   String
+  filename    String
+  accessGroup String[]
+
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, filename])
 }
 
 model WikiEntry {

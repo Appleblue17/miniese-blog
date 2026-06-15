@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import matter from "gray-matter";
 import { FileUploader, type UploadResult } from "./FileUploader";
+import { ImageManager } from "./ImageManager";
 import { computeDiff, type DiffLine } from "@/lib/diff";
 
 const FILE_TYPES = [
@@ -87,6 +88,9 @@ export function PublishForm({
 
   // Draft tracking
   const [draftId, setDraftId] = useState<string | null>(existingDraftId || null);
+  // Ref to always access the latest draftId value (bypass stale closures in callbacks)
+  const draftIdRef = useRef(draftId);
+  draftIdRef.current = draftId;
 
   // Step 3: Confirm state
   const [changelog, setChangelog] = useState("");
@@ -180,7 +184,7 @@ export function PublishForm({
     removed: number;
   } | null>(null);
 
-  const handleUpload = useCallback((result: UploadResult) => {
+  const handleUpload = useCallback(async (result: UploadResult) => {
     setFileName(result.fileName);
     setFileContent(result.fileContent);
 
@@ -192,28 +196,28 @@ export function PublishForm({
     };
 
     // Parse frontmatter using gray-matter (already done in FileUploader, but re-parse here for extra fields)
+    let parsedTitle = "";
+    let parsedLanguage: "zh" | "en" | "" = "";
+    let parsedFileType: "markdown" | "notesaw" = "markdown";
+    let parsedAuthor = "";
+    let parsedTags: string[] = [];
+    let parsedSummary = "";
+    let extra: Record<string, unknown> = {};
+
     try {
       const parsed = matter(result.fileContent);
       const data = parsed.data as Record<string, unknown>;
 
-      const fileLanguage = (
+      parsedLanguage = (
         data.language === "en" ? "en" :
         data.language === "zh" ? "zh" :
         inferLanguageFromFilename(result.fileName) || ""
       ) as "zh" | "en" | "";
-      const fileTitle = (data.title as string) || result.title;
-      const fileAuthor = (data.author as string) || result.author || meta.author;
-      const fileTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
-      const fileSummary = (data.summary as string) || result.summary;
-
-      setMeta({
-        title: fileTitle,
-        language: fileLanguage,
-        fileType: (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw",
-        tags: fileTags,
-        author: fileAuthor,
-        summary: fileSummary,
-      });
+      parsedTitle = (data.title as string) || result.title;
+      parsedAuthor = (data.author as string) || result.author || meta.author;
+      parsedTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
+      parsedSummary = (data.summary as string) || result.summary;
+      parsedFileType = (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw";
 
       // Collect extra frontmatter
       const managedKeys = new Set([
@@ -228,34 +232,68 @@ export function PublishForm({
         "accessGroup",
         "changelog",
       ]);
-      const extra: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(data)) {
         if (!managedKeys.has(key)) {
           extra[key] = value;
         }
       }
-      setExtraFrontmatter(extra);
     } catch {
-      // Use values from UploadResult
-      setMeta((prev) => ({
-        ...prev,
-        title: result.title || prev.title,
-        language: (result.language === "en" || result.language === "zh" ? result.language : "") as "zh" | "en" | "",
-        author: result.author || prev.author,
-        tags: result.tags,
-        summary: result.summary || "",
-      }));
+      parsedTitle = result.title || "";
+      parsedLanguage = (result.language === "en" || result.language === "zh" ? result.language : "") as "zh" | "en" | "";
+      parsedAuthor = result.author || meta.author;
+      parsedTags = result.tags;
+      parsedSummary = result.summary || "";
     }
+
+    setMeta({
+      title: parsedTitle,
+      language: parsedLanguage,
+      fileType: parsedFileType,
+      tags: parsedTags,
+      author: parsedAuthor,
+      summary: parsedSummary,
+    });
+    setExtraFrontmatter(extra);
 
     setPreviewHtml(null);
     setShowPreview(false);
     setError(null);
     setPublished(null);
-    setDraftId(null);
     // Reset review state — re-uploading a file should allow re-trigger
     setReviewTaskId(null);
     setReviewSubmitted(false);
-  }, [meta.author]);
+
+    // Auto-create draft if not already existing, so ImageManager is available immediately
+    // Use ref to check current draftId at the time of execution (avoid stale closures)
+    const currentDraftId = draftIdRef.current;
+    if (!existingDraftId && !currentDraftId && parsedTitle && parsedLanguage) {
+      try {
+        const res = await fetch("/api/articles/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: result.fileName,
+            fileContent: result.fileContent,
+            meta: {
+              title: parsedTitle,
+              language: parsedLanguage,
+              fileType: parsedFileType,
+              tags: parsedTags,
+              author: parsedAuthor,
+              summary: parsedSummary,
+            },
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.draft?.id) {
+          setDraftId(data.draft.id);
+        }
+      } catch {
+        // Silent fail — draft creation is optional for image management
+        // User can still manually save draft later
+      }
+    }
+  }, [meta.author, existingDraftId]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!fileContent) return;
@@ -711,6 +749,16 @@ export function PublishForm({
               )}
             </Card>
 
+            {/* Image Manager (shown in upload step if draft already exists) */}
+            {draftId && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium">图片管理</h3>
+                </div>
+                <ImageManager articleId={draftId} isDraft={true} />
+              </Card>
+            )}
+
             {/* Action buttons — only save as draft or go to confirm, no review here */}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={handleSaveDraft} disabled={savingDraft}>
@@ -834,6 +882,16 @@ export function PublishForm({
             </div>
           )}
         </Card>
+
+        {/* Image Manager */}
+        {draftId && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium">图片管理</h3>
+            </div>
+            <ImageManager articleId={draftId} isDraft={true} />
+          </Card>
+        )}
 
         {/* Action buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
