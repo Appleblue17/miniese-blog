@@ -64,7 +64,7 @@ interface TranslationItem {
   status: string;
   contentPath: string;
   updatedAt: string;
-  originalId: string;
+  originalId: string | null;
   isAITranslated: boolean;
   charCount: number;
   lineCount: number;
@@ -215,6 +215,7 @@ async function fetchData(page: number): Promise<AdminArticlesResponse> {
           status: d.status,
           contentPath: d.contentPath,
           updatedAt: d.updatedAt.toISOString(),
+          draftOfId: null,
           ...stats,
         };
       }),

@@ -169,7 +169,7 @@ model User {
   email         String    @unique
   password      String?
   name          String?
-  role          String    @default("user")
+  roles         String[]  @default(["user"])
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -178,6 +178,7 @@ model User {
   sessions      Session[]
   comments      Comment[]
   proposals     WikiProposal[]
+  notifications Notification[]
 }
 
 model Account {
@@ -223,6 +224,21 @@ model WikiProposal {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   article  Article? @relation(fields: [sourceArticleId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id           String      @id @default(uuid())
+  type         String      // comment, translation_complete, task_failed, discovery
+  title        String
+  content      String
+  articleId    String?
+  articleTitle String?
+  taskId       String?     // Link to AiTask for task-related notifications
+  userId       String?
+  isRead       Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
 model WikiDiscovery {

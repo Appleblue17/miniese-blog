@@ -126,6 +126,24 @@ export async function POST(request: Request) {
       },
     });
 
+    // Notify admin about new comment (fire-and-forget)
+    const articleTitle = article.title;
+    const authorName = session.user.name || session.user.email || "用户";
+    Promise.resolve().then(async () => {
+      try {
+        const { createNotification } = await import("@/lib/notifications");
+        await createNotification({
+          type: "comment",
+          title: "新评论",
+          content: `文章《${articleTitle}》收到来自 ${authorName} 的新评论`,
+          articleId: article.id,
+          articleTitle: article.title,
+        });
+      } catch (e) {
+        console.error("[Comments] Failed to create notification:", e);
+      }
+    });
+
     return NextResponse.json(comment, { status: 201 });
   } catch (err) {
     console.error("[Comments API] Error:", err);

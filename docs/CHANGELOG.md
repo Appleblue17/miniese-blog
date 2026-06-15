@@ -6,6 +6,19 @@
 
 ### Added
 
+#### AI 聊天对话窗口
+- 新增 `/api/chat` 端点：SSE 流式响应，直接调用 DeepSeek API，支持文章上下文注入
+- 新增 `ChatButton` 组件：右下角浮动聊天入口
+- 新增 `ChatDrawer` 组件：右侧滑入抽屉，流式显示 AI 响应，支持选中内容上下文
+- 新增 `TextSelectionToolbar` 组件：选择文本后浮动工具栏，"向 Miniese 提问"和"申请添加词条"
+- 新增 `SelectionInfo` 类型，包含选中文本、周围段落、标题路径等上下文信息
+- Settings 新增 `prompts.chat` 配置，博主可自定义 Miniese 角色 prompt
+
+#### 阅读页 AI 功能
+- 选中文本时自动计算所属标题层级（headingPath）和周围上下文（surroundingContext）
+- ChatDrawer 选中内容卡片（sticky 固定在顶部）和 4 个快捷操作按钮（解释/翻译/举例/总结）
+- 快捷按钮始终可见，不限于首次交互
+
 #### 发布流程优化
 - Settings 新增 `publish.defaultAuthor` 配置，PublishForm 从设置读取默认作者
 - 语言选择改为必选，保存/提交/确认前进行校验
@@ -14,6 +27,10 @@
 
 ### Fixed
 
+- KaTeX 公式选中后获取渲染字符而非 LaTeX 源码的问题
+  - 选择包含公式的文本时（如 "$E = mc^2$"），`selection.toString()` 返回渲染后的 "E = mc²"
+  - 修复：使用 `range.cloneContents()` 获取选中 DOM 片段，将 `.katex` 元素替换为 `<annotation>` 中的 LaTeX 源码
+  - 支持跨区域选择（普通文本和公式混合），每个公式独立替换
 - skipped 任务（feature disabled）在各处正确显示"已跳过"而非"已完成"
   - reviews 列表页：映射 status 为 "skipped"，黄色标签
   - reviews 详情页：跳过状态检测 + 显示 reason 提示卡片

@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     notesaw: { name: "Notesaw", extensions: [".md"], enabled: true },
   },
   publish: { defaultAuthor: "博主" },
-  prompts: { review: "", translate: "", discovery: "", generate: "" },
+  prompts: { review: "", translate: "", discovery: "", generate: "", chat: "" },
 };
 
 type TabId = "general" | "appearance" | "features" | "notifications" | "dev" | "advanced";

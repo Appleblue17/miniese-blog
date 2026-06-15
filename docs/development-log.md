@@ -378,3 +378,40 @@
   - router.push 后 session 未刷新：`signIn` 后如果使用 `router.push`，客户端 session 状态可能未及时更新。改用 `window.location.href = callbackUrl` 触发全页刷新
   - 评论频率限制跨翻译版本：同一用户在中英文文章各发一条应视为同一条（60s cooldown）。通过 `originalId` 解析翻译组的根文章 ID 实现
   - Github Dark/Light 主题双 CSS 变量引用冗余问题：已在阶段 5.6 提前修复
+
+### 任务 阶段7：AI 聊天对话窗口 + 阅读页 AI 功能优化
+- **时间**：2026-06-14~2026-06-15
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **AI 聊天对话窗口**（`/api/chat`）：
+    - 新建 `src/app/api/chat/route.ts`：SSE 流式响应，直接调用 DeepSeek API（不走队列）
+    - 开放给所有用户（无需登录），但带有简单的 IP 级频率限制（10s 窗口最多 5 次请求）
+    - 消息长度限制：最多 20 条消息，总字符不超过 8000
+    - 可选 `selection` 字段：将选中文本和文章上下文追加到 system prompt，增强回答准确性
+    - 系统 prompt 从站点设置加载（`settings.prompts.chat`），博主可在设置页自定义 Miniese 角色
+  - **聊天前端组件**：
+    - `src/components/ai/ChatButton.tsx` — 右下角浮动聊天按钮
+    - `src/components/ai/ChatDrawer.tsx` — 右侧滑入抽屉，SSE 流式显示 AI 响应
+    - `src/components/ai/TextSelectionToolbar.tsx` — 选择文本后浮动工具栏，支持"向 Miniese 提问"和"申请添加词条"
+  - **阅读页 AI 集成**（`ArticleReader.tsx`）：
+    - 集成聊天按钮和抽屉
+    - 选中文本时显示 `TextSelectionToolbar`
+    - 按需计算选中文本的 headingPath（DOM 遍历查找所属标题层级）和 surroundingContext（前后各 2 段）
+    - 选中信息（`SelectionInfo`）传递给 ChatDrawer，作为上下文发送给 AI
+  - **Selection 快速操作按钮**（ChatDrawer）：
+    - 选中内容显示为可折叠卡片（sticky top-0 固定在聊天区域顶部）
+    - 4 个快捷按钮：解释（Explain）、翻译（Translate）、举例（Example）、总结（Summarize）
+    - 点击后将选中内容填入选中的 Prompt 模板发送
+    - 快捷按钮始终可见（不限于首次交互）
+  - **Chat prompt 设置**：
+    - `config/default-settings.json` 新增 `prompts.chat` 字段
+    - 设置页 `DEFAULT_SETTINGS` 包含 `chat: ""`
+    - API 从数据库加载自定义 prompt
+  - **KaTeX 公式选择修复**：
+    - 选择包含 KaTeX 公式的文本时，原来 `selection.toString()` 返回渲染后字符（如 `E = mc²`）而非 LaTeX 源码
+    - 修复：新增 `extractTextFromRange()` 函数，使用 `range.cloneContents()` 获取选中 DOM 片段，遍历替换其中的 `.katex` 元素为 `<annotation>` 中的 LaTeX 源码（包上 `$...$` 或 `$$...$$`）
+    - 处理了跨区域选择（如 "BST for a set $S$ of $n$ distinct keys"），每个公式独立替换
+- **测试结果**：`npx tsc --noEmit` 编译通过，319/325 测试通过（6 个预存失败，无新增回归）
+- **遇到问题**：
+  - 流式 SSE 解析：DeepSeek 部分实现发送累积内容而非增量 delta，需检测 `previousContent` 去掉已接收部分
+  - KaTeX 公式选择修复的第一次尝试使用了 `createTreeWalker` 遍历节点，导致重复处理（既匹配到 `.katex` 元素又匹配到其子文本节点）。改用 `range.cloneContents()` 后在克隆 fragment 上操作，消除了重复问题

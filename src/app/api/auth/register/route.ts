@@ -17,7 +17,7 @@ import { sendEmail, verificationEmailHtml } from "@/lib/mail";
 async function shouldSkipEmailVerification(): Promise<boolean> {
   try {
     const { getSettings } = await import(
-      "../../../../../../config/settings"
+      "../../../../../config/settings"
     );
     const settings = await getSettings();
     const features = settings.features as Record<string, unknown>;
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         name: name || email.split("@")[0],
-        role: "user",
+        roles: ["user"],
         emailVerified,
       },
     });

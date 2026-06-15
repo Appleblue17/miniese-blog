@@ -241,7 +241,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
                 }}
                 type="button"
                 onClick={() => handleClick(item.id)}
-                className={`block w-full text-left py-1 pr-2 border-l-2 transition-colors hover:text-foreground ${
+                className={`block w-full text-left py-1.5 pr-2 border-l-2 transition-colors hover:text-foreground ${
                   activeId === item.id
                     ? "border-primary text-foreground font-semibold"
                     : "border-transparent text-muted-foreground hover:border-muted-foreground/30"
@@ -261,11 +261,11 @@ export function TableOfContents({ html }: TableOfContentsProps) {
       </nav>
 
       {/* Mobile: collapsible TOC button */}
-      <div className="xl:hidden fixed bottom-4 right-4 z-50">
+      <div className="xl:hidden fixed bottom-20 right-4 z-50">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground shadow-lg"
+          className="flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm text-primary-foreground shadow-lg min-h-[44px]"
         >
           <svg
             className="size-4"
@@ -292,7 +292,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
+                className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
               >
                 <svg
                   className="size-5"
@@ -311,7 +311,7 @@ export function TableOfContents({ html }: TableOfContentsProps) {
                   <button
                     type="button"
                     onClick={() => handleClick(item.id)}
-                    className={`block w-full text-left py-1.5 px-2 rounded-md transition-colors ${
+                    className={`block w-full text-left py-2 px-2 rounded-md transition-colors ${
                       activeId === item.id
                         ? "bg-muted font-semibold text-foreground"
                         : "text-muted-foreground hover:text-foreground"

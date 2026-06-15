@@ -25,7 +25,7 @@ interface UserInfo {
   id: string;
   name: string | null;
   email: string | null;
-  role: string;
+  roles: string[];
 }
 
 export function ActionBar() {
@@ -136,7 +136,7 @@ export function ActionBar() {
                   个人设置
                 </button>
 
-                {user.role === "admin" && (
+                {user.roles.includes("admin") && (
                   <button
                     onClick={() => { setMenuOpen(false); router.push("/admin"); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/50 transition-colors"

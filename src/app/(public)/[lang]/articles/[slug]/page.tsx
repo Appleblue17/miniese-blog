@@ -80,32 +80,32 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <div className="mx-auto px-4 py-8" style={{ maxWidth: "var(--body-width, 48rem)" }}>
-      <div className="flex items-start gap-4">
-        <div className="sticky top-24 shrink-0">
-          <Link
-            href={`/${lang}/articles`}
-            className="inline-flex items-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <ArrowLeft className="size-5" />
-          </Link>
-        </div>
-        <div className="min-w-0 flex-1">
-          <ArticleReader
-            articleId={data.article.id}
-            title={data.article.title}
-            author={data.article.author}
-            publishedAt={data.article.publishedAt}
-            updatedAt={data.article.updatedAt}
-            tags={data.article.tags}
-            summary={data.article.summary}
-            html={data.html}
-            viewCount={0}
-            likes={0}
-            lang={lang}
-            changelog={data.article.changelog}
-            isAITranslated={data.article.isAITranslated}
-          />
-        </div>
+      {/* Back button — on desktop, sticky left sidebar; on mobile, inline top */}
+      <div className="mb-4 md:mb-0 md:sticky md:top-24 md:float-left md:-ml-12 md:mr-2">
+        <Link
+          href={`/${lang}/articles`}
+          className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors min-h-[44px] min-w-[44px]"
+          aria-label={lang === "zh" ? "返回文章列表" : "Back to articles"}
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
+      </div>
+      <div className="min-w-0">
+        <ArticleReader
+          articleId={data.article.id}
+          title={data.article.title}
+          author={data.article.author}
+          publishedAt={data.article.publishedAt}
+          updatedAt={data.article.updatedAt}
+          tags={data.article.tags}
+          summary={data.article.summary}
+          html={data.html}
+          viewCount={0}
+          likes={0}
+          lang={lang}
+          changelog={data.article.changelog}
+          isAITranslated={data.article.isAITranslated}
+        />
       </div>
     </div>
   );

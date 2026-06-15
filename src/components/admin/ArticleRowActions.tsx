@@ -70,7 +70,7 @@ interface TranslationItem {
   status: string;
   contentPath: string;
   updatedAt: string;
-  originalId: string;
+  originalId: string | null;
   isAITranslated: boolean;
   charCount: number;
   lineCount: number;

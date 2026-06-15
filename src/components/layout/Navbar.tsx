@@ -29,7 +29,7 @@ export function Navbar() {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 md:hidden"
+        className="fixed top-3 left-3 z-50 md:hidden size-11"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label={mobileOpen ? (lang === "zh" ? "关闭菜单" : "Close menu") : (lang === "zh" ? "打开菜单" : "Open menu")}
       >
@@ -54,7 +54,7 @@ export function Navbar() {
         <div className="flex flex-col gap-1">
           <Link
             href={localize("")}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${
               pathname === localize("") ? "bg-muted font-medium text-primary-hsl" : ""
             }`}
           >
@@ -70,7 +70,7 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={fullHref}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${
                   isActive ? "bg-muted font-medium text-primary-hsl" : ""
                 }`}
               >
@@ -88,7 +88,7 @@ export function Navbar() {
         <div className="border-t border-border pt-3">
           <Link
             href="/admin"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings className="size-4" />
             {lang === "zh" ? "仪表盘" : "Dashboard"}

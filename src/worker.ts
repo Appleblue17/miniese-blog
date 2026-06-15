@@ -23,6 +23,7 @@ import { discoverWikiCandidates } from "./lib/ai/discovery";
 import { addJob } from "./lib/queue/producer";
 import { loadCustomPrompt } from "./lib/ai/promptLoader";
 import { getSettings } from "../config/settings";
+import { notifyAndMail } from "./lib/notifications";
 import type { Job } from "bull";
 import type { Prisma } from "./generated/prisma/client";
 
@@ -470,6 +471,20 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
+  // 11b. Notify admin about translation completion (fire-and-forget)
+  notifyAndMail({
+    type: "translation_complete",
+    title: "翻译完成",
+    content: `文章《${sourceArticle.title}》已由 ${sourceLangName} 翻译为 ${targetLangName}，共翻译 ${result.translatedCount} 段`,
+    articleId: targetArticleIdStr,
+    articleTitle: translatedTitle || sourceArticle.title,
+    taskId: translateTaskId,
+  }).catch((err) => {
+    console.warn(
+      `[Worker] Failed to send translation notification: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+
   // 12. Return result including the full translation map for future incremental runs
   //     and translatedGroups for the detail page display
   return {
@@ -562,6 +577,7 @@ async function loadExistingTranslations(
 async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   const payload = (job.data.payload ?? {}) as Record<string, unknown>;
   const { discoveryId } = payload;
+  const { taskId: generateTaskId } = job.data as { taskId: string };
 
   const discoveryIdStr = String(discoveryId ?? "");
 
@@ -743,6 +759,19 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
   });
   console.log(`[Worker] Discovery "${discoveryIdStr}" marked as generated`);
 
+  // 6b. Notify admin about term generation completion (fire-and-forget)
+  notifyAndMail({
+    type: "discovery",
+    title: "词条生成完成",
+    content: `术语「${discovery.term}」的 Wiki 词条已由 AI 生成，请前往审核`,
+    articleTitle: entry.name,
+    taskId: generateTaskId,
+  }).catch((err) => {
+    console.warn(
+      `[Worker] Failed to send generation notification: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+
   // 7. Return success
   return {
     discoveryId: discoveryIdStr,
@@ -770,6 +799,7 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
  */
 async function processDiscover(job: Job): Promise<Record<string, unknown>> {
   const payload = (job.data.payload ?? {}) as Record<string, unknown>;
+  const { taskId: discoverTaskId } = job.data as { taskId: string };
   const { articleId, articleSlug, articleLang } = payload;
 
   const articleIdStr = String(articleId ?? "");
@@ -839,7 +869,21 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
 
   console.log(`[Worker] Discovery complete: ${storedCount}/${candidates.length} candidates stored`);
 
-  // 4. Return summary
+  // 4. Notify admin about discovery completion (fire-and-forget)
+  notifyAndMail({
+    type: "discovery",
+    title: "术语发现完成",
+    content: `文章发现 ${storedCount} 个候选术语，请前往审核`,
+    articleId: articleIdStr,
+    articleTitle: slugStr,
+    taskId: discoverTaskId,
+  }).catch((err) => {
+    console.warn(
+      `[Worker] Failed to send discovery notification: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+
+  // 5. Return summary
   return {
     articleId: articleIdStr,
     discoveredAt: new Date().toISOString(),

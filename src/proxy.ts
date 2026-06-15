@@ -32,9 +32,9 @@ export async function proxy(request: NextRequest) {
     const session = await auth();
 
     const isLoggedIn = !!session?.user;
-    const role = session?.user?.role;
+    const roles = (session?.user as { roles?: string[] })?.roles || [];
 
-    if (!isLoggedIn || role !== "admin") {
+    if (!isLoggedIn || !roles.includes("admin")) {
       if (isAdminApi) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }

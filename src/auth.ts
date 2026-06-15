@@ -51,7 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          roles: user.roles,
         };
       },
     }),
@@ -75,24 +75,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as { role?: string }).role || "user";
+        token.roles = (user as { roles?: string[] }).roles || ["user"];
         token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { role: string }).role = (token.role as string) || "user";
+        (session.user as { roles: string[] }).roles = (token.roles as string[]) || ["user"];
         (session.user as { id: string }).id = token.id as string;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET!,
 });
 
 /**
- * Extend the built-in session types to include role and id.
+ * Extend the built-in session types to include roles and id.
  */
 declare module "next-auth" {
   interface Session {
@@ -101,14 +101,14 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      role: string;
+      roles: string[];
     };
   }
 }
 
-declare module "next-auth/jwt" {
+declare module "@auth/core/jwt" {
   interface JWT {
-    role: string;
-    id: string;
+    roles: string[];
+    id?: string;
   }
 }

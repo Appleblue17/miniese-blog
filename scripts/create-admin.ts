@@ -45,19 +45,19 @@ async function main() {
       where: { email },
       update: {
         password: hashedPassword,
-        role: "admin",
+        roles: ["admin"],
         emailVerified: new Date(),
       },
       create: {
         email,
         password: hashedPassword,
         name: "Admin",
-        role: "admin",
+        roles: ["admin"],
         emailVerified: new Date(),
       },
     });
 
-    console.log(`Admin user "${user.email}" (id: ${user.id}) ${user.role === "admin" ? "created/updated" : "created"} successfully.`);
+    console.log(`Admin user "${user.email}" (id: ${user.id}) ${user.roles.includes("admin") ? "created/updated" : "created"} successfully.`);
   } catch (err) {
     console.error("Error creating admin user:", err);
     process.exit(1);

@@ -15,7 +15,7 @@ interface UserInfo {
   id: string;
   name: string | null;
   email: string | null;
-  role: string;
+  roles: string[];
 }
 
 export default function SettingsPage() {
@@ -132,7 +132,7 @@ export default function SettingsPage() {
           </p>
           <p>
             <span className="text-muted-foreground">角色：</span>
-            {user.role === "admin" ? "管理员" : "用户"}
+            {user.roles.includes("admin") ? "管理员" : "用户"}
           </p>
         </div>
       </div>
@@ -211,7 +211,7 @@ export default function SettingsPage() {
       </form>
 
       {/* Admin link */}
-      {user.role === "admin" && (
+      {user.roles.includes("admin") && (
         <div className="text-center">
           <Link
             href="/admin"
