@@ -309,22 +309,23 @@ export function ChatDrawer({
       {/* No overlay — drawer stays open until closed via X button or Escape key.
           This allows users to select article text while chatting. */}
 
-      {/* Drawer */}
+      {/* Drawer — mobile: fullscreen, desktop: side panel */}
       <div
-        className="fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-background shadow-xl"
+        className="fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-background shadow-xl max-md:inset-0 max-md:w-full max-md:border-l-0"
         style={{ width: drawerWidth }}
       >
-        {/* Drag handle */}
+        {/* Drag handle — desktop only */}
         <div
           onMouseDown={handleDragStart}
-          className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 transition-colors z-20"
+          className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 transition-colors z-20"
           title={t("拖拽调整宽度", "Drag to resize")}
         />
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 md:px-4">
           <div className="flex items-center gap-2">
-            <Bot className="size-5 text-primary" />
-            <span className="font-medium">{t("向 Miniese 提问", "Ask Miniese")}</span>
+            <Bot className="size-5 text-primary shrink-0" />
+            <span className="font-medium text-sm md:text-base">{t("向 Miniese 提问", "Ask Miniese")}</span>
           </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
@@ -332,19 +333,19 @@ export function ChatDrawer({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowClearConfirm(true)}
-                className="text-xs text-muted-foreground"
+                className="text-xs text-muted-foreground max-md:px-2 max-md:h-8"
               >
-                {t("清空历史/记忆", "Clear History/Memory")}
+                {t("清空历史", "Clear History")}
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="size-8"
+              className="size-8 md:size-9"
               aria-label={t("关闭", "Close")}
             >
-              <X className="size-4" />
+              <X className="size-4 md:size-5" />
             </Button>
           </div>
         </div>
@@ -358,7 +359,7 @@ export function ChatDrawer({
                 <button
                   type="button"
                   onClick={() => setSelectionCollapsed(!selectionCollapsed)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left"
+                  className="flex w-full items-center justify-between px-3 py-2.5 md:py-2 text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
@@ -391,8 +392,8 @@ export function ChatDrawer({
                 )}
               </div>
 
-              {/* Quick action buttons — always visible (no "first interaction only") */}
-              <div className="flex items-center gap-1.5 px-4 pb-3">
+              {/* Quick action buttons — horizontal scroll on mobile */}
+              <div className="flex items-center gap-1.5 px-4 pb-3 overflow-x-auto max-md:gap-2 max-md:px-3 max-md:pb-4 scrollbar-none">
                 {(Object.keys(QUICK_ACTIONS) as QuickActionKey[]).map((key) => {
                   const action = QUICK_ACTIONS[key];
                   const Icon = action.icon;
@@ -403,9 +404,9 @@ export function ChatDrawer({
                       type="button"
                       onClick={() => handleQuickAction(key)}
                       disabled={streaming}
-                      className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 md:px-2.5 md:py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                     >
-                      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <Icon className="size-3.5 md:size-3 shrink-0 text-muted-foreground" />
                       {label}
                     </button>
                   );
@@ -428,9 +429,9 @@ export function ChatDrawer({
 
           {/* Empty state (no selection, no messages) */}
           {messages.length === 0 && !selection && (
-            <div className="flex flex-col items-center justify-center flex-1 text-center text-muted-foreground/60 px-4">
-              <Bot className="size-12 mb-3 opacity-30" />
-              <p className="text-sm">
+            <div className="flex flex-col items-center justify-center flex-1 text-center text-muted-foreground/60 px-6 md:px-4">
+              <Bot className="size-12 md:size-12 mb-3 md:mb-3 opacity-30" />
+              <p className="text-sm md:text-sm">
                 {t("你好！我是 Miniese，可以问我关于文章的任何问题。", "Hi! I'm Miniese. Ask me anything about the article.")}
               </p>
             </div>
@@ -438,22 +439,22 @@ export function ChatDrawer({
 
           {/* Chat messages */}
           {messages.length > 0 && (
-            <div className="px-4 py-4 space-y-4">
+            <div className="px-4 py-4 md:py-4 space-y-4 md:space-y-4">
               {messages.map((msg, i) => (
                 <div
                   key={i}
-                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex gap-2 md:gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="size-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="size-4 text-primary" />
+                    <div className="size-7 md:size-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="size-3.5 md:size-4 text-primary" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-xl px-3 text-sm leading-relaxed break-words ${
+                    className={`rounded-xl px-3 md:px-3 text-sm leading-relaxed break-words ${
                       msg.role === "user"
-                        ? "bg-primary text-primary-foreground py-2"
-                        : "bg-muted prose prose-sm dark:prose-invert max-w-none"
+                        ? "bg-primary text-primary-foreground py-2 max-w-[85%] md:max-w-[80%]"
+                        : "bg-muted prose prose-sm dark:prose-invert max-w-[85%] md:max-w-[80%] max-w-none"
                     }`}
                   >
                     {msg.role === "assistant" ? (
@@ -473,8 +474,8 @@ export function ChatDrawer({
                     )}
                   </div>
                   {msg.role === "user" && (
-                    <div className="size-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
-                      <User className="size-4 text-muted-foreground/60" />
+                    <div className="size-7 md:size-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
+                      <User className="size-3.5 md:size-4 text-muted-foreground/60" />
                     </div>
                   )}
                 </div>
@@ -486,8 +487,8 @@ export function ChatDrawer({
 
         {/* Clear confirmation */}
         {showClearConfirm && (
-          <div className="mx-4 mb-2 flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-lg">
-            <span className="text-muted-foreground">
+          <div className="mx-4 mb-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2.5 md:px-3 md:py-2 text-sm shadow-lg">
+            <span className="text-muted-foreground text-xs md:text-sm leading-relaxed">
               {t("确定清空所有对话历史？此操作将让 Miniese 忘记本次对话，且不可撤销。", "Clear all conversation history? This will make Miniese forget this conversation, and it cannot be undone.")}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -495,7 +496,7 @@ export function ChatDrawer({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowClearConfirm(false)}
-                className="text-xs h-7"
+                className="text-xs h-8 md:h-7 flex-1 md:flex-none"
               >
                 {t("取消", "Cancel")}
               </Button>
@@ -503,7 +504,7 @@ export function ChatDrawer({
                 variant="destructive"
                 size="sm"
                 onClick={handleClear}
-                className="text-xs h-7"
+                className="text-xs h-8 md:h-7 flex-1 md:flex-none"
               >
                 {t("清空", "Clear")}
               </Button>
@@ -513,14 +514,14 @@ export function ChatDrawer({
 
         {/* Error */}
         {error && (
-          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <AlertCircle className="size-3 shrink-0" />
-            {error}
+          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 md:px-3 md:py-2 text-xs md:text-xs text-destructive">
+            <AlertCircle className="size-3.5 md:size-3 shrink-0" />
+            <span className="leading-relaxed">{error}</span>
           </div>
         )}
 
         {/* Input */}
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-t border-border px-4 py-3 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -530,13 +531,13 @@ export function ChatDrawer({
               placeholder={selection ? t("补充你的问题...", "Ask a follow-up...") : t("输入你的问题...", "Ask a question...")}
               rows={2}
               disabled={streaming}
-              className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 md:py-2 text-sm md:text-sm ring-offset-background placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 max-md:min-h-[44px]"
             />
             <Button
               size="icon"
               onClick={handleSend}
               disabled={!input.trim() || streaming}
-              className="shrink-0 size-[42px]"
+              className="shrink-0 size-[42px] md:size-[42px] max-md:size-[48px]"
             >
               {streaming ? (
                 <Loader2 className="size-4 animate-spin" />

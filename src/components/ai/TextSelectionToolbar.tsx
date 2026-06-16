@@ -202,7 +202,7 @@ export function TextSelectionToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-lg border border-border bg-background px-1.5 py-1 shadow-lg"
+      className="fixed z-50 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-lg border border-border bg-background px-1.5 py-1.5 md:px-1.5 md:py-1 shadow-lg"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -211,25 +211,25 @@ export function TextSelectionToolbar({
     >
       <button
         onClick={handleAskQuestion}
-        className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors cursor-pointer whitespace-nowrap min-h-[36px]"
+        className="flex items-center gap-1.5 rounded-md px-3 py-2.5 md:px-3 md:py-2 text-xs md:text-xs font-medium text-foreground hover:bg-accent transition-colors cursor-pointer whitespace-nowrap min-h-[44px] md:min-h-[36px]"
       >
-        <Bot className="size-3.5" />
+        <Bot className="size-4 md:size-3.5" />
         {t("向 Miniese 提问", "Ask Miniese")}
       </button>
 
-      <div className="h-5 w-px bg-border" />
+      <div className="h-6 md:h-5 w-px bg-border" />
 
       <button
         onClick={handleProposeTerm}
         disabled={proposing || proposeDone}
-        className="flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap min-h-[36px]"
+        className="flex items-center gap-1.5 rounded-md px-3 py-2.5 md:px-3 md:py-2 text-xs md:text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap min-h-[44px] md:min-h-[36px]"
       >
         {proposeDone ? (
-          <Check className="size-3.5 text-green-500" />
+          <Check className="size-4 md:size-3.5 text-green-500" />
         ) : proposing ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader2 className="size-4 md:size-3.5 animate-spin" />
         ) : (
-          <BookPlus className="size-3.5" />
+          <BookPlus className="size-4 md:size-3.5" />
         )}
         {proposeDone
           ? t("已提交", "Submitted")
