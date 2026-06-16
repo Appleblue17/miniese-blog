@@ -277,16 +277,19 @@ export function ChatDrawer({
     setError(null);
   };
 
-  // Draggable width — attach/detach global mouse events
-  const handleDragStart = useCallback(() => {
+  // Draggable width — mouse (desktop) and touch (tablet)
+  const handleDragStartMouse = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     dragRef.current = true;
     document.body.style.cursor = "ew-resize";
     document.body.style.userSelect = "none";
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const initialWidth = drawerWidth;
+    const startX = e.clientX;
+
+    const handleMouseMove = (me: MouseEvent) => {
       if (!dragRef.current) return;
-      // Distance from right edge of viewport
-      const newWidth = window.innerWidth - e.clientX;
+      const newWidth = initialWidth + startX - me.clientX;
       setDrawerWidth(Math.max(320, Math.min(700, newWidth)));
     };
 
@@ -300,7 +303,32 @@ export function ChatDrawer({
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-  }, []);
+  }, [drawerWidth]);
+
+  const handleDragStartTouch = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    dragRef.current = true;
+    document.body.style.userSelect = "none";
+
+    const initialWidth = drawerWidth;
+    const startX = e.touches[0].clientX;
+
+    const handleTouchMove = (te: TouchEvent) => {
+      if (!dragRef.current) return;
+      const newWidth = initialWidth + startX - te.touches[0].clientX;
+      setDrawerWidth(Math.max(320, Math.min(700, newWidth)));
+    };
+
+    const handleTouchEnd = () => {
+      dragRef.current = false;
+      document.body.style.userSelect = "";
+      document.removeEventListener("touchmove", handleTouchMove);
+      document.removeEventListener("touchend", handleTouchEnd);
+    };
+
+    document.addEventListener("touchmove", handleTouchMove, { passive: true });
+    document.addEventListener("touchend", handleTouchEnd);
+  }, [drawerWidth]);
 
   if (!open) return null;
 
@@ -314,10 +342,11 @@ export function ChatDrawer({
         className="fixed right-0 top-0 z-50 flex h-full flex-col border-l border-border bg-background shadow-xl max-md:inset-0 max-md:w-full max-md:border-l-0"
         style={{ width: drawerWidth }}
       >
-        {/* Drag handle — desktop only */}
+        {/* Drag handle — desktop and tablet */}
         <div
-          onMouseDown={handleDragStart}
-          className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/50 transition-colors z-20"
+          onMouseDown={handleDragStartMouse}
+          onTouchStart={handleDragStartTouch}
+          className="hidden md:block absolute left-0 top-0 bottom-0 w-2 md:w-1 cursor-ew-resize hover:bg-primary/50 active:bg-primary transition-colors z-20"
           title={t("拖拽调整宽度", "Drag to resize")}
         />
 
@@ -392,8 +421,8 @@ export function ChatDrawer({
                 )}
               </div>
 
-              {/* Quick action buttons — horizontal scroll on mobile */}
-              <div className="flex items-center gap-1.5 px-4 pb-3 overflow-x-auto max-md:gap-2 max-md:px-3 max-md:pb-4 scrollbar-none">
+              {/* Quick action buttons — wrap into rows when space is tight */}
+              <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3 max-md:gap-2 max-md:px-3 max-md:pb-4">
                 {(Object.keys(QUICK_ACTIONS) as QuickActionKey[]).map((key) => {
                   const action = QUICK_ACTIONS[key];
                   const Icon = action.icon;
@@ -404,7 +433,7 @@ export function ChatDrawer({
                       type="button"
                       onClick={() => handleQuickAction(key)}
                       disabled={streaming}
-                      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 md:px-2.5 md:py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 md:px-2.5 md:py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Icon className="size-3.5 md:size-3 shrink-0 text-muted-foreground" />
                       {label}

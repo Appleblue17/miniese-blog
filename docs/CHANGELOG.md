@@ -6,6 +6,25 @@
 
 ### Added
 
+#### 图片灯箱移动端交互（双指缩放 + 拖动平移）
+- 新增触摸事件处理：双指 pinch-to-zoom（0.2x–5x 无级缩放）
+- 缩放后单指 drag-to-pan 平移图片，边界约束防止图片移出视口
+- 拖动时使用 `window.innerWidth/Height` 计算最大偏移量 `(scale-1)*vw/2`
+- 移除右上角关闭按钮（点击 overlay 背景即可关闭 + Escape 键盘）
+- 移除过渡动画（`transition-transform duration-100` → `transition-none`），手势响应更即时
+- caption 和底部信息添加 `pointer-events-none`，防止点击干扰关闭操作
+- 添加 `touch-none select-none` 防止触摸时页面滚动或选中文字
+
+#### AI 对话窗口响应式优化
+- ChatButton 移动端缩小（`size-14`→`size-12`），适配 `safe-area-inset-bottom`
+- ChatDrawer 移动端全屏覆盖（`max-md:inset-0 w-full`），桌面端保持侧滑抽屉
+- 快速操作按钮由 `overflow-x-auto` 改为 `flex flex-wrap`，空间不足时自动换行成两行
+- 拖拽手柄同时支持鼠标（`onMouseDown`）和触摸（`onTouchStart`）事件，平板端可拖拽调整宽度
+- 消息气泡移动端宽度放宽（`max-w-[85%]`）
+- 输入框移动端最小高度 44px，发送按钮 48px
+- 底部适配 `safe-area-inset-bottom` 防止系统导航栏遮挡
+- TextSelectionToolbar 移动端按钮触控热区提升至 `min-h-[44px]`
+
 #### 重名草稿检测和返回按钮统一
 - 新增 `GET /api/articles/draft/check-duplicate` API：上传前检测草稿 slug 是否已存在
 - PublishForm 上传流程新增重名草稿确认对话框（黄色警告卡片），支持覆盖已有草稿
