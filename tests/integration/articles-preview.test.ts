@@ -23,7 +23,7 @@ describe("POST /api/articles/preview", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.html).toContain("<h1>Hello</h1>");
+    expect(data.html).toContain("<h1 id=\"hello\">Hello</h1>");
     expect(data.html).toContain("<p>World.</p>");
     expect(data.metadata.title).toBeNull();
     expect(data.metadata.tags).toEqual([]);
@@ -133,3 +133,4 @@ summary: "A test summary"
     expect(data.error).toContain("Content is required");
   });
 });
+

@@ -650,7 +650,7 @@ export function ArticleReader({
         </div>
 
         {/* Desktop TOC sidebar */}
-        <TableOfContents html={html} />
+        <TableOfContents html={html} lang={lang} />
       </div>
     </>
   );

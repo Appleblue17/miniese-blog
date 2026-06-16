@@ -4,7 +4,12 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-15
+**最后更新**：2026-06-15 (v0.9.2)
+
+### v0.9.2 2026-06-15
+
+- §11.5：补充 `GET /api/articles/[slug]` 的自动重新渲染说明——当 `renderedContent` 缺少 heading ID 时自动触发的补偿机制
+- §7.7：补充 rehype-slug 集成说明——双渲染管线均集成，SSG/SSR 时自动添加 heading ID
 
 ### v0.9.1 2026-06-15
 
@@ -1001,6 +1006,19 @@ export async function renderMarkdown(
 
 - 输出 HTML **片段**（无 `<html><head><body>` 包装），通过 React 的 `dangerouslySetInnerHTML` 注入页面
 - 空字符串或纯空白输入返回空字符串
+- 双渲染管线均集成 `rehype-slug`，自动为所有 heading（`h1`-`h6`）生成 `id` 属性（如 `id="1-数学符号"`、`id="section-2"`），供 TOC 组件和锚点跳转使用
+
+#### rehype-slug 自动 ID 补偿机制
+
+由于部分历史文章或 AI 翻译生成的文章在发布时未经过含 rehype-slug 的渲染管线（`renderedContent` 中 heading 缺少 `id` 属性），`GET /api/articles/[slug]` 接口内置自动补偿逻辑：
+
+1. 从 DB 读取 `renderedContent` 后，检测是否存在 `<h1-h6>` 标签的 `id` 属性
+2. 如果检测到缺少 `id`，读取源文件重新渲染（含 rehype-slug）
+3. 将新渲染的 HTML 持久化到 DB 的 `renderedContent` 字段，后续请求直接使用
+
+**关键实现细节**（`src/app/api/articles/[slug]/route.ts`）：
+- Prisma query 必须包含 `contentPath` 和 `contentType` 字段，否则重新渲染会因 `readFile` 传入了 `undefined` 路径而静默失败
+- 重新渲染失败时（如源文件被删除），静默回退到原有内容
 
 ### 7.3 标准 Markdown 渲染管线
 
@@ -1008,6 +1026,7 @@ export async function renderMarkdown(
 MD 文件内容
   → remark-parse (GFM + math)
   → remark-rehype
+  → rehype-slug (自动为 heading 生成 id)
   → rehype-katex (KaTeX 公式)
   → rehype-stringify
   → HTML 片段
@@ -1016,6 +1035,7 @@ MD 文件内容
 依赖：
 - `remark-parse`, `remark-gfm`, `remark-math` — Markdown 解析
 - `remark-rehype` — MDAST→HAST 转换
+- `rehype-slug` — 为 heading 生成 `id` 属性（用于 TOC 目录锚点和高亮）
 - `rehype-katex` — KaTeX 数学公式渲染
 - `rehype-stringify` — HAST→HTML 序列化
 
@@ -1026,6 +1046,7 @@ Notesaw 文件内容
   → noteParsePlugin (自定义 parser，识别 @block / @inline-block)
   → noteBoxParsePlugin (处理 @[...] box 语法 + math wrapper)
   → remark-rehype (MDAST → HAST)
+  → rehype-slug (自动为 heading 生成 id)
   → rehype-katex (KaTeX 数学渲染)
   → noteTransformPlugin (block → 带样式/图标/颜色的 HTML 结构)
   → rehype-stringify

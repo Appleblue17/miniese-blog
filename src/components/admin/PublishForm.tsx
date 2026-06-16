@@ -26,6 +26,7 @@ import { generateSlug } from "@/lib/articles/frontmatter";
 import { computeDiff, type DiffLine } from "@/lib/diff";
 
 const FILE_TYPES = [
+  { value: "", label: "选择格式" },
   { value: "markdown", label: "Markdown" },
   { value: "notesaw", label: "Notesaw" },
 ] as const;
@@ -35,7 +36,7 @@ type Step = "upload" | "review" | "confirm";
 interface ArticleMeta {
   title: string;
   language: "zh" | "en" | "";
-  fileType: "markdown" | "notesaw";
+  fileType: "markdown" | "notesaw" | "";
   tags: string[];
   author: string;
   summary: string;
@@ -73,7 +74,7 @@ export function PublishForm({
   const [meta, setMeta] = useState<ArticleMeta>({
     title: "",
     language: "",
-    fileType: "markdown",
+    fileType: "",
     tags: [],
     author: "",
     summary: "",
@@ -246,8 +247,9 @@ export function PublishForm({
     }
 
     if (!parsedLanguage) {
-      setError("无法确定语言，请在文件名中使用 .zh.md 或 .en.md 后缀。");
-      return;
+      // Language not detected — create draft with empty language,
+      // user can set it manually in the draft editor
+      parsedLanguage = "";
     }
 
     const title = parsedTitle || "未命名文章";
@@ -400,6 +402,10 @@ export function PublishForm({
       setError("请选择语言");
       return;
     }
+    if (!currentMeta.fileType) {
+      setError("请选择文件格式");
+      return;
+    }
 
     setSavingDraft(true);
     setError(null);
@@ -442,6 +448,10 @@ export function PublishForm({
     }
     if (!currentMeta.language) {
       setError("请选择语言");
+      return;
+    }
+    if (!currentMeta.fileType) {
+      setError("请选择文件格式");
       return;
     }
 
@@ -515,6 +525,10 @@ export function PublishForm({
       setError("请选择语言");
       return;
     }
+    if (!currentMeta.fileType) {
+      setError("请选择文件格式");
+      return;
+    }
     setError(null);
 
     // Generate diff against previous version (if updating)
@@ -541,6 +555,10 @@ export function PublishForm({
     const currentMeta = metaRef.current;
     if (!currentMeta.language) {
       setError("请选择语言");
+      return;
+    }
+    if (!currentMeta.fileType) {
+      setError("请选择文件格式");
       return;
     }
 
@@ -651,12 +669,12 @@ export function PublishForm({
             id="meta-filetype"
             value={meta.fileType}
             onChange={(e) =>
-              setMeta((m) => ({ ...m, fileType: e.target.value as "markdown" | "notesaw" }))
+              setMeta((m) => ({ ...m, fileType: e.target.value as "markdown" | "notesaw" | "" }))
             }
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {FILE_TYPES.map((ft) => (
-              <option key={ft.value} value={ft.value}>
+              <option key={ft.value} value={ft.value} disabled={ft.value === ""}>
                 {ft.label}
               </option>
             ))}
@@ -1061,7 +1079,7 @@ export function PublishForm({
           </div>
           <div className="flex gap-2">
             <span className="text-muted-foreground shrink-0 w-16">格式：</span>
-            <span>{meta.fileType === "notesaw" ? "Notesaw" : "Markdown"}</span>
+            <span>{meta.fileType === "notesaw" ? "Notesaw" : meta.fileType === "markdown" ? "Markdown" : "未选择"}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-muted-foreground shrink-0 w-16">作者：</span>

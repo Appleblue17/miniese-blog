@@ -34,12 +34,11 @@ export async function POST(request: NextRequest) {
     const resolvedMeta: ArticleMeta | null = meta || null;
 
     // Validate language — must be a valid ArticleLanguage value
-    const resolvedLang = (resolvedMeta?.language || language) as string;
+    let resolvedLang = (resolvedMeta?.language || language) as string;
     if (resolvedLang !== "zh" && resolvedLang !== "en") {
-      return NextResponse.json(
-        { error: "language must be 'zh' or 'en'." },
-        { status: 400 },
-      );
+      // Default to "zh" when language cannot be determined (e.g. file upload
+      // without frontmatter or language suffix). User can change it in editor.
+      resolvedLang = "zh";
     }
 
     // Build file content with frontmatter from metadata

@@ -14,6 +14,16 @@
  *   (relative paths). This route rewrites them to absolute paths pointing to
  *   the dedicated image serving API: /api/images/{articleId}/{filename}.
  *   This ensures images load correctly regardless of the page URL structure.
+ *
+ * Auto re-rendering (rehype-slug compensation):
+ *   When the stored renderedContent lacks heading IDs (e.g., from older articles
+ *   or AI-translated content that bypassed rehype-slug), this route automatically
+ *   re-renders the article from its source file to inject heading IDs.
+ *   The updated HTML is persisted to the database for subsequent requests.
+ *
+ *   IMPORTANT: The Prisma query MUST include `contentPath` and `contentType`
+ *   in the `select`, otherwise the re-rendering silently fails (readFile gets
+ *   `undefined` path → caught by the catch block → falls back to original).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -94,6 +104,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         renderedContent: true,
         isAITranslated: true,
         originalId: true,
+        contentPath: true,
+        contentType: true,
       },
     });
 

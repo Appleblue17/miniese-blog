@@ -247,10 +247,10 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center justify-center gap-2 rounded-full border border-border bg-background/80 backdrop-blur-sm px-4 py-3 text-sm text-foreground shadow-lg min-h-[44px] hover:bg-accent transition-colors"
+          className="flex items-center justify-center gap-2 rounded-full border border-border bg-background/80 backdrop-blur-sm px-4 py-3 md:px-5 md:py-3.5 text-sm md:text-base text-foreground shadow-lg min-h-[44px] md:min-h-[52px] hover:bg-accent transition-colors"
         >
           <svg
-            className="size-4"
+            className="size-4 md:size-6"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -266,9 +266,9 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
       {isOpen && (
         <div className="xl:hidden fixed inset-0 z-40 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsOpen(false)} />
-          <div className="relative w-full max-h-[60vh] overflow-y-auto rounded-t-2xl bg-background p-6 shadow-xl">
+          <div className="relative w-full max-h-[60vh] overflow-y-auto rounded-t-2xl bg-background p-6 md:p-8 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <h4 className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 {t("目录", "Contents")}
               </h4>
               <button
@@ -287,7 +287,7 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                 </svg>
               </button>
             </div>
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-1 text-sm md:text-base">
               {headings.map((item) => (
                 <li key={item.id}>
                   <button
@@ -302,7 +302,7 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                         ? "pl-2 font-medium"
                         : item.level === 2
                           ? "pl-5"
-                          : "pl-8 text-xs text-muted-foreground/80"
+                          : "pl-8 text-xs md:text-sm text-muted-foreground/80"
                     }`}
                   >
                     {item.text}
