@@ -3,7 +3,7 @@
  *
  * Features:
  * - Fetches entries from the API based on language
- * - Supports tag filtering
+ * - Supports tag filtering and full-text search
  * - Pagination controls
  * - Loading and empty states
  * - Responsive grid layout (1 col mobile, 2 col tablet, 3 col desktop)
@@ -11,11 +11,12 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { WikiCard } from "@/components/wiki/WikiCard";
+import { SearchFilters } from "@/components/ui/SearchFilters";
 import type { WikiEntryMeta, WikiListResponse } from "@/types/wiki";
 
 interface WikiListProps {
@@ -31,8 +32,12 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [tag, setTag] = useState(initialTag || "");
+  const [searchQ, setSearchQ] = useState("");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagExclude, setTagExclude] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
 
-  useEffect(() => {
+  const fetchEntries = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({
       lang,
@@ -40,6 +45,9 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
       limit: String(limit),
     });
     if (tag) params.set("tag", tag);
+    if (searchQ) params.set("q", searchQ);
+    if (tagFilter.length > 0) params.set("tagFilter", tagFilter.join(","));
+    if (tagExclude.length > 0) params.set("tagExclude", tagExclude.join(","));
 
     fetch(`/api/wiki?${params}`)
       .then((res) => {
@@ -60,13 +68,43 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
         setData({ entries: [], total: 0, page: 1, totalPages: 0 });
         setLoading(false);
       });
-  }, [lang, page, tag]);
+  }, [lang, page, tag, searchQ, tagFilter, tagExclude]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  // Fetch available tags on mount
+  useEffect(() => {
+    fetch(`/api/tags?type=wiki&lang=${lang}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.tags) setAllTags(data.tags);
+      })
+      .catch(() => {});
+  }, [lang]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || (data && newPage > data.totalPages)) return;
     setPage(newPage);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Reset page when filters change
+  const handleSearch = useCallback((q: string) => {
+    setSearchQ(q);
+    setPage(1);
+  }, []);
+
+  const handleTagFilter = useCallback((tags: string[]) => {
+    setTagFilter(tags);
+    setPage(1);
+  }, []);
+
+  const handleTagExclude = useCallback((tags: string[]) => {
+    setTagExclude(tags);
+    setPage(1);
+  }, []);
 
   const title = lang === "zh" ? "知识库" : "Wiki";
   const subtitle = lang === "zh" ? "词条" : "entries";
@@ -83,6 +121,18 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
         </p>
       </div>
 
+      {/* Search & Filters */}
+      <SearchFilters
+        q={searchQ}
+        tagFilter={tagFilter}
+        tagExclude={tagExclude}
+        allTags={allTags}
+        onSearch={handleSearch}
+        onTagFilter={handleTagFilter}
+        onTagExclude={handleTagExclude}
+        lang={lang}
+      />
+
       {/* Loading state */}
       {loading && (
         <div className="flex items-center justify-center py-16">
@@ -96,8 +146,8 @@ export function WikiList({ lang, initialTag }: WikiListProps) {
           <p className="text-lg">{lang === "zh" ? "暂无词条" : "No entries"}</p>
           <p className="text-sm">
             {lang === "zh"
-              ? "知识库还没有任何词条，请稍后再来。"
-              : "No wiki entries yet. Check back later."}
+              ? "没有找到匹配的词条"
+              : "No matching wiki entries found."}
           </p>
         </div>
       )}

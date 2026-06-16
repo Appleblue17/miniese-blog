@@ -14,6 +14,7 @@ import Link from "next/link";
 import { PlusCircle, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import { ArticleRowActions } from "@/components/admin/ArticleRowActions";
+import { AdminArticleSearch } from "@/components/admin/AdminArticleSearch";
 import { prisma } from "@/lib/db";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -79,6 +80,7 @@ interface AdminArticlesResponse {
   total: number;
   page: number;
   totalPages: number;
+  allTags: string[];
 }
 
 async function getFileStats(contentPath: string) {
@@ -93,19 +95,58 @@ async function getFileStats(contentPath: string) {
   }
 }
 
-async function fetchData(page: number): Promise<AdminArticlesResponse> {
+async function fetchData(
+  page: number,
+  q = "",
+  tagFilter = "",
+  tagExclude = "",
+): Promise<AdminArticlesResponse> {
   try {
     const limit = PAGE_SIZE;
     const skip = (page - 1) * limit;
 
+    // Build where clause for published ORIGINAL articles
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { status: "published", originalId: null };
+
+    // Full-text search
+    if (q && q.trim()) {
+      const searchTerm = q.trim();
+      where.AND = [
+        {
+          OR: [
+            { title: { contains: searchTerm, mode: "insensitive" as const } },
+            { summary: { contains: searchTerm, mode: "insensitive" as const } },
+            { tags: { has: searchTerm } },
+          ],
+        },
+      ];
+    }
+
+    // Tag include filter
+    if (tagFilter && tagFilter.trim()) {
+      const includeTags = tagFilter.split(",").map((t) => t.trim()).filter(Boolean);
+      if (includeTags.length > 0) {
+        const andClause = where.AND || [];
+        andClause.push({ tags: { hasEvery: includeTags } });
+        where.AND = andClause;
+      }
+    }
+
+    // Tag exclude filter
+    if (tagExclude && tagExclude.trim()) {
+      const excludeTags = tagExclude.split(",").map((t) => t.trim()).filter(Boolean);
+      if (excludeTags.length > 0) {
+        where.NOT = { tags: { hasSome: excludeTags } };
+      }
+    }
+
     // Get total count of published ORIGINAL articles (exclude translations)
-    const total = await prisma.article.count({
-      where: { status: "published", originalId: null },
-    });
+    const total = await prisma.article.count({ where });
 
     // Get paginated published ORIGINAL articles (exclude translations)
     const publishedArticles = await prisma.article.findMany({
-      where: { status: "published", originalId: null },
+      where,
       orderBy: { publishedAt: "desc" },
       skip,
       take: limit,
@@ -221,6 +262,19 @@ async function fetchData(page: number): Promise<AdminArticlesResponse> {
       }),
     );
 
+    // Collect all tags from all published articles for the filter dropdown
+    const allTagRecords = await prisma.article.findMany({
+      where: { status: "published", originalId: null },
+      select: { tags: true },
+    });
+    const tagSet = new Set<string>();
+    for (const record of allTagRecords) {
+      for (const tag of record.tags) {
+        tagSet.add(tag);
+      }
+    }
+    const allTags = Array.from(tagSet).sort();
+
     return {
       articles: articlesWithStats,
       translations: translationsWithStats,
@@ -230,6 +284,7 @@ async function fetchData(page: number): Promise<AdminArticlesResponse> {
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      allTags,
     };
   } catch {
     return {
@@ -241,6 +296,7 @@ async function fetchData(page: number): Promise<AdminArticlesResponse> {
       total: 0,
       page: 1,
       totalPages: 0,
+      allTags: [],
     };
   }
 }
@@ -248,13 +304,23 @@ async function fetchData(page: number): Promise<AdminArticlesResponse> {
 export default async function AdminArticlesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; tagFilter?: string; tagExclude?: string }>;
 }) {
   const params = await searchParams;
   const currentPage = Math.max(1, parseInt(params.page || "1", 10));
+  const q = params.q || "";
+  const tagFilterParam = params.tagFilter || "";
+  const tagExcludeParam = params.tagExclude || "";
 
-  const { articles, translations, drafts, newDrafts, pendingTasks, total } =
-    await fetchData(currentPage);
+  const {
+    articles,
+    translations,
+    drafts,
+    newDrafts,
+    pendingTasks,
+    total,
+    allTags,
+  } = await fetchData(currentPage, q, tagFilterParam, tagExcludeParam);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)) || 1;
 
   const hasContent = articles.length > 0 || newDrafts.length > 0;
@@ -286,6 +352,13 @@ export default async function AdminArticlesPage({
         </Link>
       </div>
 
+      <AdminArticleSearch
+        q={q}
+        tagFilter={tagFilterParam}
+        tagExclude={tagExcludeParam}
+        allTags={allTags}
+      />
+
       {!hasContent ? (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <p className="text-lg">暂无文章</p>
@@ -307,7 +380,15 @@ export default async function AdminArticlesPage({
       {totalPages > 1 && (
         <nav className="flex items-center justify-center gap-1 mt-6" aria-label="分页">
           <Link
-            href={currentPage > 1 ? `/admin/articles?page=${currentPage - 1}` : "#"}
+            href={(() => {
+              if (currentPage <= 1) return "#";
+              const p = new URLSearchParams();
+              p.set("page", String(currentPage - 1));
+              if (q) p.set("q", q);
+              if (tagFilterParam) p.set("tagFilter", tagFilterParam);
+              if (tagExcludeParam) p.set("tagExclude", tagExcludeParam);
+              return `/admin/articles?${p.toString()}`;
+            })()}
             className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm ${
               currentPage <= 1
                 ? "text-muted-foreground/40 pointer-events-none"
@@ -318,13 +399,11 @@ export default async function AdminArticlesPage({
           </Link>
           {Array.from({ length: totalPages }, (_, i) => i + 1)
             .filter((p) => {
-              // Show first, last, and pages around current
               if (p === 1 || p === totalPages) return true;
               if (Math.abs(p - currentPage) <= 1) return true;
               return false;
             })
             .map((p, idx, arr) => {
-              // Add ellipsis
               const prev = arr[idx - 1];
               const needsEllipsis = prev !== undefined && p - prev > 1;
               return (
@@ -333,7 +412,14 @@ export default async function AdminArticlesPage({
                     <span className="px-2 text-sm text-muted-foreground/60">...</span>
                   )}
                   <Link
-                    href={`/admin/articles?page=${p}`}
+                    href={(() => {
+                      const sp = new URLSearchParams();
+                      sp.set("page", String(p));
+                      if (q) sp.set("q", q);
+                      if (tagFilterParam) sp.set("tagFilter", tagFilterParam);
+                      if (tagExcludeParam) sp.set("tagExclude", tagExcludeParam);
+                      return `/admin/articles?${sp.toString()}`;
+                    })()}
                     className={`inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium ${
                       p === currentPage
                         ? "bg-primary text-primary-foreground"
@@ -346,7 +432,15 @@ export default async function AdminArticlesPage({
               );
             })}
           <Link
-            href={currentPage < totalPages ? `/admin/articles?page=${currentPage + 1}` : "#"}
+            href={(() => {
+              if (currentPage >= totalPages) return "#";
+              const p = new URLSearchParams();
+              p.set("page", String(currentPage + 1));
+              if (q) p.set("q", q);
+              if (tagFilterParam) p.set("tagFilter", tagFilterParam);
+              if (tagExcludeParam) p.set("tagExclude", tagExcludeParam);
+              return `/admin/articles?${p.toString()}`;
+            })()}
             className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm ${
               currentPage >= totalPages
                 ? "text-muted-foreground/40 pointer-events-none"

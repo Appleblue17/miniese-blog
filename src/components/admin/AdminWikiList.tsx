@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { SearchFilters } from "@/components/ui/SearchFilters";
 import type { WikiEntryMeta, WikiStatus } from "@/types/wiki";
 
 /** Map language code to display label */
@@ -837,6 +838,12 @@ export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Search & filter
+  const [searchQ, setSearchQ] = useState("");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagExclude, setTagExclude] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+
   // Batch operation
   const [processing, setProcessing] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
@@ -862,10 +869,17 @@ export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps)
 
       for (const status of statuses) {
         for (const lang of ["zh", "en"] as const) {
-          const res = await fetch(
-            `/api/wiki?lang=${lang}&page=${currentPage}&limit=${PAGE_SIZE}&status=${status}`,
-            { cache: "no-store" },
-          );
+          const params = new URLSearchParams({
+            lang,
+            page: String(currentPage),
+            limit: String(PAGE_SIZE),
+            status,
+          });
+          if (searchQ) params.set("q", searchQ);
+          if (tagFilter.length > 0) params.set("tagFilter", tagFilter.join(","));
+          if (tagExclude.length > 0) params.set("tagExclude", tagExclude.join(","));
+
+          const res = await fetch(`/api/wiki?${params}`, { cache: "no-store" });
           if (res.ok) {
             const data = await res.json();
             results.push(...data.entries);
@@ -882,7 +896,7 @@ export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps)
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, currentPage]);
+  }, [activeStatus, currentPage, searchQ, tagFilter, tagExclude]);
 
   const fetchDiscoveries = useCallback(async () => {
     if (!DISCOVERY_TABS.has(activeStatus)) return;
@@ -913,6 +927,18 @@ export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps)
       setLoading(false);
     }
   }, [activeStatus, currentPage]);
+
+  // Fetch available tags for entry tabs
+  useEffect(() => {
+    if (ENTRY_TABS.has(activeStatus)) {
+      fetch("/api/tags?type=wiki")
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.tags) setAllTags(data.tags);
+        })
+        .catch(() => {});
+    }
+  }, [activeStatus]);
 
   useEffect(() => {
     if (ENTRY_TABS.has(activeStatus)) {
@@ -1099,6 +1125,47 @@ export function AdminWikiList({ activeStatus, currentPage }: AdminWikiListProps)
   return (
     <div className="flex flex-col gap-4">
       <StatusTabBar tabs={STATUS_TABS} activeKey={activeStatus} basePath={basePath} />
+
+      {/* Search & Filters (entry tabs only) */}
+      {isEntryTab && (
+        <SearchFilters
+          q={searchQ}
+          tagFilter={tagFilter}
+          tagExclude={tagExclude}
+          allTags={allTags}
+          onSearch={(q) => {
+            setSearchQ(q);
+            const p = new URLSearchParams();
+            p.set("status", activeStatus);
+            p.set("page", "1");
+            if (q) p.set("q", q);
+            if (tagFilter.length > 0) p.set("tagFilter", tagFilter.join(","));
+            if (tagExclude.length > 0) p.set("tagExclude", tagExclude.join(","));
+            window.history.replaceState(null, "", `/admin/wiki?${p.toString()}`);
+          }}
+          onTagFilter={(tags) => {
+            setTagFilter(tags);
+            const p = new URLSearchParams();
+            p.set("status", activeStatus);
+            p.set("page", "1");
+            if (searchQ) p.set("q", searchQ);
+            if (tags.length > 0) p.set("tagFilter", tags.join(","));
+            if (tagExclude.length > 0) p.set("tagExclude", tagExclude.join(","));
+            window.history.replaceState(null, "", `/admin/wiki?${p.toString()}`);
+          }}
+          onTagExclude={(tags) => {
+            setTagExclude(tags);
+            const p = new URLSearchParams();
+            p.set("status", activeStatus);
+            p.set("page", "1");
+            if (searchQ) p.set("q", searchQ);
+            if (tagFilter.length > 0) p.set("tagFilter", tagFilter.join(","));
+            if (tags.length > 0) p.set("tagExclude", tags.join(","));
+            window.history.replaceState(null, "", `/admin/wiki?${p.toString()}`);
+          }}
+          lang="zh"
+        />
+      )}
 
       {/* Batch operation toolbar (pending discoveries only) */}
       {activeStatus === "pending" && discoveries.length > 0 && !loading && (

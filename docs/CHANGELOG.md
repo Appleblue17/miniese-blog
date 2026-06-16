@@ -6,6 +6,15 @@
 
 ### Added
 
+#### 搜索与标签筛选系统
+- 新增 `GET /api/tags` API：聚合文章/词条的可用标签列表，支持 `?type=article|wiki|all` 和 `?lang=zh|en`
+- 新增 `SearchFilters` 可复用 UI 组件：搜索框（300ms 防抖）、标签包含/排除下拉选择器、激活筛选条件徽章、移动端折叠面板
+- 文章公开列表页（`ArticleList`）与词条公开列表页（`WikiList`）集成搜索和标签筛选
+- 管理后台文章列表（`admin/articles`）通过 URL search params 持久化搜索/筛选条件，服务端 Prisma 查询
+- 管理后台词条列表（`AdminWikiList`）搜索和标签筛选对 entry tabs 生效
+- 新增 `AdminArticleSearch` 客户端组件：管理后台文章页的搜索/筛选包装器
+- `GET /api/articles` 和 `GET /api/wiki` API 新增 `?q=`（全文搜索 title/summary/tags）、`?tagFilter=`（包含标签，逗号分隔 AND）、`?tagExclude=`（排除标签，逗号分隔）参数
+
 #### 图片灯箱移动端交互（双指缩放 + 拖动平移）
 - 新增触摸事件处理：双指 pinch-to-zoom（0.2x–5x 无级缩放）
 - 缩放后单指 drag-to-pan 平移图片，边界约束防止图片移出视口

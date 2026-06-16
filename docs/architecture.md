@@ -4,7 +4,15 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-15 (v0.9.2)
+**最后更新**：2026-06-16 (v0.9.3)
+
+### v0.9.3 2026-06-16
+- §3 目录结构：补充 `src/app/api/tags/` API 路由
+- §3 目录结构：补充 `src/components/ui/SearchFilters.tsx` 组件
+- §3 目录结构：补充 `src/components/admin/AdminArticleSearch.tsx` 组件
+- §11.5：补充 `GET /api/tags` 标签聚合 API
+- §11.9：API 清单补充 `GET /api/tags`
+- §11.9：`GET /api/articles` 和 `GET /api/wiki` 补充 `?q=`（全文搜索）、`?tagFilter=`（标签包含）、`?tagExclude=`（标签排除）参数说明
 
 ### v0.9.2 2026-06-15
 
@@ -212,6 +220,7 @@ miniese-blog/
 │   │   │   ├── page.tsx        # 主页
 │   │   │   ├── articles/
 │   │   │   ├── wiki/
+│   │   │   ├── tags/          # GET 可用标签聚合
 │   │   │   └── about/
 │   │   ├── (dashboard)/        # 仪表盘（需认证，MVP 简单密码保护）
 │   │   │   └── admin/
@@ -231,6 +240,7 @@ miniese-blog/
 │   │   │   │   ├── delete/     # POST 删除文章/草稿
 │   │   │   │   └── create-draft/ # POST 从已发布文章创建草稿
 │   │   │   ├── wiki/
+│   │   │   ├── tags/          # GET 可用标签聚合
 │   │   │   ├── ai/
 │   │   │   │   ├── review/
 │   │   │   │   ├── translate/
@@ -239,10 +249,10 @@ miniese-blog/
 │   │   │   └── webhook/
 │   │   └── layout.tsx
 │   ├── components/             # React 组件
-│   │   ├── ui/                 # shadcn/ui 组件
+│   │   ├── ui/                 # shadcn/ui 组件（含 SearchFilters.tsx）
 │   │   ├── layout/             # 导航栏、页脚、ActionBar 等
 │   │   ├── article/            # 文章相关组件（TableOfContents、ArticleReader、ArticleCard）
-│   │   ├── admin/              # 管理面板组件（PublishForm、ArticleRowActions、StatusBadge）
+│   │   ├── admin/              # 管理面板组件（PublishForm、ArticleRowActions、StatusBadge、AdminArticleSearch）
 │   │   ├── theme/              # 主题组件（ThemeProvider、ThemeToggle）
 │   │   └── ai/                 # AI 对话窗口等
 │   ├── lib/
@@ -1418,7 +1428,7 @@ SITE_URL="https://..."
 | POST | `/api/articles/upload` | 上传 MD 文件到草稿 | 从 frontmatter 读 |
 | POST | `/api/articles/preview` | 预览渲染 | 无需 |
 | POST | `/api/articles/publish` | 发布文章 | 从 frontmatter 读 |
-| GET | `/api/articles` | 文章列表 | `?lang=zh` 必填 |
+| GET | `/api/articles` | 文章列表 | `?lang=zh` 必填，支持 `?tag=`（单标签）、`?q=`（全文搜索）、`?tagFilter=`（包含标签，逗号分隔）、`?tagExclude=`（排除标签，逗号分隔） |
 | GET | `/api/articles/[slug]` | 文章详情 | `?lang=zh` 必填 |
 | GET | `/api/articles/draft/check-duplicate` | 检测草稿 slug 是否已存在 | `?slug=` 必填 |
 | PUT | `/api/articles/[slug]` | 更新文章（v2） | `?lang=zh` |
@@ -1428,9 +1438,20 @@ SITE_URL="https://..."
 
 词条 API 基于生命周期状态设计。`POST` 只接收最小信息（name + language），其余字段由 AI 填充。
 
+
+#### 标签相关
+
+| 方法 | 路径 | 说明 | 参数 |
+|------|------|------|------|
+| GET | `/api/tags` | 返回聚合后的可用标签列表 | `?type=(article|wiki|all)` 默认 `all`；`?lang=(zh|en)` 可选 |
+
+#### 词条相关
+
+词条 API 基于生命周期状态设计。`POST` 只接收最小信息（name + language），其余字段由 AI 填充。
+
 | 方法 | 路径 | 说明 | 语言参数 |
 |------|------|------|----------|
-| GET | `/api/wiki` | 词条列表（默认只返回 `reviewed`，管理员可用 `?status=` 参数） | `?lang=zh` 必填 |
+| GET | `/api/wiki` | 词条列表（默认只返回 `reviewed`，管理员可用 `?status=` 参数） | `?lang=zh` 必填，支持 `?q=`（全文搜索）、`?tagFilter=`（包含标签）、`?tagExclude=`（排除标签） |
 | GET | `/api/wiki/[name]` | 词条详情（返回 frontmatter + 各区块内容） | `?lang=zh` 必填 |
 | POST | `/api/wiki` | 创建词条申请（只接收 `name` + `language`，状态为 `proposed`） | 从请求体读 |
 | PUT | `/api/wiki/[name]` | 更新词条（仅 `unreviewed`/`reviewed` 状态可编辑） | `?lang=zh` |
@@ -1562,7 +1583,7 @@ export const config = {
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/articles` | 文章列表（分页，`?lang=` 必填，支持 `?tag=` 筛选） |
+| GET | `/api/articles` | 文章列表（分页，`?lang=` 必填，支持 `?tag=`、`?q=`、`?tagFilter=`、`?tagExclude=` 筛选） |
 | GET | `/api/articles/[slug]` | 文章详情（`?lang=` 必填） |
 | GET | `/api/articles/content` | 获取文章文件内容（`?id=` 指定文章 ID） |
 | POST | `/api/articles/upload` | 上传 MD 文件到草稿目录 |
@@ -1573,6 +1594,7 @@ export const config = {
 | POST | `/api/articles/delete` | 删除文章/草稿（删除记录 + 文件） |
 | POST | `/api/articles/create-draft` | 从已发布文章创建草稿（复制文件） |
 | GET | `/api/articles/draft/check-duplicate` | 检测草稿 slug 是否已存在 |
+| GET | `/api/tags` | 可用标签聚合列表（`?type=article|wiki|all`，`?lang=zh|en`） |
 | POST | `/api/articles/images/[id]/verify` | 验证图片引用 |
 | GET | `/api/admin/articles` | 管理员文章列表（已发布+草稿+新草稿） |
 | GET | `/api/admin/ai-tasks` | AI 任务列表 |
@@ -1594,7 +1616,7 @@ export const config = {
 | GET | `/api/auth/me` | 获取当前用户 |
 | GET | `/api/comments?articleId=xxx` | 获取评论列表 |
 | POST | `/api/comments` | 发表评论 |
-| GET/POST | `/api/wiki` | 词条列表/创建 |
+| GET/POST | `/api/wiki` | 词条列表（`?q=`、`?tagFilter=`、`?tagExclude=` 筛选）/创建 |
 | GET | `/api/wiki/[name]` | 词条详情 |
 | PUT/DELETE | `/api/wiki/[name]` | 更新/删除词条 |
 | POST | `/api/wiki/[name]/approve` | 审批通过 |

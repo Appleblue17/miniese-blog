@@ -2,7 +2,8 @@
  * @file GET/POST /api/wiki
  *
  * GET  — Returns a paginated list of wiki entries.
- *        Query params: lang (required), page, limit, tag, status (admin only; defaults to "unreviewed,reviewed")
+ *        Query params: lang (required), page, limit, tag, q, tagFilter, tagExclude,
+ *                      status (admin only; defaults to "unreviewed,reviewed")
  * POST — Creates a new WikiDiscovery (manual entry).
  *        Body: { name, language, overrideDefinition?: string }
  *        If overrideDefinition is provided, skips AI refinement and uses it directly.
@@ -66,6 +67,9 @@ export async function GET(request: NextRequest) {
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
     const statusParam = searchParams.get("status");
+    const q = searchParams.get("q");
+    const tagFilter = searchParams.get("tagFilter");
+    const tagExclude = searchParams.get("tagExclude");
 
     if (language !== "zh" && language !== "en") {
       return NextResponse.json(
@@ -77,6 +81,7 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = { language };
 
+    // Legacy single-tag filter
     if (tag) {
       where.tags = { has: tag };
     }
@@ -92,6 +97,38 @@ export async function GET(request: NextRequest) {
       where.status = statusParam;
     } else {
       where.status = { in: ["unreviewed", "reviewed"] };
+    }
+
+    // Full-text search: match against name, definition, and tags
+    if (q && q.trim()) {
+      const searchTerm = q.trim();
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" as const } },
+            { definition: { contains: searchTerm, mode: "insensitive" as const } },
+            { tags: { has: searchTerm } },
+          ],
+        },
+      ];
+    }
+
+    // Tag include filter (AND logic)
+    if (tagFilter && tagFilter.trim()) {
+      const includeTags = tagFilter.split(",").map((t) => t.trim()).filter(Boolean);
+      if (includeTags.length > 0) {
+        const andClause = where.AND || [];
+        andClause.push({ tags: { hasEvery: includeTags } });
+        where.AND = andClause;
+      }
+    }
+
+    // Tag exclude filter
+    if (tagExclude && tagExclude.trim()) {
+      const excludeTags = tagExclude.split(",").map((t) => t.trim()).filter(Boolean);
+      if (excludeTags.length > 0) {
+        where.NOT = { tags: { hasSome: excludeTags } };
+      }
     }
 
     const [entries, total] = await Promise.all([

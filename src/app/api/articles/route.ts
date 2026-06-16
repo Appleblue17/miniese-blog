@@ -2,13 +2,16 @@
  * @file GET /api/articles
  *
  * Returns a paginated list of published articles.
- * Supports filtering by tag and language.
+ * Supports filtering by tag, full-text search, and tag include/exclude.
  *
  * Query params:
- *   page  - Page number (default: 1)
- *   limit - Items per page (default: 10, max: 100)
- *   tag   - Filter by tag (optional)
- *   lang  - Language code "zh" or "en" (required)
+ *   page       - Page number (default: 1)
+ *   limit      - Items per page (default: 10, max: 100)
+ *   tag        - Filter by single tag (optional, legacy)
+ *   lang       - Language code "zh" or "en" (required)
+ *   q          - Search query (matches title, summary, tags)
+ *   tagFilter  - Comma-separated tags to include (AND logic)
+ *   tagExclude - Comma-separated tags to exclude
  *
  * Response: { articles: [...], total: number, page: number, totalPages: number }
  */
@@ -27,6 +30,9 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || String(defaultLimit), 10)));
     const tag = searchParams.get("tag");
     const language = searchParams.get("lang");
+    const q = searchParams.get("q");
+    const tagFilter = searchParams.get("tagFilter");
+    const tagExclude = searchParams.get("tagExclude");
 
     // lang is required
     if (language !== "zh" && language !== "en") {
@@ -40,8 +46,43 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = { status: "published", language };
 
+    // Legacy single-tag filter
     if (tag) {
       where.tags = { has: tag };
+    }
+
+    // Full-text search: match against title, summary, and tags
+    if (q && q.trim()) {
+      const searchTerm = q.trim();
+      where.AND = [
+        {
+          OR: [
+            { title: { contains: searchTerm, mode: "insensitive" as const } },
+            { summary: { contains: searchTerm, mode: "insensitive" as const } },
+            { tags: { has: searchTerm } },
+          ],
+        },
+      ];
+    }
+
+    // Tag include filter (AND logic — article must have ALL specified tags)
+    if (tagFilter && tagFilter.trim()) {
+      const includeTags = tagFilter.split(",").map((t) => t.trim()).filter(Boolean);
+      if (includeTags.length > 0) {
+        const andClause = where.AND || [];
+        andClause.push({ tags: { hasEvery: includeTags } });
+        where.AND = andClause;
+      }
+    }
+
+    // Tag exclude filter (article must NOT have any of the specified tags)
+    if (tagExclude && tagExclude.trim()) {
+      const excludeTags = tagExclude.split(",").map((t) => t.trim()).filter(Boolean);
+      if (excludeTags.length > 0) {
+        const andClause = where.AND || [];
+        andClause.push({ tags: { hasSome: excludeTags } });
+        where.NOT = { tags: { hasSome: excludeTags } };
+      }
     }
 
     // Execute query and count in parallel
