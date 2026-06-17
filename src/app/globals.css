@@ -178,7 +178,7 @@
     position: fixed;
     inset: 0;
     background-color: var(--background);
-    opacity: calc(1 - var(--bg-opacity, 0%) / 100);
+    opacity: calc(1 - var(--bg-opacity, 0.1));
     pointer-events: none;
     z-index: -1;
   }

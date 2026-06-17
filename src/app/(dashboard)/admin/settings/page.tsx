@@ -1013,11 +1013,11 @@ export default function SettingsPage() {
 
               <div>
                 <label className="text-sm font-medium block mb-1">单张背景图片 URL</label>
-                <p className="text-xs text-muted-foreground mb-2">留空则无背景图片。如果下方启用了轮播，此项将被忽略。</p>
+                <p className="text-xs text-muted-foreground mb-2">留空则无背景图片。如果下方启用了轮播，此项将被忽略。支持填入目录路径（如 /images/bg），系统将自动使用该目录下所有图片。</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="/images/background.jpg"
+                    placeholder="/images/bg 或 /images/background.jpg"
                     value={a.backgroundImage ?? ""}
                     onChange={(e) => updateLocal("appearance", "backgroundImage", e.target.value)}
                     className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50"
@@ -1031,11 +1031,11 @@ export default function SettingsPage() {
 
               <div>
                 <label className="text-sm font-medium block mb-1">背景图片列表（轮播用）</label>
-                <p className="text-xs text-muted-foreground mb-2">每行一张图片 URL。当启用轮播时，每次刷新页面会随机选择一张作为背景。</p>
+                <p className="text-xs text-muted-foreground mb-2">每行一张图片或目录路径。支持填入目录（如 /images/bg），系统将使用该目录下所有图片。当启用轮播时，每次刷新页面会从所有展开后的图片中随机选择一张。</p>
                 <div className="flex items-start gap-2">
                   <textarea
                     rows={4}
-                    placeholder={"/images/bg1.jpg\n/images/bg2.jpg\n/images/bg3.jpg"}
+                    placeholder={"/images/bg\n/images/background.jpg"}
                     value={(a.backgroundImages ?? []).join("\n")}
                     onChange={(e) => {
                       const list = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -1090,7 +1090,7 @@ export default function SettingsPage() {
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateLocal("appearance", "backgroundOpacity", v);
-                      document.documentElement.style.setProperty("--bg-opacity", `${v}%`);
+                      document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
                     }}
                     className="flex-1 accent-foreground"
                   />
@@ -1098,7 +1098,7 @@ export default function SettingsPage() {
                     isDefault={a.backgroundOpacity === DEFAULT_SETTINGS.appearance.backgroundOpacity}
                     onReset={() => {
                       resetField("appearance", "backgroundOpacity");
-                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity}%`);
+                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity / 100}`);
                     }}
                   />
                 </div>

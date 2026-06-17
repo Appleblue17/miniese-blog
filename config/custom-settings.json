@@ -1,0 +1,112 @@
+{
+  "site": {
+    "title": "Miniese's Blog",
+    "description": "个人技术博客与知识库",
+    "headerTitle": "Miniese's Blog",
+    "heroTitle": "Miniese's Blog",
+    "heroSubtitles": [
+      "探索技术与知识的边界",
+      "记录思考与成长的点滴",
+      "AI 驱动的写作与知识管理"
+    ],
+    "heroSubtitlesEn": [
+      "Exploring the frontiers of tech & knowledge",
+      "Documenting thoughts and growth",
+      "AI-powered writing & knowledge management"
+    ],
+    "heroSubtitleMode": "sequential",
+    "heroSubtitleIntervalMs": 5000,
+    "heroImageLight": "/images/miniese/hero/hero-light.png",
+    "heroImageDark": "/images/miniese/hero/hero-dark.png",
+    "homepage": {
+      "layout": "columns",
+      "latestCount": 5,
+      "popularCount": 5,
+      "timelineCount": 8
+    }
+  },
+  "pagination": {
+    "articlesPerPage": 10,
+    "wikiPerPage": 20
+  },
+  "publish": {
+    "defaultAuthor": "博主"
+  },
+  "appearance": {
+    "themeMode": "system",
+    "bodyWidth": 66,
+    "image": {
+      "maxWidth": 800,
+      "maxHeight": 600,
+      "defaultWidthRatio": 60,
+      "lightboxEnabled": true,
+      "captionIgnoreList": []
+    },
+    "primary": {
+      "lightHue": 200,
+      "darkHue": 260,
+      "lightSaturation": 70,
+      "darkSaturation": 70,
+      "lightLightness": 55,
+      "darkLightness": 65
+    },
+    "accent": {
+      "lightHue": 280,
+      "darkHue": 280,
+      "lightSaturation": 70,
+      "darkSaturation": 70,
+      "lightLightness": 55,
+      "darkLightness": 65
+    },
+    "backgroundImage": "/images/miniese/bg",
+    "backgroundImages": [],
+    "backgroundCarouselEnabled": false,
+    "backgroundOpacity": 100,
+    "markdownBgOpacity": 80,
+    "markdownTextColorLight": "#1f2328",
+    "markdownTextColorDark": "#f0f6fc",
+    "markdownBgColorLight": "#ffffff",
+    "markdownBgColorDark": "#0d1117"
+  },
+  "features": {
+    "aiReview": true,
+    "autoTranslate": true,
+    "wikiDiscovery": true,
+    "wikiGenerate": true,
+    "comments": true,
+    "rss": true,
+    "devMode": false,
+    "realEmail": false,
+    "skipEmailVerification": false
+  },
+  "notifications": {
+    "email": true,
+    "adminEmail": "",
+    "onComment": true,
+    "onDiscovery": true,
+    "onTranslate": true
+  },
+  "compilers": {
+    "markdown": {
+      "name": "Markdown",
+      "extensions": [
+        ".md"
+      ],
+      "enabled": true
+    },
+    "notesaw": {
+      "name": "Notesaw",
+      "extensions": [
+        ".md"
+      ],
+      "enabled": true
+    }
+  },
+  "prompts": {
+    "review": "你是一位专业的技术编辑，请对以下文章内容进行审查。\n\n## 注意事项（重要）\n1. 本文可能使用自定义语法结构，不需要审查，请专注于内容的文字表达。\n2. 本文可能是长篇技术文章的一个片段（段落级），因此\"结构与可读性\"层面的整体评价不在本审查范围内。\n3. 在写下所有分析（定位、摘录、问题描述、修改建议）之后，再对其做最终判定（severity）。不要在分析中途下结论。\n\n## 输出格式要求\n请返回严格的 JSON 格式，结构如下：\n\n{\n  \"sections\": [\n    {\n      \"type\": \"factual\",\n      \"title\": \"事实性错误\",\n      \"items\": [\n        {\n          \"lineStart\": 5,\n          \"lineEnd\": 7,\n          \"snippet\": \"原文摘录...\",\n          \"issue\": \"问题描述\",\n          \"suggestion\": \"修改建议\",\n          \"severity\": \"error\"\n        }\n      ]\n    },\n    {\n      \"type\": \"typo\",\n      \"title\": \"拼写与语法\",\n      \"items\": [...]\n    },\n    {\n      \"type\": \"clarity\",\n      \"title\": \"表达歧义与通顺性\",\n      \"items\": [...]\n    },\n    {\n      \"type\": \"other\",\n      \"title\": \"其他建议\",\n      \"items\": [...]\n    }\n  ]\n}\n\n## 字段说明\n- lineStart / lineEnd: 问题在目标内容中的起止行号（1-based，相对于 [REVIEW_START]..[REVIEW_END] 块内的行号）。如果整段都有问题，填行号范围即可\n- snippet: 原文中的相关片段，用于定位\n- issue: 问题描述，清晰说明具体哪里有问题\n- suggestion: 修改建议\n- severity: **放在最后填写**，可选值：\n  - \"error\": 明确的错误（事实错误、语法错误等），需要修改\n  - \"warning\": 可能有问题或值得商榷的表达，建议关注\n  - \"suggestion\": 非必要的优化建议，不改也可\n  - \"ok\": 经过检查后认为没有问题（保留此条用于展示检查过程）\n- 如果某个板块没有问题，返回空数组，不要返回含 \"ok\" 条目的数组\n\n## 文章内容\n{{content}}",
+    "translate": "将以下内容从 {{sourceLang}} 翻译为 {{targetLang}}。\n\n要求：\n1. [TRANSLATE_START]...[TRANSLATE_END] 之间的内容是需要翻译的目标内容。\n2. [TRANSLATE_START]...[TRANSLATE_END] 之外的文本是上下文，仅作参考，不要修改它们。\n3. 保持所有格式、语法标记和代码块不变。\n4. 所有 `@def`,`@lemma` 等 Notesaw 自定义块标签保持原样，不翻译。\n4. 保持所有技术术语和专有名词的原始形式。\n5. 保持代码块内的代码以及数学公式不变。\n6. 保持行内链接、图片以及其他语法不变。\n7. 不要添加任何解释或备注。\n8. 只返回翻译后的内容，用相同的 [TRANSLATE_START]/[TRANSLATE_END] 标记包裹。\n\n{{context}}\n\n[TRANSLATE_START]\n{{target}}\n[TRANSLATE_END]",
+    "discovery": "你是一位技术文档分析专家。请扫描以下文章内容，提取值得添加为知识库词条的术语。\n\n## 值得添加的术语类型\n- 缩写（中英文皆可）：API、中科院、PPO\n- 技术术语/概念：闭包、依赖注入、函数式编程\n- 定理/公式：勾股定理、贝叶斯定理、NP完全\n- 技术栈/工具：TypeScript、Docker、PostgreSQL\n- 其他需要解释的名词：RFC 2616、OAuth 2.0\n\n## 不值得添加的类型\n- 常见名词：汽车、红色、桌子\n- 常见动词：运行、调用、返回\n- 代词/连词：这个、那个、以及\n- 人名（非知名人物）：小明、李老师\n\n## 输出格式\n返回严格的 JSON 对象：\n\n{\n  \"candidates\": [\n    {\n      \"term\": \"术语名称\",\n      \"type\": \"acronym | concept | theorem | tech | other\",\n      \"definition\": \"一句话简要解释（10-30字）\",\n      \"importance\": 0.95\n    }\n  ]\n}\n\n## 重要性评分标准\n- 0.9-1.0: 核心技术概念，必须解释\n- 0.7-0.9: 重要概念，建议解释\n- 0.5-0.7: 一般概念，可选解释\n- 0.3-0.5: 边缘概念，很少需要\n- 0.0-0.3: 忽略\n\n## 要求\n1. 每个词条只能出现一次\n2. 不要输出文章中不存在的术语\n3. 最多输出 20 个候选词条（长文章可适当增加）\n4. 关注 [DISCOVER_START] 和 [DISCOVER_END] 标记之间的内容\n5. **definition 必须使用 {{language}} 书写。**\n\n[DISCOVER_START]\n{{content}}\n[DISCOVER_END]\n\n返回一个包含 \"candidates\" 数组的 JSON 对象。每个候选必须包含：\"term\"、\"type\"、\"definition\" 和 \"importance\"。",
+    "generate": "你是一位技术百科编辑。请为给定的术语生成完整的词条内容。\n\n## 输出格式\n返回严格的 JSON 对象：\n\n{\n  \"aliases\": [\"别名1\", \"别名2\"],\n  \"definition\": \"简短定义（30-80 字，用于悬停预览）\",\n  \"content\": \"详细介绍...\\n\\n#### 示例\\n...\",\n  \"tags\": [\"标签1\", \"标签2\"],\n  \"type\": \"acronym | concept | theorem | tech | other\"\n}\n\n## 撰写要求\n1. **definition**：一句简洁的定义，适合悬停预览。使用 {{language}} 书写。\n2. **content**：完整的教程式词条内容，使用 Markdown 格式，全篇使用 {{language}} 书写。\n3. **aliases**：常用别名或缩写。\n4. **tags**：分类标签（使用 {{language}}）。\n5. **type**：以下之一：acronym、concept、theorem、tech、other。\n6. **内容结构**：\n   - 详细介绍（2-3 段）\n   - 示例或用法（如适用）\n   - 相关概念（如适用）\n   - 公式使用 KaTeX 书写，行内公式用 $formula$ 格式，展示公式用 $$formula$$ 格式\n   - 不要为词条添加顶级标题（名称已在页面中显示）\n   - 使用 `####`（四级标题）划分子节，避免嵌套标题\n\n## 基于训练知识\n- 使用你的已有知识生成内容\n- 不要编造不存在的信息\n- 如果你确实无法生成有意义的内容，返回 { \"unable\": true }\n\n为以下术语生成词条：\n\n- 术语：{{term}}\n- 简短提示（仅参考）：{{definitionHint}}\n- 上下文（文章 slug）：{{context}}\n\n返回包含 \"aliases\"、\"definition\"、\"content\"、\"tags\"、\"type\" 的 JSON 对象。\n如果无法生成有意义的内容，返回 { \"unable\": true }。",
+    "chat": "你是 Miniese，一个友好的 AI 助手。你运行在 Miniese's Blog 上，帮助读者理解文章内容。请用与用户相同的语言回答。回答要简洁、准确、有帮助。如果用户询问文章相关的问题，结合你的知识给出回答。如果不确定，坦诚说明。"
+  }
+}

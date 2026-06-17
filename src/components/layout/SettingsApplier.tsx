@@ -7,10 +7,15 @@ import { useTheme } from "next-themes";
  * Loads site settings from the API and applies them as CSS variables on <html>.
  * Listens to theme changes (light/dark) and re-applies the correct color values.
  * Should be placed inside ThemeProvider so it can respond to theme changes.
+ *
+ * Supports directory paths in backgroundImage and backgroundImages:
+ * if a path points to a directory (e.g., "/images/bg"), it will be expanded
+ * to all image files inside that directory.
  */
 export function SettingsApplier() {
   const { resolvedTheme } = useTheme();
   const settingsRef = useRef<AppearanceSettings | null>(null);
+  const expandedRef = useRef<string[]>([]); // Cached expanded image URLs
 
   // Fetch settings once
   useEffect(() => {
@@ -18,7 +23,11 @@ export function SettingsApplier() {
 
     async function load() {
       try {
-        const res = await fetch("/api/admin/settings");
+        const [res, _mediaRes] = await Promise.all([
+          fetch("/api/admin/settings"),
+          // Also warm up media API cache
+          fetch("/api/admin/media?dir=/images").catch(() => null),
+        ]);
         if (!res.ok) return;
         const settings = await res.json();
         if (cancelled) return;
@@ -27,7 +36,7 @@ export function SettingsApplier() {
         if (!a) return;
 
         settingsRef.current = a;
-        applySettings(a, resolvedTheme ?? "light");
+        await applySettingsAsync(a, resolvedTheme ?? "light", expandedRef);
       } catch {
         // Silently fail — defaults from CSS will be used
       }
@@ -37,13 +46,11 @@ export function SettingsApplier() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep data-theme attribute in sync with the current theme class
-  // so that github-markdown.css [data-theme="dark"] selectors work after theme switching.
-  // Also re-apply settings when theme changes (after settings have been fetched).
+  // Re-apply settings when theme changes (after settings have been fetched).
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", resolvedTheme ?? "light");
     if (settingsRef.current) {
-      applySettings(settingsRef.current, resolvedTheme ?? "light");
+      applySettingsAsync(settingsRef.current, resolvedTheme ?? "light", expandedRef);
     }
   }, [resolvedTheme]);
 
@@ -72,9 +79,102 @@ interface AppearanceSettings {
   markdownBgColorDark: string;
 }
 
-function applySettings(a: AppearanceSettings, resolvedTheme: string) {
+/**
+ * Checks if a path looks like a directory (not a file extension).
+ */
+function isDirectoryPath(p: string): boolean {
+  if (!p) return false;
+  // Paths ending with / are directories
+  if (p.endsWith("/")) return true;
+  // Paths without a file extension are likely directories
+  const lastSegment = p.split("/").pop() || p;
+  return !lastSegment.includes(".");
+}
+
+/**
+ * Expands a single path to image files. If the path is a directory,
+ * fetches its contents via the media API and returns image file paths.
+ * Otherwise returns the path as-is if it's a valid image.
+ */
+async function expandPathToImages(p: string): Promise<string[]> {
+  if (!p) return [];
+
+  if (isDirectoryPath(p)) {
+    try {
+      const dir = p.endsWith("/") ? p.slice(0, -1) : p;
+      const res = await fetch(`/api/admin/media?dir=${encodeURIComponent(dir)}`);
+      if (!res.ok) return [p]; // Fallback: use as-is
+      const data = await res.json();
+      const images: string[] = (data.files || [])
+        .filter((f: { isImage: boolean }) => f.isImage)
+        .map((f: { path: string }) => f.path);
+      return images.length > 0 ? images : [p]; // Fallback if no images found
+    } catch {
+      return [p]; // Fallback: use as-is
+    }
+  }
+
+  // Single file path — return as-is
+  return [p];
+}
+
+/**
+ * Applies settings to CSS variables. Async because it may need to expand
+ * directory paths to individual image files.
+ */
+async function applySettingsAsync(
+  a: AppearanceSettings,
+  resolvedTheme: string,
+  expandedRef: React.MutableRefObject<string[]>,
+) {
   const isDark = resolvedTheme === "dark";
 
+  // Apply colors synchronously first
+  applyColorsSync(a, isDark);
+
+  // Expand background images (async)
+  const bgImagesSetting = a.backgroundImages?.filter(Boolean) ?? [];
+  const carouselEnabled = a.backgroundCarouselEnabled ?? false;
+
+  // Build the full list of image URLs by expanding directory paths
+  let allImages: string[] = [];
+
+  if (carouselEnabled && bgImagesSetting.length > 0) {
+    // Expand each entry (could be file or directory)
+    const expandedArrays = await Promise.all(
+      bgImagesSetting.map((p) => expandPathToImages(p)),
+    );
+    allImages = expandedArrays.flat();
+  } else if (a.backgroundImage) {
+    allImages = await expandPathToImages(a.backgroundImage);
+  }
+
+  // Cache expanded results
+  expandedRef.current = allImages;
+
+  // Pick the image URL
+  let bgUrl = "";
+  if (carouselEnabled && allImages.length > 0) {
+    const seed = `${resolvedTheme}-${Date.now()}`;
+    const idx = hashString(seed) % allImages.length;
+    bgUrl = allImages[idx];
+  } else if (allImages.length > 0) {
+    bgUrl = allImages[0];
+  }
+
+  const root = document.documentElement;
+  if (bgUrl) {
+    root.style.setProperty("--bg-image", `url(${bgUrl})`);
+  } else {
+    root.style.setProperty("--bg-image", "none");
+  }
+  root.style.setProperty("--bg-opacity", `${(a.backgroundOpacity ?? 10) / 100}`);
+}
+
+/**
+ * Applies color-related CSS variables synchronously.
+ */
+function applyColorsSync(a: AppearanceSettings, isDark: boolean) {
   const primaryHue = isDark ? a.primary.darkHue : a.primary.lightHue;
   const accentHue = isDark ? a.accent.darkHue : a.accent.lightHue;
 
@@ -107,32 +207,17 @@ function applySettings(a: AppearanceSettings, resolvedTheme: string) {
   root.style.setProperty("--image-max-width", `${img.maxWidth ?? 800}px`);
   root.style.setProperty("--image-width-ratio", `${img.defaultWidthRatio ?? 60}%`);
 
-  const textColor = isDark ? (a.markdownTextColorDark ?? "#f0f6fc") : (a.markdownTextColorLight ?? "#1f2328");
+  const textColor = isDark
+    ? a.markdownTextColorDark ?? "#f0f6fc"
+    : a.markdownTextColorLight ?? "#1f2328";
   root.style.setProperty("--markdown-text-color", textColor);
 
-  const bgColor = isDark ? (a.markdownBgColorDark ?? "#0d1117") : (a.markdownBgColorLight ?? "#ffffff");
+  const bgColor = isDark
+    ? a.markdownBgColorDark ?? "#0d1117"
+    : a.markdownBgColorLight ?? "#ffffff";
   root.style.setProperty("--markdown-bg-color-global", bgColor);
 
   root.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
-
-  // Global background image with carousel support
-  const bgImages = a.backgroundImages?.filter(Boolean) ?? [];
-  const carouselEnabled = a.backgroundCarouselEnabled ?? false;
-
-  let bgUrl = a.backgroundImage;
-  if (carouselEnabled && bgImages.length > 0) {
-    // Pick a random image from the list on each page load/theme switch
-    const seed = `${resolvedTheme}-${Date.now()}`;
-    const idx = hashString(seed) % bgImages.length;
-    bgUrl = bgImages[idx];
-  }
-
-  if (bgUrl) {
-    root.style.setProperty("--bg-image", `url(${bgUrl})`);
-  } else {
-    root.style.setProperty("--bg-image", "none");
-  }
-  root.style.setProperty("--bg-opacity", `${a.backgroundOpacity}%`);
 }
 
 /** Simple string hash for deterministic random selection */

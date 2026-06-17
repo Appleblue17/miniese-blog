@@ -26,8 +26,10 @@ export async function proxy(request: NextRequest) {
   // Settings GET is public — non-admin users need appearance settings (body width, colors)
   // for proper page rendering. Only PUT (update) requires admin auth.
   const isSettingsGet = pathname === "/api/admin/settings" && request.method === "GET";
+  // Media API GET is public — needed for background image directory expansion on public pages
+  const isMediaGet = pathname === "/api/admin/media" && request.method === "GET";
 
-  if ((isAdminPage || isAdminApi) && !isSettingsGet) {
+  if ((isAdminPage || isAdminApi) && !isSettingsGet && !isMediaGet) {
     const { auth } = await import("@/auth");
     const session = await auth();
 

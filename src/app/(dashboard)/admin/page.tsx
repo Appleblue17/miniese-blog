@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { FileText, PlusCircle, BookOpen, Settings, Bot, MessageSquare, Bell } from "lucide-react";
+import { FileText, PlusCircle, BookOpen, Settings, Bot, MessageSquare, Bell, Images } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 
@@ -104,6 +104,17 @@ export default async function AdminDashboardPage() {
                 ? `${unreadCount} 条未读通知`
                 : "查看系统通知和任务状态"}
             </p>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/media"
+          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+        >
+          <Images className="size-10 text-primary" />
+          <div>
+            <h2 className="font-medium text-lg">媒体库</h2>
+            <p className="text-sm text-muted-foreground mt-1">管理上传的图片和文件</p>
           </div>
         </Link>
 
