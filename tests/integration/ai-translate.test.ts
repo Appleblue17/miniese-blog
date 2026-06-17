@@ -332,17 +332,17 @@ describeDb("AI Translation API", () => {
   it("GET /api/articles/[slug] returns isAITranslated field", async () => {
     const { GET } = await import("@/app/api/articles/[slug]/route");
 
+    // The English article with slug "integration-test-auto" was created with isAITranslated: true
     const response = await GET(
       toNextRequest(
-        new Request("http://localhost:3000/api/articles/integration-test-translate?lang=en"),
+        new Request("http://localhost:3000/api/articles/integration-test-auto?lang=en"),
       ),
-      { params: Promise.resolve({ slug: "integration-test-translate" }) },
+      { params: Promise.resolve({ slug: "integration-test-auto" }) },
     );
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.article).toHaveProperty("isAITranslated");
-    // The English article was created with isAITranslated: true
     expect(data.article.isAITranslated).toBe(true);
   });
 

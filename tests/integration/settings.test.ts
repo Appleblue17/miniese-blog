@@ -95,11 +95,12 @@ describe("Settings API", () => {
         image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: [] },
         primary: { lightHue: 210, darkHue: 250, lightSaturation: 65, darkSaturation: 65, lightLightness: 55, darkLightness: 65 },
         accent: { lightHue: 300, darkHue: 290, lightSaturation: 60, darkSaturation: 60, lightLightness: 55, darkLightness: 65 },
-        backgroundImage: "",
         backgroundImages: [],
         backgroundCarouselEnabled: false,
-        backgroundOpacity: 20,
-        markdownBgOpacity: 30,
+        backgroundOpacityLight: 20,
+        backgroundOpacityDark: 10,
+        markdownBgOpacityLight: 30,
+        markdownBgOpacityDark: 80,
         markdownTextColorLight: "#1f2328",
         markdownTextColorDark: "#f0f6fc",
         markdownBgColorLight: "#ffffff",
@@ -116,7 +117,8 @@ describe("Settings API", () => {
     expect(settings.appearance.themeMode).toBe("dark");
     expect(settings.appearance.bodyWidth).toBe(80);
     expect(settings.appearance.primary.lightHue).toBe(210);
-    expect(settings.appearance.markdownBgOpacity).toBe(30);
+    expect(settings.appearance.markdownBgOpacityLight).toBe(30);
+    expect(settings.appearance.markdownBgOpacityDark).toBe(80);
   });
 
   it("handles nested partial updates correctly", async () => {

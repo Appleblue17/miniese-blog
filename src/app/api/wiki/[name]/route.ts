@@ -62,7 +62,7 @@ function serializeEntry(entry: {
 }
 
 /**
- * Finds a wiki entry by name or slug.
+ * Finds a wiki entry by name or slug, excluding soft-deleted entries.
  */
 async function findEntry(name: string, language: "zh" | "en") {
   const slug = slugifyName(name);
@@ -72,6 +72,7 @@ async function findEntry(name: string, language: "zh" | "en") {
         { name, language },
         { name: slug, language },
       ],
+      status: { not: "deleted" },
     },
   });
 }

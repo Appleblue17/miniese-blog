@@ -78,7 +78,7 @@ describeDb("POST /api/auth/register", () => {
     const user = await prisma.user.findUnique({ where: { email: testEmail } });
     expect(user).not.toBeNull();
     expect(user!.name).toBe("Test User");
-    expect(user!.role).toBe("user");
+    expect(user!.roles).toContain("user");
     expect(user!.emailVerified).toBeNull();
 
     // Verify password is hashed

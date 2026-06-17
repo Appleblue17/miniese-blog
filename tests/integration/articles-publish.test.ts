@@ -98,7 +98,7 @@ This is a test article.`;
     expect(article).not.toBeNull();
     expect(article!.title).toBe("Test Article");
     expect(article!.status).toBe("published");
-    expect(article!.renderedContent).toContain("<h1>Hello World</h1>");
+    expect(article!.renderedContent).toContain("<h1 id=\"hello-world\">Hello World</h1>");
 
     // Queue cleanup
     cleanupFns.push(async () => {
