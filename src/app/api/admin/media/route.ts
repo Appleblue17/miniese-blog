@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     directories.sort();
     files.sort((a, b) => a.name.localeCompare(b.name));
 
-    return NextResponse.json({ files, directories, currentDir: `/${safeDir}` });
+    return NextResponse.json({ files, directories, currentDir: safeDir });
   } catch (err) {
     console.error("[Media API] GET error:", err);
     return NextResponse.json({ error: "Failed to list files" }, { status: 500 });

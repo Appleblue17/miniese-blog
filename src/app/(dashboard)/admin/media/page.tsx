@@ -296,7 +296,7 @@ export default function MediaPage() {
                     <button
                       type="button"
                       onClick={() => handleCopyPath(file.path)}
-                      className="rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-white transition-colors"
+                      className="rounded-lg bg-foreground/80 px-2.5 py-1.5 text-xs font-medium text-background hover:bg-foreground transition-colors"
                       title="复制路径"
                     >
                       复制路径
@@ -313,7 +313,7 @@ export default function MediaPage() {
                         <button
                           type="button"
                           onClick={() => setDeleteConfirm(null)}
-                          className="rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-white transition-colors"
+                          className="rounded-lg bg-foreground/80 px-2.5 py-1.5 text-xs font-medium text-background hover:bg-foreground transition-colors"
                         >
                           取消
                         </button>
