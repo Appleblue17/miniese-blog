@@ -69,8 +69,10 @@ interface AppearanceSettings {
   primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   backgroundImages: string[];
-  backgroundOpacity: number;
-  markdownBgOpacity: number;
+  backgroundOpacityLight: number;
+  backgroundOpacityDark: number;
+  markdownBgOpacityLight: number;
+  markdownBgOpacityDark: number;
   markdownTextColorLight: string;
   markdownTextColorDark: string;
   markdownBgColorLight: string;
@@ -154,7 +156,7 @@ async function applySettingsAsync(
   } else {
     root.style.setProperty("--bg-image", "none");
   }
-  root.style.setProperty("--bg-opacity", `${(a.backgroundOpacity ?? 10) / 100}`);
+  root.style.setProperty("--bg-opacity", `${(isDark ? (a.backgroundOpacityDark ?? 10) : (a.backgroundOpacityLight ?? 10)) / 100}`);
 }
 
 /**
@@ -203,7 +205,7 @@ function applyColorsSync(a: AppearanceSettings, isDark: boolean) {
     : a.markdownBgColorLight ?? "#ffffff";
   root.style.setProperty("--markdown-bg-color-global", bgColor);
 
-  root.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
+  root.style.setProperty("--markdown-bg-opacity", `${(isDark ? (a.markdownBgOpacityDark ?? 80) : (a.markdownBgOpacityLight ?? 80))}%`);
 }
 
 /** Simple string hash for deterministic random selection */

@@ -58,9 +58,13 @@
       "lightLightness": 55,
       "darkLightness": 65
     },
-    "backgroundImages": [],
-    "backgroundOpacity": 10,
-    "markdownBgOpacity": 80,
+    "backgroundImages": [
+      "/images/miniese/bg"
+    ],
+    "backgroundOpacityLight": 35,
+    "backgroundOpacityDark": 20,
+    "markdownBgOpacityLight": 70,
+    "markdownBgOpacityDark": 80,
     "markdownTextColorLight": "#1f2328",
     "markdownTextColorDark": "#f0f6fc",
     "markdownBgColorLight": "#ffffff",

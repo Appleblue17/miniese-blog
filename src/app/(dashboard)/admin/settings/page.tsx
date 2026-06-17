@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
-    backgroundImages: [], backgroundOpacity: 10, markdownBgOpacity: 80,
+    backgroundImages: [], backgroundOpacityLight: 10, backgroundOpacityDark: 10, markdownBgOpacityLight: 80, markdownBgOpacityDark: 80,
     markdownTextColorLight: "#1f2328", markdownTextColorDark: "#f0f6fc",
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
@@ -293,8 +293,13 @@ export default function SettingsPage() {
     const bgColor = isDark ? (a.markdownBgColorDark ?? "#0d1117") : (a.markdownBgColorLight ?? "#ffffff");
     document.documentElement.style.setProperty("--markdown-bg-color-global", bgColor);
 
-    // Sync markdown bg opacity
-    document.documentElement.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
+    // Sync markdown bg opacity — use the value for the current theme
+    const mdBgOpacity = isDark ? (a.markdownBgOpacityDark ?? 80) : (a.markdownBgOpacityLight ?? 80);
+    document.documentElement.style.setProperty("--markdown-bg-opacity", `${mdBgOpacity}%`);
+
+    // Sync global bg image opacity — use the value for the current theme
+    const bgOpacity = isDark ? (a.backgroundOpacityDark ?? 10) : (a.backgroundOpacityLight ?? 10);
+    document.documentElement.style.setProperty("--bg-opacity", `${bgOpacity / 100}`);
 
     // Sync image settings
     const img = a.image ?? {};
@@ -1045,31 +1050,82 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="text-sm font-medium">背景不透明度 ({a.backgroundOpacity}%)</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-sm font-medium">背景不透明度 — 浅色模式</label>
                   <ResetButton
-                    isDefault={a.backgroundOpacity === DEFAULT_SETTINGS.appearance.backgroundOpacity}
+                    isDefault={a.backgroundOpacityLight === DEFAULT_SETTINGS.appearance.backgroundOpacityLight}
                     onReset={() => {
-                      resetField("appearance", "backgroundOpacity");
-                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity / 100}`);
+                      resetField("appearance", "backgroundOpacityLight");
+                      const v = DEFAULT_SETTINGS.appearance.backgroundOpacityLight / 100;
+                      document.documentElement.style.setProperty("--bg-opacity", `${v}`);
                     }}
                   />
                 </div>
                 <div className="flex items-center gap-2">
+                  <Sun className="size-4 text-muted-foreground shrink-0" />
                   <input
                     type="range"
                     min={0}
                     max={100}
-                    value={a.backgroundOpacity}
+                    value={a.backgroundOpacityLight}
                     onChange={(e) => {
                       const v = Number(e.target.value);
-                      updateLocal("appearance", "backgroundOpacity", v);
-                      document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
+                      updateLocal("appearance", "backgroundOpacityLight", v);
+                      const isDark =
+                        a.themeMode === "dark" ||
+                        (a.themeMode === "system" &&
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(prefers-color-scheme: dark)").matches);
+                      if (!isDark) {
+                        document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
+                      }
                     }}
                     className="flex-1 accent-foreground"
                   />
+                  <span className="text-xs text-muted-foreground w-10 tabular-nums">{a.backgroundOpacityLight}%</span>
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <div className="flex justify-between text-xs text-muted-foreground mt-1 ml-7">
+                  <span>透明</span>
+                  <span>不透明</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-sm font-medium">背景不透明度 — 深色模式</label>
+                  <ResetButton
+                    isDefault={a.backgroundOpacityDark === DEFAULT_SETTINGS.appearance.backgroundOpacityDark}
+                    onReset={() => {
+                      resetField("appearance", "backgroundOpacityDark");
+                      const v = DEFAULT_SETTINGS.appearance.backgroundOpacityDark / 100;
+                      document.documentElement.style.setProperty("--bg-opacity", `${v}`);
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Moon className="size-4 text-muted-foreground shrink-0" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={a.backgroundOpacityDark}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      updateLocal("appearance", "backgroundOpacityDark", v);
+                      const isDark =
+                        a.themeMode === "dark" ||
+                        (a.themeMode === "system" &&
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(prefers-color-scheme: dark)").matches);
+                      if (isDark) {
+                        document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
+                      }
+                    }}
+                    className="flex-1 accent-foreground"
+                  />
+                  <span className="text-xs text-muted-foreground w-10 tabular-nums">{a.backgroundOpacityDark}%</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1 ml-7">
                   <span>透明</span>
                   <span>不透明</span>
                 </div>
@@ -1126,33 +1182,86 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <label className="text-sm font-medium">
-                    背景不透明度 ({a.markdownBgOpacity}%)
+                    Markdown 背景不透明度 — 浅色模式
                   </label>
                   <ResetButton
-                    isDefault={a.markdownBgOpacity === DEFAULT_SETTINGS.appearance.markdownBgOpacity}
+                    isDefault={a.markdownBgOpacityLight === DEFAULT_SETTINGS.appearance.markdownBgOpacityLight}
                     onReset={() => {
-                      resetField("appearance", "markdownBgOpacity");
-                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${DEFAULT_SETTINGS.appearance.markdownBgOpacity}%`);
+                      resetField("appearance", "markdownBgOpacityLight");
+                      const v = DEFAULT_SETTINGS.appearance.markdownBgOpacityLight;
+                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
                     }}
                   />
                 </div>
                 <div className="flex items-center gap-2">
+                  <Sun className="size-4 text-muted-foreground shrink-0" />
                   <input
                     type="range"
                     min={0}
                     max={100}
-                    value={a.markdownBgOpacity}
+                    value={a.markdownBgOpacityLight}
                     onChange={(e) => {
                       const v = Number(e.target.value);
-                      updateLocal("appearance", "markdownBgOpacity", v);
-                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
+                      updateLocal("appearance", "markdownBgOpacityLight", v);
+                      const isDark =
+                        a.themeMode === "dark" ||
+                        (a.themeMode === "system" &&
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(prefers-color-scheme: dark)").matches);
+                      if (!isDark) {
+                        document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
+                      }
                     }}
                     className="flex-1 accent-foreground"
                   />
+                  <span className="text-xs text-muted-foreground w-10 tabular-nums">{a.markdownBgOpacityLight}%</span>
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <div className="flex justify-between text-xs text-muted-foreground mt-1 ml-7">
+                  <span>透明</span>
+                  <span>不透明</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-sm font-medium">
+                    Markdown 背景不透明度 — 深色模式
+                  </label>
+                  <ResetButton
+                    isDefault={a.markdownBgOpacityDark === DEFAULT_SETTINGS.appearance.markdownBgOpacityDark}
+                    onReset={() => {
+                      resetField("appearance", "markdownBgOpacityDark");
+                      const v = DEFAULT_SETTINGS.appearance.markdownBgOpacityDark;
+                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Moon className="size-4 text-muted-foreground shrink-0" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={a.markdownBgOpacityDark}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      updateLocal("appearance", "markdownBgOpacityDark", v);
+                      const isDark =
+                        a.themeMode === "dark" ||
+                        (a.themeMode === "system" &&
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(prefers-color-scheme: dark)").matches);
+                      if (isDark) {
+                        document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
+                      }
+                    }}
+                    className="flex-1 accent-foreground"
+                  />
+                  <span className="text-xs text-muted-foreground w-10 tabular-nums">{a.markdownBgOpacityDark}%</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1 ml-7">
                   <span>透明</span>
                   <span>不透明</span>
                 </div>
@@ -1326,106 +1435,99 @@ export default function SettingsPage() {
                     typeof window !== "undefined" &&
                     window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-                const previewBg = "var(--background)";
-                const previewBorder = isDark
-                  ? `hsl(var(--primary-hue), var(--primary-sat), 20%)`
-                  : `hsl(var(--primary-hue), var(--primary-sat), 70%)`;
                 const previewHeading = isDark
                   ? `hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))`
                   : `hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))`;
 
                 const mdBgColor = isDark ? (a.markdownBgColorDark ?? "#0d1117") : (a.markdownBgColorLight ?? "#ffffff");
                 const mdTextColor = isDark ? (a.markdownTextColorDark ?? "#f0f6fc") : (a.markdownTextColorLight ?? "#1f2328");
+                const mdOpacityValue = isDark ? (a.markdownBgOpacityDark ?? 80) : (a.markdownBgOpacityLight ?? 80);
 
                 return (
-              <div
-                className="rounded-xl border p-5 space-y-4"
-                style={{
-                  backgroundColor: previewBg,
-                  borderColor: previewBorder,
-                }}
-              >
-                <h3
-                  className="text-lg font-semibold"
-                  style={{ color: previewHeading }}
-                >
-                  预览标题
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  这是一段示例正文内容，用于展示当前配色方案的效果。
-                </p>
-                <div className="flex gap-2">
-                  <a
-                    href="#"
-                    className="text-sm underline"
+                <div className="space-y-4">
+                  <h3
+                    className="text-lg font-semibold"
                     style={{ color: previewHeading }}
                   >
-                    链接示例
-                  </a>
-                  <a
-                    href="#"
-                    className="text-sm underline"
-                    style={{ color: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))` }}
-                  >
-                    强调链接
-                  </a>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
-                    style={{
-                      backgroundColor: previewHeading,
-                    }}
-                  >
-                    主要按钮
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
-                    style={{
-                      backgroundColor: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))`,
-                    }}
-                  >
-                    强调按钮
-                  </button>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-[10px]"
-                  style={{
-                    backgroundColor: `${previewHeading}1A`,
-                    color: previewHeading,
-                    borderColor: `${previewHeading}33`,
-                  }}
-                >
-                  标签示例
-                </Badge>
+                    预览标题
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    这是一段示例正文内容，用于展示当前配色方案的效果。
+                  </p>
+                  <div className="flex gap-3">
+                    <a
+                      href="#"
+                      className="text-sm underline"
+                      style={{ color: previewHeading }}
+                    >
+                      链接示例
+                    </a>
+                    <a
+                      href="#"
+                      className="text-sm underline"
+                      style={{ color: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))` }}
+                    >
+                      强调链接
+                    </a>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+                      style={{
+                        backgroundColor: previewHeading,
+                      }}
+                    >
+                      主要按钮
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+                      style={{
+                        backgroundColor: `hsl(var(--accent-hue), var(--accent-sat), var(--accent-light))`,
+                      }}
+                    >
+                      强调按钮
+                    </button>
+                  </div>
+                  <div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px]"
+                      style={{
+                        backgroundColor: `${previewHeading}1A`,
+                        color: previewHeading,
+                        borderColor: `${previewHeading}33`,
+                      }}
+                    >
+                      标签示例
+                    </Badge>
+                  </div>
 
-                {/* Markdown preview */}
-                <div className="mt-4 pt-4 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Markdown 渲染效果预览：</p>
-                  <div
-                    className="rounded-lg p-4 text-sm leading-relaxed"
-                    style={{
-                      backgroundColor: a.markdownBgOpacity === 0
-                        ? "transparent"
-                        : `color-mix(in srgb, ${mdBgColor} ${a.markdownBgOpacity}%, transparent)`,
-                      color: mdTextColor,
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, fontSize: "1.125em", marginBottom: "0.5em" }}>
-                      标题
-                    </p>
-                    <p style={{ marginBottom: "0.5em" }}>
-                      这是一段 Markdown 正文内容，展示了当前背景色、不透明度和字体颜色的效果。
-                    </p>
-                    <p style={{ marginBottom: "0.5em" }}>
-                      你可以调整左侧的颜色选择器和滑块来改变样式。
-                    </p>
+                  {/* Markdown preview */}
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-xs text-muted-foreground mb-2">Markdown 渲染效果预览：</p>
+                    <div
+                      className="rounded-lg p-4 text-sm leading-relaxed"
+                      style={{
+                        backgroundColor: mdOpacityValue === 0
+                          ? "transparent"
+                          : `color-mix(in srgb, ${mdBgColor} ${mdOpacityValue}%, transparent)`,
+                        color: mdTextColor,
+                      }}
+                    >
+                      <p style={{ fontWeight: 600, fontSize: "1.125em", marginBottom: "0.5em" }}>
+                        标题
+                      </p>
+                      <p style={{ marginBottom: "0.5em" }}>
+                        这是一段 Markdown 正文内容，展示了当前背景色、不透明度和字体颜色的效果。
+                      </p>
+                      <p style={{ marginBottom: "0.5em" }}>
+                        你可以调整左侧的颜色选择器和滑块来改变样式。
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
                 );
               })()}
             </div>
@@ -1710,6 +1812,7 @@ export default function SettingsPage() {
               const displayValue = val || defaultVal;
               // "恢复默认" is hidden when the current value matches the default template
               const matchesDefault = displayValue === defaultVal;
+
               return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">

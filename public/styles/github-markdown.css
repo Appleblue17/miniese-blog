@@ -12,10 +12,11 @@
   --fgColor-accent: Highlight;
 
   /* Override background with CSS variable for dynamic opacity control.
-     Uses the globally-set --markdown-bg-color as the base (from settings),
+     Uses the globally-set --markdown-bg-color-global as the base (from settings),
      falls back to --bgColor-default, then applies opacity via color-mix
-     against the page background so the result is correct regardless of opacity. */
-  --markdown-bg-color: color-mix(in srgb, var(--markdown-bg-color-global, var(--bgColor-default, #ffffff)) var(--markdown-bg-opacity, 80%), var(--background, #ffffff));
+     against transparent so the slider works correctly regardless of page
+     background color. */
+  --markdown-bg-color: color-mix(in srgb, var(--markdown-bg-color-global, var(--bgColor-default, #ffffff)) var(--markdown-bg-opacity, 80%), transparent);
 }
 @media (prefers-color-scheme: dark) {
   .markdown-body,
