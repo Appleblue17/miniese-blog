@@ -20,10 +20,10 @@ export function ScrollIndicator() {
   return (
     <button
       onClick={handleClick}
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+      className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-white/60 hover:text-white/90 transition-colors cursor-pointer z-20"
       aria-label="Scroll down"
     >
-      <ChevronDown className="size-8" />
+      <ChevronDown className="size-12" />
     </button>
   );
 }

@@ -18,27 +18,39 @@ interface HeroSectionProps {
 
 export async function HeroSection({ lang }: HeroSectionProps) {
   const settings = await getSettings();
-  const { heroTitle, heroSubtitles, heroSubtitlesEn, heroSubtitleMode, heroSubtitleIntervalMs, heroImageLight, heroImageDark } = settings.site;
+  const { heroTitle, heroSubtitles, heroSubtitlesEn, heroSubtitleMode, heroSubtitleIntervalMs, heroImageLight, heroImageDark, heroImageLightPortrait, heroImageDarkPortrait } = settings.site;
   const subtitles = lang === "en" && heroSubtitlesEn?.length ? heroSubtitlesEn : heroSubtitles;
 
   return (
-    <section className="relative h-screen w-full overflow-hidden flex items-center">
-      {/* Light mode background — fixed to cover entire viewport including sidebar area */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={heroImageLight || "/images/miniese/hero/hero-light.png"}
-        alt=""
-        className="fixed inset-0 w-full h-full object-cover block dark:hidden"
-        aria-hidden="true"
-      />
+    <section className="relative h-screen w-full overflow-hidden">
+      {/* Light mode background — responsive: portrait < 1280px, landscape >= 1280px */}
+      <picture className="fixed inset-0 w-full h-full block dark:hidden">
+        <source
+          srcSet={heroImageLightPortrait || "/images/miniese/hero/hero-light-portrait.png"}
+          media="(max-width: 1279px)"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroImageLight || "/images/miniese/hero/hero-light.png"}
+          alt=""
+          className="w-full h-full object-cover"
+          aria-hidden="true"
+        />
+      </picture>
       {/* Dark mode background */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={heroImageDark || "/images/miniese/hero/hero-dark.png"}
-        alt=""
-        className="fixed inset-0 w-full h-full object-cover hidden dark:block"
-        aria-hidden="true"
-      />
+      <picture className="fixed inset-0 w-full h-full hidden dark:block">
+        <source
+          srcSet={heroImageDarkPortrait || "/images/miniese/hero/hero-dark-portrait.png"}
+          media="(max-width: 1279px)"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroImageDark || "/images/miniese/hero/hero-dark.png"}
+          alt=""
+          className="w-full h-full object-cover"
+          aria-hidden="true"
+        />
+      </picture>
 
       {/* Overlay gradient for readability — fixed as well */}
       <div
@@ -49,8 +61,8 @@ export async function HeroSection({ lang }: HeroSectionProps) {
         }}
       />
 
-      {/* Content layer */}
-      <div className="relative z-10 mx-auto px-6 sm:px-10 lg:px-16 w-full max-w-7xl">
+      {/* Content layer — narrow: title near top, cards near bottom; wide: vertically centered */}
+      <div className="relative z-10 mx-auto px-6 sm:px-10 lg:px-16 w-full max-w-7xl max-xl:min-h-full max-xl:flex max-xl:flex-col max-xl:justify-between max-xl:pt-[15vh] max-xl:pb-[15vh] xl:flex xl:flex-col xl:justify-center xl:h-full">
         <div className="max-w-2xl">
           <h1
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-4"
@@ -66,8 +78,10 @@ export async function HeroSection({ lang }: HeroSectionProps) {
               interval={heroSubtitleIntervalMs || 5000}
             />
           </div>
+        </div>
 
-          {/* Entry cards */}
+        {/* Narrow screens: cards pushed down; wide screens: in normal flow */}
+        <div>
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <HeroCard
               href={`/${lang}/articles`}
@@ -121,8 +135,8 @@ function HeroCard({
         {icon}
       </div>
       <div>
-        <div className="font-medium text-sm sm:text-base">{label}</div>
-        <div className="text-xs text-white/70">{description}</div>
+        <div className="font-medium text-sm sm:text-base lg:text-lg">{label}</div>
+        <div className="text-xs lg:text-sm text-white/70">{description}</div>
       </div>
     </Link>
   );

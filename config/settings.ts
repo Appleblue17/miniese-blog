@@ -20,6 +20,8 @@ export interface AppSettings {
     heroSubtitleIntervalMs: number;
     heroImageLight: string;
     heroImageDark: string;
+    heroImageLightPortrait: string;
+    heroImageDarkPortrait: string;
     homepage: {
       layout: "columns" | "rows";
       latestCount: number;
