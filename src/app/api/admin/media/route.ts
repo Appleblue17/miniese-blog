@@ -1,15 +1,18 @@
 /**
  * @file /api/admin/media — Media library API route.
  *
- * GET  /api/admin/media?dir=/images — List files in a directory under public/
- * POST /api/admin/media — Upload a file to public/images/
- * DELETE /api/admin/media?path=/images/foo.png — Delete a file
+ * GET    /api/admin/media?dir=/images — List files in a directory under public/
+ * POST   /api/admin/media — Upload a file to public/images/
+ * PUT    /api/admin/media — Create a new folder (body: { dir: "/images/subdir" })
+ * PATCH  /api/admin/media — Rename a file or folder (body: { path: "/images/old", newName: "new-name" })
+ * DELETE /api/admin/media?path=/images/foo.png — Delete a file or folder
  */
 
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { existsSync } from "fs";
+import sharp from "sharp";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 
@@ -43,7 +46,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ files: [], directories: [] });
     }
 
-    const files: { name: string; path: string; size: number; isImage: boolean }[] = [];
+    const files: { name: string; path: string; size: number; isImage: boolean; width?: number; height?: number }[] = [];
     const directories: string[] = [];
 
     for (const entry of entries) {
@@ -55,12 +58,23 @@ export async function GET(request: Request) {
         if (stat.isDirectory()) {
           directories.push(relativePath);
         } else if (stat.isFile()) {
-          files.push({
+          const fileInfo: { name: string; path: string; size: number; isImage: boolean; width?: number; height?: number } = {
             name: entry,
             path: relativePath,
             size: stat.size,
             isImage: isImageFile(entry),
-          });
+          };
+          // Get image dimensions for image files
+          if (fileInfo.isImage) {
+            try {
+              const metadata = await sharp(fullPath).metadata();
+              fileInfo.width = metadata.width ?? undefined;
+              fileInfo.height = metadata.height ?? undefined;
+            } catch {
+              // Ignore metadata errors
+            }
+          }
+          files.push(fileInfo);
         }
       } catch {
         // Skip inaccessible entries
@@ -141,17 +155,89 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Invalid path" }, { status: 400 });
     }
 
-    // Prevent deleting directories via DELETE
     const stat = await fs.stat(fullPath);
     if (stat.isDirectory()) {
-      return NextResponse.json({ error: "Cannot delete directories via this endpoint" }, { status: 400 });
+      await fs.rm(fullPath, { recursive: true, force: true });
+    } else {
+      await fs.unlink(fullPath);
     }
-
-    await fs.unlink(fullPath);
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[Media API] DELETE error:", err);
-    return NextResponse.json({ error: "Failed to delete file" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const dir = body.dir as string;
+
+    if (!dir) {
+      return NextResponse.json({ error: "No directory path provided" }, { status: 400 });
+    }
+
+    // Security: prevent directory traversal
+    const safeDir = path.normalize(dir).replace(/^(\.\.(\/|\\|$))+/, "");
+    const fullDir = path.join(PUBLIC_DIR, safeDir);
+
+    if (!fullDir.startsWith(PUBLIC_DIR)) {
+      return NextResponse.json({ error: "Invalid directory" }, { status: 400 });
+    }
+
+    // Check if already exists
+    if (existsSync(fullDir)) {
+      return NextResponse.json({ error: "文件夹已存在", code: "EXISTS" }, { status: 409 });
+    }
+
+    await fs.mkdir(fullDir, { recursive: true });
+
+    const relativePath = `/${path.relative(PUBLIC_DIR, fullDir)}`;
+    return NextResponse.json({ success: true, path: relativePath });
+  } catch (err) {
+    console.error("[Media API] PUT error:", err);
+    return NextResponse.json({ error: "Failed to create folder" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const targetPath = body.path as string;
+    const newName = body.newName as string;
+
+    if (!targetPath || !newName) {
+      return NextResponse.json({ error: "Missing path or newName" }, { status: 400 });
+    }
+
+    // Validate new name
+    if (!/^[a-zA-Z0-9._\-\u4e00-\u9fff]+$/.test(newName)) {
+      return NextResponse.json({ error: "名称包含非法字符" }, { status: 400 });
+    }
+
+    // Security: prevent directory traversal
+    const safePath = path.normalize(targetPath).replace(/^(\.\.(\/|\\|$))+/, "");
+    const fullPath = path.join(PUBLIC_DIR, safePath);
+
+    if (!fullPath.startsWith(PUBLIC_DIR)) {
+      return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+    }
+
+    const parentDir = path.dirname(fullPath);
+    const newFullPath = path.join(parentDir, newName);
+
+    // Check if target already exists
+    if (existsSync(newFullPath)) {
+      return NextResponse.json({ error: "目标名称已存在", code: "EXISTS" }, { status: 409 });
+    }
+
+    await fs.rename(fullPath, newFullPath);
+
+    const relativePath = `/${path.relative(PUBLIC_DIR, newFullPath)}`;
+    return NextResponse.json({ success: true, path: relativePath });
+  } catch (err) {
+    console.error("[Media API] PATCH error:", err);
+    return NextResponse.json({ error: "Failed to rename" }, { status: 500 });
   }
 }
