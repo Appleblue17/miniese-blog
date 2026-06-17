@@ -38,7 +38,7 @@ import type { AppSettings } from "../../../../../config/settings";
 
 // Default hardcoded settings (prompts are loaded from default-settings.json via API)
 const DEFAULT_SETTINGS: AppSettings = {
-  site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog", heroTitle: "Miniese's Blog", heroSubtitles: ["探索技术与知识的边界", "记录思考与成长的点滴", "AI 驱动的写作与知识管理"], heroSubtitlesEn: ["Exploring the frontiers of tech & knowledge", "Documenting thoughts and growth", "AI-powered writing & knowledge management"], heroSubtitleMode: "sequential", heroSubtitleIntervalMs: 5000, heroImageLight: "/images/miniese/hero/hero-light.png", heroImageDark: "/images/miniese/hero/hero-dark.png" },
+  site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog", heroTitle: "Miniese's Blog", heroSubtitles: ["探索技术与知识的边界", "记录思考与成长的点滴", "AI 驱动的写作与知识管理"], heroSubtitlesEn: ["Exploring the frontiers of tech & knowledge", "Documenting thoughts and growth", "AI-powered writing & knowledge management"], heroSubtitleMode: "sequential", heroSubtitleIntervalMs: 5000, heroImageLight: "/images/miniese/hero/hero-light.png", heroImageDark: "/images/miniese/hero/hero-dark.png", homepage: { layout: "columns", latestCount: 5, popularCount: 5, timelineCount: 8 } },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
   appearance: {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
@@ -603,6 +603,140 @@ export default function SettingsPage() {
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>1s</span>
                 <span>15s</span>
+              </div>
+            </div>
+
+            <SectionHeading>首页布局</SectionHeading>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium block mb-1">
+                  最新文章数
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={local.site.homepage?.latestCount ?? 5}
+                    onChange={(e) =>
+                      updateLocal("site", "homepage", {
+                        ...(local.site.homepage ?? {
+                          layout: "columns",
+                          latestCount: 5,
+                          popularCount: 5,
+                          timelineCount: 8,
+                        }),
+                        latestCount: Number(e.target.value),
+                      })
+                    }
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={
+                      (local.site.homepage?.latestCount ?? 5) ===
+                      DEFAULT_SETTINGS.site.homepage?.latestCount
+                    }
+                    onReset={() => {
+                      const hp = local.site.homepage ?? {
+                        layout: "columns" as const,
+                        latestCount: 5,
+                        popularCount: 5,
+                        timelineCount: 8,
+                      };
+                      updateLocal("site", "homepage", {
+                        ...hp,
+                        latestCount: DEFAULT_SETTINGS.site.homepage?.latestCount ?? 5,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">
+                  热门文章数
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={local.site.homepage?.popularCount ?? 5}
+                    onChange={(e) =>
+                      updateLocal("site", "homepage", {
+                        ...(local.site.homepage ?? {
+                          layout: "columns",
+                          latestCount: 5,
+                          popularCount: 5,
+                          timelineCount: 8,
+                        }),
+                        popularCount: Number(e.target.value),
+                      })
+                    }
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={
+                      (local.site.homepage?.popularCount ?? 5) ===
+                      DEFAULT_SETTINGS.site.homepage?.popularCount
+                    }
+                    onReset={() => {
+                      const hp = local.site.homepage ?? {
+                        layout: "columns" as const,
+                        latestCount: 5,
+                        popularCount: 5,
+                        timelineCount: 8,
+                      };
+                      updateLocal("site", "homepage", {
+                        ...hp,
+                        popularCount: DEFAULT_SETTINGS.site.homepage?.popularCount ?? 5,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">
+                  动态条目数
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={local.site.homepage?.timelineCount ?? 8}
+                    onChange={(e) =>
+                      updateLocal("site", "homepage", {
+                        ...(local.site.homepage ?? {
+                          layout: "columns",
+                          latestCount: 5,
+                          popularCount: 5,
+                          timelineCount: 8,
+                        }),
+                        timelineCount: Number(e.target.value),
+                      })
+                    }
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={
+                      (local.site.homepage?.timelineCount ?? 8) ===
+                      DEFAULT_SETTINGS.site.homepage?.timelineCount
+                    }
+                    onReset={() => {
+                      const hp = local.site.homepage ?? {
+                        layout: "columns" as const,
+                        latestCount: 5,
+                        popularCount: 5,
+                        timelineCount: 8,
+                      };
+                      updateLocal("site", "homepage", {
+                        ...hp,
+                        timelineCount: DEFAULT_SETTINGS.site.homepage?.timelineCount ?? 8,
+                      });
+                    }}
+                  />
+                </div>
               </div>
             </div>
 

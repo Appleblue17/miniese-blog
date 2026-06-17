@@ -1,8 +1,8 @@
 /**
  * @file ArticleCard — Card component for homepage article listings.
  *
- * Renders a compact card with title, summary, tags, date, and stats.
- * Designed for use in LatestArticles and PopularArticles sections.
+ * Renders a card with title, summary, tags, date, and stats.
+ * Supports compact mode for use in column layout.
  */
 
 import Link from "next/link";
@@ -17,6 +17,7 @@ interface ArticleCardProps {
   viewCount: number;
   likes: number;
   lang: string;
+  compact?: boolean;
 }
 
 export function ArticleCard({
@@ -28,7 +29,53 @@ export function ArticleCard({
   viewCount,
   likes,
   lang,
+  compact,
 }: ArticleCardProps) {
+  if (compact) {
+    return (
+      <Link
+        href={href}
+        className="group flex items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+      >
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+            {title}
+          </h3>
+          {summary && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+              {summary}
+            </p>
+          )}
+          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Calendar className="size-2.5" />
+              {date.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            <span className="flex items-center gap-1">
+              <Eye className="size-2.5" />
+              {viewCount}
+            </span>
+            {likes > 0 && (
+              <span className="flex items-center gap-1">
+                <ThumbsUp className="size-2.5" />
+                {likes}
+              </span>
+            )}
+          </div>
+        </div>
+        {tags.length > 0 && (
+          <span className="shrink-0 inline-block rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+            {tags[0]}
+          </span>
+        )}
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={href}

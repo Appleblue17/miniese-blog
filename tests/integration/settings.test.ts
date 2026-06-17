@@ -61,12 +61,14 @@ describe("Settings API", () => {
         heroSubtitleIntervalMs: 5000,
         heroImageLight: "/images/miniese/hero/hero-light.png",
         heroImageDark: "/images/miniese/hero/hero-dark.png",
+        homepage: { layout: "columns", latestCount: 5, popularCount: 5, timelineCount: 8 },
       },
     });
 
     expect(updated.site.title).toBe("My Blog");
     expect(updated.site.description).toBe("Test");
     expect(updated.site.heroTitle).toBe("My Blog");
+    expect(updated.site.homepage.latestCount).toBe(5);
 
     // Other fields should still be defaults
     expect(updated.pagination.articlesPerPage).toBe(10);

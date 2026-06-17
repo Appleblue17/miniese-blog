@@ -1,5 +1,5 @@
 /**
- * @file PopularArticles — Server component that shows the 5 most read articles.
+ * @file PopularArticles — Server component showing the most read articles.
  */
 
 import Link from "next/link";
@@ -8,16 +8,17 @@ import { ArticleCard } from "./ArticleCard";
 
 interface PopularArticlesProps {
   lang: string;
+  count?: number;
 }
 
-export async function PopularArticles({ lang }: PopularArticlesProps) {
+export async function PopularArticles({ lang, count = 5 }: PopularArticlesProps) {
   const articles = await prisma.article.findMany({
     where: {
       status: "published",
       language: lang as "zh" | "en",
     },
     orderBy: { viewCount: "desc" },
-    take: 5,
+    take: count,
     select: {
       slug: true,
       title: true,
@@ -34,10 +35,10 @@ export async function PopularArticles({ lang }: PopularArticlesProps) {
 
   return (
     <section>
-      <h2 className="text-2xl sm:text-3xl font-bold mb-8">
+      <h2 className="text-lg sm:text-xl font-bold mb-4">
         {lang === "zh" ? "热门文章" : "Popular Articles"}
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-3">
         {articles.map((article) => (
           <ArticleCard
             key={article.slug}
@@ -49,13 +50,14 @@ export async function PopularArticles({ lang }: PopularArticlesProps) {
             viewCount={article.viewCount}
             likes={article.likes}
             lang={lang}
+            compact
           />
         ))}
       </div>
-      <div className="mt-8 text-center">
+      <div className="mt-4 text-center">
         <Link
           href={`/${lang}/articles`}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
         >
           {lang === "zh" ? "查看更多 →" : "See more →"}
         </Link>

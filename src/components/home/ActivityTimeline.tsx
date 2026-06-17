@@ -1,9 +1,8 @@
 /**
  * @file ActivityTimeline — Shows recent site activity (article updates).
  *
- * Server component that fetches the most recent 10 article events
+ * Server component that fetches the most recent article events
  * and displays them as a chronological timeline.
- * Uses updatedAt since the Article model has no separate createdAt field.
  */
 
 import { prisma } from "@/lib/db";
@@ -12,17 +11,17 @@ import Link from "next/link";
 
 interface ActivityTimelineProps {
   lang: string;
+  count?: number;
 }
 
-export async function ActivityTimeline({ lang }: ActivityTimelineProps) {
-  // Fetch recent articles for activity timeline
+export async function ActivityTimeline({ lang, count = 8 }: ActivityTimelineProps) {
   const articles = await prisma.article.findMany({
     where: {
       status: "published",
       language: lang as "zh" | "en",
     },
     orderBy: { updatedAt: "desc" },
-    take: 10,
+    take: count,
     select: {
       slug: true,
       title: true,
@@ -34,7 +33,7 @@ export async function ActivityTimeline({ lang }: ActivityTimelineProps) {
 
   return (
     <section>
-      <h2 className="text-2xl sm:text-3xl font-bold mb-8">
+      <h2 className="text-lg sm:text-xl font-bold mb-4">
         {lang === "zh" ? "博客动态" : "Activity"}
       </h2>
       <div className="relative">

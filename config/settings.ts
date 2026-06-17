@@ -20,6 +20,12 @@ export interface AppSettings {
     heroSubtitleIntervalMs: number;
     heroImageLight: string;
     heroImageDark: string;
+    homepage: {
+      layout: "columns" | "rows";
+      latestCount: number;
+      popularCount: number;
+      timelineCount: number;
+    };
   };
   pagination: {
     articlesPerPage: number;
