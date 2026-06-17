@@ -38,7 +38,7 @@ import type { AppSettings } from "../../../../../config/settings";
 
 // Default hardcoded settings (prompts are loaded from default-settings.json via API)
 const DEFAULT_SETTINGS: AppSettings = {
-  site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog" },
+  site: { title: "Miniese's Blog", description: "个人技术博客与知识库", headerTitle: "Miniese's Blog", heroTitle: "Miniese's Blog", heroSubtitles: ["探索技术与知识的边界", "记录思考与成长的点滴", "AI 驱动的写作与知识管理"], heroSubtitlesEn: ["Exploring the frontiers of tech & knowledge", "Documenting thoughts and growth", "AI-powered writing & knowledge management"], heroSubtitleMode: "sequential", heroSubtitleIntervalMs: 5000, heroImageLight: "/images/miniese/hero/hero-light.png", heroImageDark: "/images/miniese/hero/hero-dark.png" },
   pagination: { articlesPerPage: 10, wikiPerPage: 20 },
   appearance: {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
@@ -471,6 +471,138 @@ export default function SettingsPage() {
                   isDefault={local.site.headerTitle === DEFAULT_SETTINGS.site.headerTitle}
                   onReset={() => resetField("site", "headerTitle")}
                 />
+              </div>
+            </div>
+
+            <SectionHeading>Hero 区设置</SectionHeading>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">主标题</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={local.site.heroTitle}
+                  onChange={(e) => updateLocal("site", "heroTitle", e.target.value)}
+                  className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                />
+                <ResetButton
+                  isDefault={local.site.heroTitle === DEFAULT_SETTINGS.site.heroTitle}
+                  onReset={() => resetField("site", "heroTitle")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">副标题列表 · 中文（每行一条）</label>
+              <div className="flex items-start gap-2">
+                <textarea
+                  value={(local.site.heroSubtitles || []).join("\n")}
+                  onChange={(e) => {
+                    const lines = e.target.value.split("\n").filter((l) => l.trim());
+                    updateLocal("site", "heroSubtitles", lines);
+                  }}
+                  rows={4}
+                  className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y min-h-[80px]"
+                  placeholder="每行一条副标题..."
+                />
+                <ResetButton
+                  isDefault={
+                    JSON.stringify(local.site.heroSubtitles) ===
+                    JSON.stringify(DEFAULT_SETTINGS.site.heroSubtitles)
+                  }
+                  onReset={() => resetField("site", "heroSubtitles")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">副标题列表 · English（one per line）</label>
+              <div className="flex items-start gap-2">
+                <textarea
+                  value={(local.site.heroSubtitlesEn || []).join("\n")}
+                  onChange={(e) => {
+                    const lines = e.target.value.split("\n").filter((l) => l.trim());
+                    updateLocal("site", "heroSubtitlesEn", lines);
+                  }}
+                  rows={4}
+                  className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y min-h-[80px]"
+                  placeholder="One subtitle per line..."
+                />
+                <ResetButton
+                  isDefault={
+                    JSON.stringify(local.site.heroSubtitlesEn) ===
+                    JSON.stringify(DEFAULT_SETTINGS.site.heroSubtitlesEn)
+                  }
+                  onReset={() => resetField("site", "heroSubtitlesEn")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">副标题切换模式</label>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-2 flex-1">
+                  {[
+                    { value: "sequential", label: "顺序轮播" },
+                    { value: "shuffled", label: "随机轮播" },
+                    { value: "static", label: "随机显示" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        updateLocal("site", "heroSubtitleMode", opt.value)
+                      }
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors ${
+                        local.site.heroSubtitleMode === opt.value
+                          ? "border-primary bg-primary/15 text-primary shadow-sm"
+                          : "border-primary/30 bg-primary/5 text-foreground hover:bg-primary/10"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <ResetButton
+                  isDefault={
+                    local.site.heroSubtitleMode === DEFAULT_SETTINGS.site.heroSubtitleMode
+                  }
+                  onReset={() => resetField("site", "heroSubtitleMode")}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">
+                轮播间隔 ({local.site.heroSubtitleIntervalMs}ms)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={1000}
+                  max={15000}
+                  step={500}
+                  value={local.site.heroSubtitleIntervalMs ?? 5000}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    updateLocal("site", "heroSubtitleIntervalMs", v);
+                  }}
+                  className="flex-1 accent-foreground"
+                />
+                <span className="text-xs text-muted-foreground w-12 text-right tabular-nums">
+                  {(local.site.heroSubtitleIntervalMs ?? 5000) / 1000}s
+                </span>
+                <ResetButton
+                  isDefault={
+                    (local.site.heroSubtitleIntervalMs ?? 5000) ===
+                    DEFAULT_SETTINGS.site.heroSubtitleIntervalMs
+                  }
+                  onReset={() => resetField("site", "heroSubtitleIntervalMs")}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>1s</span>
+                <span>15s</span>
               </div>
             </div>
 

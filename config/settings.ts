@@ -13,6 +13,13 @@ export interface AppSettings {
     title: string;
     description: string;
     headerTitle: string;
+    heroTitle: string;
+    heroSubtitles: string[];
+    heroSubtitlesEn: string[];
+    heroSubtitleMode: "sequential" | "shuffled" | "static";
+    heroSubtitleIntervalMs: number;
+    heroImageLight: string;
+    heroImageDark: string;
   };
   pagination: {
     articlesPerPage: number;

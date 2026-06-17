@@ -50,11 +50,23 @@ describe("Settings API", () => {
 
   it("updates a single field and persists", async () => {
     const updated = await updateSettings({
-      site: { title: "My Blog", description: "Test", headerTitle: "My Blog" },
+      site: {
+        title: "My Blog",
+        description: "Test",
+        headerTitle: "My Blog",
+        heroTitle: "My Blog",
+        heroSubtitles: ["Test subtitle"],
+        heroSubtitlesEn: ["Test subtitle en"],
+        heroSubtitleMode: "sequential",
+        heroSubtitleIntervalMs: 5000,
+        heroImageLight: "/images/miniese/hero/hero-light.png",
+        heroImageDark: "/images/miniese/hero/hero-dark.png",
+      },
     });
 
     expect(updated.site.title).toBe("My Blog");
     expect(updated.site.description).toBe("Test");
+    expect(updated.site.heroTitle).toBe("My Blog");
 
     // Other fields should still be defaults
     expect(updated.pagination.articlesPerPage).toBe(10);

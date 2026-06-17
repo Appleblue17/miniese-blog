@@ -112,4 +112,12 @@ function applySettings(a: AppearanceSettings, resolvedTheme: string) {
   root.style.setProperty("--markdown-bg-color-global", bgColor);
 
   root.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
+
+  // Global background image
+  if (a.backgroundImage) {
+    root.style.setProperty("--bg-image", `url(${a.backgroundImage})`);
+  } else {
+    root.style.setProperty("--bg-image", "none");
+  }
+  root.style.setProperty("--bg-opacity", `${a.backgroundOpacity}%`);
 }

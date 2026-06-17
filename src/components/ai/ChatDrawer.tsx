@@ -15,7 +15,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X,
   Send,
-  Bot,
   User,
   Loader2,
   AlertCircle,
@@ -353,7 +352,12 @@ export function ChatDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3 md:px-4">
           <div className="flex items-center gap-2">
-            <Bot className="size-5 text-primary shrink-0" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/miniese/avatar/avatar.png"
+              alt="Miniese"
+              className="size-5 shrink-0 rounded-full"
+            />
             <span className="font-medium text-sm md:text-base">{t("向 Miniese 提问", "Ask Miniese")}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -459,7 +463,12 @@ export function ChatDrawer({
           {/* Empty state (no selection, no messages) */}
           {messages.length === 0 && !selection && (
             <div className="flex flex-col items-center justify-center flex-1 text-center text-muted-foreground/60 px-6 md:px-4">
-              <Bot className="size-12 md:size-12 mb-3 md:mb-3 opacity-30" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/miniese/avatar/avatar.png"
+              alt="Miniese"
+              className="size-12 md:size-12 mb-3 md:mb-3 opacity-30 rounded-full"
+            />
               <p className="text-sm md:text-sm">
                 {t("你好！我是 Miniese，可以问我关于文章的任何问题。", "Hi! I'm Miniese. Ask me anything about the article.")}
               </p>
@@ -476,7 +485,12 @@ export function ChatDrawer({
                 >
                   {msg.role === "assistant" && (
                     <div className="size-7 md:size-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="size-3.5 md:size-4 text-primary" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/images/miniese/avatar/avatar.png"
+                    alt="Miniese"
+                    className="size-7 md:size-8 shrink-0 rounded-full"
+                  />
                     </div>
                   )}
                   <div
