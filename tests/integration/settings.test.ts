@@ -96,6 +96,8 @@ describe("Settings API", () => {
         primary: { lightHue: 210, darkHue: 250, lightSaturation: 65, darkSaturation: 65, lightLightness: 55, darkLightness: 65 },
         accent: { lightHue: 300, darkHue: 290, lightSaturation: 60, darkSaturation: 60, lightLightness: 55, darkLightness: 65 },
         backgroundImage: "",
+        backgroundImages: [],
+        backgroundCarouselEnabled: false,
         backgroundOpacity: 20,
         markdownBgOpacity: 30,
         markdownTextColorLight: "#1f2328",

@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
-    backgroundImage: "", backgroundOpacity: 10, markdownBgOpacity: 80,
+    backgroundImage: "", backgroundImages: [], backgroundCarouselEnabled: false, backgroundOpacity: 10, markdownBgOpacity: 80,
     markdownTextColorLight: "#1f2328", markdownTextColorDark: "#f0f6fc",
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
@@ -1008,6 +1008,105 @@ export default function SettingsPage() {
                 sat={a.accent.darkSaturation}
                 isLightness={true}
               />
+
+              <SectionHeading>全局背景图片</SectionHeading>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">单张背景图片 URL</label>
+                <p className="text-xs text-muted-foreground mb-2">留空则无背景图片。如果下方启用了轮播，此项将被忽略。</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="/images/background.jpg"
+                    value={a.backgroundImage ?? ""}
+                    onChange={(e) => updateLocal("appearance", "backgroundImage", e.target.value)}
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50"
+                  />
+                  <ResetButton
+                    isDefault={(a.backgroundImage ?? "") === DEFAULT_SETTINGS.appearance.backgroundImage}
+                    onReset={() => resetField("appearance", "backgroundImage")}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">背景图片列表（轮播用）</label>
+                <p className="text-xs text-muted-foreground mb-2">每行一张图片 URL。当启用轮播时，每次刷新页面会随机选择一张作为背景。</p>
+                <div className="flex items-start gap-2">
+                  <textarea
+                    rows={4}
+                    placeholder={"/images/bg1.jpg\n/images/bg2.jpg\n/images/bg3.jpg"}
+                    value={(a.backgroundImages ?? []).join("\n")}
+                    onChange={(e) => {
+                      const list = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
+                      updateLocal("appearance", "backgroundImages", list);
+                    }}
+                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y"
+                  />
+                  <ResetButton
+                    isDefault={JSON.stringify(a.backgroundImages ?? []) === JSON.stringify(DEFAULT_SETTINGS.appearance.backgroundImages)}
+                    onReset={() => resetField("appearance", "backgroundImages")}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div>
+                  <p className="text-sm font-medium">启用背景轮播</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">每次页面刷新时从上方的图片列表中随机选择一张背景</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={a.backgroundCarouselEnabled ?? false}
+                    onClick={() => updateLocal("appearance", "backgroundCarouselEnabled", !(a.backgroundCarouselEnabled ?? false))}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                      (a.backgroundCarouselEnabled ?? false) ? "" : "bg-primary/20"
+                    }`}
+                    style={(a.backgroundCarouselEnabled ?? false) ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                        (a.backgroundCarouselEnabled ?? false) ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <ResetButton
+                    isDefault={(a.backgroundCarouselEnabled ?? false) === DEFAULT_SETTINGS.appearance.backgroundCarouselEnabled}
+                    onReset={() => resetField("appearance", "backgroundCarouselEnabled")}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">背景不透明度 ({a.backgroundOpacity}%)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={a.backgroundOpacity}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      updateLocal("appearance", "backgroundOpacity", v);
+                      document.documentElement.style.setProperty("--bg-opacity", `${v}%`);
+                    }}
+                    className="flex-1 accent-foreground"
+                  />
+                  <ResetButton
+                    isDefault={a.backgroundOpacity === DEFAULT_SETTINGS.appearance.backgroundOpacity}
+                    onReset={() => {
+                      resetField("appearance", "backgroundOpacity");
+                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity}%`);
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>透明</span>
+                  <span>不透明</span>
+                </div>
+              </div>
 
               <SectionHeading>Markdown 样式</SectionHeading>
 

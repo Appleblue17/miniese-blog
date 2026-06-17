@@ -62,6 +62,8 @@ interface AppearanceSettings {
   primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   backgroundImage: string;
+  backgroundImages?: string[];
+  backgroundCarouselEnabled?: boolean;
   backgroundOpacity: number;
   markdownBgOpacity: number;
   markdownTextColorLight: string;
@@ -113,11 +115,33 @@ function applySettings(a: AppearanceSettings, resolvedTheme: string) {
 
   root.style.setProperty("--markdown-bg-opacity", `${a.markdownBgOpacity}%`);
 
-  // Global background image
-  if (a.backgroundImage) {
-    root.style.setProperty("--bg-image", `url(${a.backgroundImage})`);
+  // Global background image with carousel support
+  const bgImages = a.backgroundImages?.filter(Boolean) ?? [];
+  const carouselEnabled = a.backgroundCarouselEnabled ?? false;
+
+  let bgUrl = a.backgroundImage;
+  if (carouselEnabled && bgImages.length > 0) {
+    // Pick a random image from the list on each page load/theme switch
+    const seed = `${resolvedTheme}-${Date.now()}`;
+    const idx = hashString(seed) % bgImages.length;
+    bgUrl = bgImages[idx];
+  }
+
+  if (bgUrl) {
+    root.style.setProperty("--bg-image", `url(${bgUrl})`);
   } else {
     root.style.setProperty("--bg-image", "none");
   }
   root.style.setProperty("--bg-opacity", `${a.backgroundOpacity}%`);
+}
+
+/** Simple string hash for deterministic random selection */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
 }

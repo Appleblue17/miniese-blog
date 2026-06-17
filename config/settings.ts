@@ -47,6 +47,8 @@ export interface AppSettings {
     primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
     backgroundImage: string;
+    backgroundImages: string[];
+    backgroundCarouselEnabled: boolean;
     backgroundOpacity: number;
     markdownBgOpacity: number;
     markdownTextColorLight: string;
