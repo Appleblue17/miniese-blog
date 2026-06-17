@@ -186,3 +186,25 @@
     @apply font-sans;
   }
 }
+
+/* Glass overlay sections: darker muted-foreground in light mode for readability */
+.section-glass {
+  --muted-foreground: oklch(0.35 0 0);
+}
+.dark .section-glass {
+  --muted-foreground: oklch(0.708 0 0);
+}
+
+.footer-glass {
+  --muted-foreground: oklch(0.35 0 0);
+}
+.dark .footer-glass {
+  --muted-foreground: oklch(0.708 0 0);
+}
+
+.sidebar-glass {
+  --muted-foreground: oklch(0.35 0 0);
+}
+.dark .sidebar-glass {
+  --muted-foreground: oklch(0.708 0 0);
+}

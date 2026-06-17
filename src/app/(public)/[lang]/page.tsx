@@ -38,7 +38,16 @@ export default async function HomePage({ params }: Props) {
       <HeroSection lang={lang} />
 
       {/* Second screen: content showcase */}
-      <section className="relative z-10 mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+      <section className="section-glass relative z-10 mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+        {/* Glass overlay for readability against fixed Hero background */}
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            backgroundColor: `color-mix(in srgb, var(--background) 40%, transparent)`,
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
+        />
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
             <LatestArticles lang={lang} count={hp.latestCount} />

@@ -6,7 +6,6 @@
  */
 
 import { prisma } from "@/lib/db";
-import { FileText } from "lucide-react";
 import Link from "next/link";
 
 interface ActivityTimelineProps {
@@ -46,11 +45,6 @@ export async function ActivityTimeline({ lang, count = 8 }: ActivityTimelineProp
               {/* Timeline dot */}
               <div className="absolute left-2.5 top-1.5 size-3 rounded-full bg-primary ring-4 ring-background" />
 
-              {/* Icon */}
-              <div className="absolute left-1 top-1">
-                <FileText className="size-5 text-primary" />
-              </div>
-
               <div>
                 <Link
                   href={`/${lang}/articles/${article.slug}`}
@@ -58,7 +52,7 @@ export async function ActivityTimeline({ lang, count = 8 }: ActivityTimelineProp
                 >
                   {article.title}
                 </Link>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs mt-0.5">
                   {lang === "zh" ? "更新" : "Updated"} —{" "}
                   {article.updatedAt.toLocaleDateString(
                     lang === "zh" ? "zh-CN" : "en-US",

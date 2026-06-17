@@ -39,11 +39,17 @@ export function Navbar() {
       {/* Sidebar */}
       <nav
         className={`
-          fixed top-0 left-0 z-40 h-full w-56 border-r border-border bg-background
-          flex flex-col p-4 transition-transform duration-200
+          fixed top-0 left-0 z-40 h-full w-56 border-r border-border
+          flex flex-col p-4 transition-transform duration-200 sidebar-glass
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
           xl:translate-x-0
         `}
+        style={{
+          // Semi-transparent overlay for readability when Hero image shows through
+          backgroundColor: `color-mix(in srgb, var(--background) 30%, transparent)`,
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }}
       >
         {/* Logo */}
         <Link href={localize("")} className="mb-8 mt-2 text-lg font-semibold tracking-tight">
