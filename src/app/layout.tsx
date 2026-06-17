@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { readFileSync } from "fs";
 import path from "path";
 import "./globals.css";
@@ -29,9 +30,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Miniese's Blog",
+  metadataBase: new URL(process.env.SITE_URL || "http://localhost:3000"),
+  title: {
+    default: process.env.SITE_NAME || "Miniese's Blog",
+    template: `%s | ${process.env.SITE_NAME || "Miniese's Blog"}`,
+  },
   description:
     "A personal blog and knowledge base built with Next.js, featuring AI-powered content assistance.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  manifest: "/manifest.json",
+  openGraph: {
+    title: "Miniese's Blog",
+    description: "个人博客与知识库，AI 驱动的写作助手",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Miniese's Blog",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
@@ -58,8 +90,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-background text-foreground">
         {/* Prevent FOUC: set dark class and data-theme before React hydrates */}
-        <script
+        <Script
           id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {

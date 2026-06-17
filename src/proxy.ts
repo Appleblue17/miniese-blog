@@ -62,9 +62,11 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/static") ||
     pathname.startsWith("/styles") ||
     pathname.startsWith("/icon") ||
+    pathname.startsWith("/images") ||  // Miniese images
     pathname === "/favicon.ico" ||
     pathname === "/rss.xml" ||
-    pathname === "/sitemap.xml"
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.json"
   ) {
     return NextResponse.next();
   }
