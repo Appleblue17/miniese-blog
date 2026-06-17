@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
-    backgroundImage: "", backgroundImages: [], backgroundCarouselEnabled: false, backgroundOpacity: 10, markdownBgOpacity: 80,
+    backgroundImages: [], backgroundOpacity: 10, markdownBgOpacity: 80,
     markdownTextColorLight: "#1f2328", markdownTextColorDark: "#f0f6fc",
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
@@ -573,9 +573,18 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium block mb-1">
-                轮播间隔 ({local.site.heroSubtitleIntervalMs}ms)
-              </label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-sm font-medium">
+                  轮播间隔 ({local.site.heroSubtitleIntervalMs}ms)
+                </label>
+                <ResetButton
+                  isDefault={
+                    (local.site.heroSubtitleIntervalMs ?? 5000) ===
+                    DEFAULT_SETTINGS.site.heroSubtitleIntervalMs
+                  }
+                  onReset={() => resetField("site", "heroSubtitleIntervalMs")}
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="range"
@@ -592,13 +601,6 @@ export default function SettingsPage() {
                 <span className="text-xs text-muted-foreground w-12 text-right tabular-nums">
                   {(local.site.heroSubtitleIntervalMs ?? 5000) / 1000}s
                 </span>
-                <ResetButton
-                  isDefault={
-                    (local.site.heroSubtitleIntervalMs ?? 5000) ===
-                    DEFAULT_SETTINGS.site.heroSubtitleIntervalMs
-                  }
-                  onReset={() => resetField("site", "heroSubtitleIntervalMs")}
-                />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>1s</span>
@@ -1012,26 +1014,18 @@ export default function SettingsPage() {
               <SectionHeading>全局背景图片</SectionHeading>
 
               <div>
-                <label className="text-sm font-medium block mb-1">单张背景图片 URL</label>
-                <p className="text-xs text-muted-foreground mb-2">留空则无背景图片。如果下方启用了轮播，此项将被忽略。支持填入目录路径（如 /images/bg），系统将自动使用该目录下所有图片。</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="/images/bg 或 /images/background.jpg"
-                    value={a.backgroundImage ?? ""}
-                    onChange={(e) => updateLocal("appearance", "backgroundImage", e.target.value)}
-                    className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50"
-                  />
-                  <ResetButton
-                    isDefault={(a.backgroundImage ?? "") === DEFAULT_SETTINGS.appearance.backgroundImage}
-                    onReset={() => resetField("appearance", "backgroundImage")}
-                  />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium">背景图片列表</label>
+                  <a
+                    href="/admin/media"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                  >
+                    打开媒体库 →
+                  </a>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium block mb-1">背景图片列表（轮播用）</label>
-                <p className="text-xs text-muted-foreground mb-2">每行一张图片或目录路径。支持填入目录（如 /images/bg），系统将使用该目录下所有图片。当启用轮播时，每次刷新页面会从所有展开后的图片中随机选择一张。</p>
+                <p className="text-xs text-muted-foreground mb-2">每行一张图片或目录路径。支持填入目录（如 /images/bg），系统将使用该目录下所有图片。刷新页面时会从所有展开后的图片中随机选择一张。</p>
                 <div className="flex items-start gap-2">
                   <textarea
                     rows={4}
@@ -1050,37 +1044,17 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                <div>
-                  <p className="text-sm font-medium">启用背景轮播</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">每次页面刷新时从上方的图片列表中随机选择一张背景</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={a.backgroundCarouselEnabled ?? false}
-                    onClick={() => updateLocal("appearance", "backgroundCarouselEnabled", !(a.backgroundCarouselEnabled ?? false))}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                      (a.backgroundCarouselEnabled ?? false) ? "" : "bg-primary/20"
-                    }`}
-                    style={(a.backgroundCarouselEnabled ?? false) ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
-                        (a.backgroundCarouselEnabled ?? false) ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="text-sm font-medium">背景不透明度 ({a.backgroundOpacity}%)</label>
                   <ResetButton
-                    isDefault={(a.backgroundCarouselEnabled ?? false) === DEFAULT_SETTINGS.appearance.backgroundCarouselEnabled}
-                    onReset={() => resetField("appearance", "backgroundCarouselEnabled")}
+                    isDefault={a.backgroundOpacity === DEFAULT_SETTINGS.appearance.backgroundOpacity}
+                    onReset={() => {
+                      resetField("appearance", "backgroundOpacity");
+                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity / 100}`);
+                    }}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium block mb-1">背景不透明度 ({a.backgroundOpacity}%)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -1093,13 +1067,6 @@ export default function SettingsPage() {
                       document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
                     }}
                     className="flex-1 accent-foreground"
-                  />
-                  <ResetButton
-                    isDefault={a.backgroundOpacity === DEFAULT_SETTINGS.appearance.backgroundOpacity}
-                    onReset={() => {
-                      resetField("appearance", "backgroundOpacity");
-                      document.documentElement.style.setProperty("--bg-opacity", `${DEFAULT_SETTINGS.appearance.backgroundOpacity / 100}`);
-                    }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -1159,9 +1126,18 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-1">
-                  背景不透明度 ({a.markdownBgOpacity}%)
-                </label>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="text-sm font-medium">
+                    背景不透明度 ({a.markdownBgOpacity}%)
+                  </label>
+                  <ResetButton
+                    isDefault={a.markdownBgOpacity === DEFAULT_SETTINGS.appearance.markdownBgOpacity}
+                    onReset={() => {
+                      resetField("appearance", "markdownBgOpacity");
+                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${DEFAULT_SETTINGS.appearance.markdownBgOpacity}%`);
+                    }}
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -1174,13 +1150,6 @@ export default function SettingsPage() {
                       document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
                     }}
                     className="flex-1 accent-foreground"
-                  />
-                  <ResetButton
-                    isDefault={a.markdownBgOpacity === DEFAULT_SETTINGS.appearance.markdownBgOpacity}
-                    onReset={() => {
-                      resetField("appearance", "markdownBgOpacity");
-                      document.documentElement.style.setProperty("--markdown-bg-opacity", `${DEFAULT_SETTINGS.appearance.markdownBgOpacity}%`);
-                    }}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -1276,7 +1245,13 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-1">默认宽度比例 ({a.image?.defaultWidthRatio ?? 60}%)</label>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="text-sm font-medium">默认宽度比例 ({a.image?.defaultWidthRatio ?? 60}%)</label>
+                  <ResetButton
+                    isDefault={(a.image?.defaultWidthRatio ?? 60) === DEFAULT_SETTINGS.appearance.image.defaultWidthRatio}
+                    onReset={() => updateLocal("appearance", "image", { ...a.image, defaultWidthRatio: DEFAULT_SETTINGS.appearance.image.defaultWidthRatio })}
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -1285,10 +1260,6 @@ export default function SettingsPage() {
                     value={a.image?.defaultWidthRatio ?? 60}
                     onChange={(e) => updateLocal("appearance", "image", { ...a.image, defaultWidthRatio: Number(e.target.value) })}
                     className="flex-1 accent-foreground"
-                  />
-                  <ResetButton
-                    isDefault={(a.image?.defaultWidthRatio ?? 60) === DEFAULT_SETTINGS.appearance.image.defaultWidthRatio}
-                    onReset={() => updateLocal("appearance", "image", { ...a.image, defaultWidthRatio: DEFAULT_SETTINGS.appearance.image.defaultWidthRatio })}
                   />
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">

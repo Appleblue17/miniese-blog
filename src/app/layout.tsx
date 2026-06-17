@@ -76,7 +76,7 @@ export default function RootLayout({
       lang="zh"
       suppressHydrationWarning
       data-theme="light"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
       <head>
         {/* KaTeX styles for math rendering */}
@@ -88,7 +88,7 @@ export default function RootLayout({
         {/* GitHub Markdown theme styles */}
         <link rel="stylesheet" href="/styles/github-markdown.css" />
       </head>
-      <body className="min-h-full bg-background text-foreground">
+      <body className="bg-background text-foreground">
         {/* Prevent FOUC: set dark class and data-theme before React hydrates */}
         <Script
           id="theme-init"
@@ -124,7 +124,7 @@ export default function RootLayout({
           <SettingsApplier />
           <Navbar />
           <ActionBar />
-          <div className="xl:pl-56 flex flex-col min-h-full">
+          <div className="xl:pl-56 flex flex-col min-h-screen">
             <main className="flex-1">{children}</main>
             <Footer />
           </div>

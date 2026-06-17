@@ -8,9 +8,9 @@ import { useTheme } from "next-themes";
  * Listens to theme changes (light/dark) and re-applies the correct color values.
  * Should be placed inside ThemeProvider so it can respond to theme changes.
  *
- * Supports directory paths in backgroundImage and backgroundImages:
- * if a path points to a directory (e.g., "/images/bg"), it will be expanded
- * to all image files inside that directory.
+ * Background images: each entry in backgroundImages can be a file path or
+ * a directory path (e.g., "/images/bg"), which will be expanded to all image
+ * files inside that directory.
  */
 export function SettingsApplier() {
   const { resolvedTheme } = useTheme();
@@ -68,9 +68,7 @@ interface AppearanceSettings {
   };
   primary: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
   accent: { lightHue: number; darkHue: number; lightSaturation: number; darkSaturation: number; lightLightness: number; darkLightness: number };
-  backgroundImage: string;
-  backgroundImages?: string[];
-  backgroundCarouselEnabled?: boolean;
+  backgroundImages: string[];
   backgroundOpacity: number;
   markdownBgOpacity: number;
   markdownTextColorLight: string;
@@ -132,34 +130,22 @@ async function applySettingsAsync(
   // Apply colors synchronously first
   applyColorsSync(a, isDark);
 
-  // Expand background images (async)
-  const bgImagesSetting = a.backgroundImages?.filter(Boolean) ?? [];
-  const carouselEnabled = a.backgroundCarouselEnabled ?? false;
-
-  // Build the full list of image URLs by expanding directory paths
-  let allImages: string[] = [];
-
-  if (carouselEnabled && bgImagesSetting.length > 0) {
-    // Expand each entry (could be file or directory)
-    const expandedArrays = await Promise.all(
-      bgImagesSetting.map((p) => expandPathToImages(p)),
-    );
-    allImages = expandedArrays.flat();
-  } else if (a.backgroundImage) {
-    allImages = await expandPathToImages(a.backgroundImage);
-  }
+  // Expand background images (async) — each entry can be a file or directory
+  const bgImages = a.backgroundImages?.filter(Boolean) ?? [];
+  const expandedArrays = await Promise.all(
+    bgImages.map((p) => expandPathToImages(p)),
+  );
+  const allImages = expandedArrays.flat();
 
   // Cache expanded results
   expandedRef.current = allImages;
 
-  // Pick the image URL
+  // Pick a random image from the expanded list
   let bgUrl = "";
-  if (carouselEnabled && allImages.length > 0) {
+  if (allImages.length > 0) {
     const seed = `${resolvedTheme}-${Date.now()}`;
-    const idx = hashString(seed) % allImages.length;
+    const idx = Math.abs(hashString(seed)) % allImages.length;
     bgUrl = allImages[idx];
-  } else if (allImages.length > 0) {
-    bgUrl = allImages[0];
   }
 
   const root = document.documentElement;

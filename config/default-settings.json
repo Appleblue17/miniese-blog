@@ -58,9 +58,7 @@
       "lightLightness": 55,
       "darkLightness": 65
     },
-    "backgroundImage": "",
     "backgroundImages": [],
-    "backgroundCarouselEnabled": false,
     "backgroundOpacity": 10,
     "markdownBgOpacity": 80,
     "markdownTextColorLight": "#1f2328",

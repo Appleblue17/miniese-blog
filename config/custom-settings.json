@@ -15,7 +15,7 @@
       "AI-powered writing & knowledge management"
     ],
     "heroSubtitleMode": "sequential",
-    "heroSubtitleIntervalMs": 5000,
+    "heroSubtitleIntervalMs": 4500,
     "heroImageLight": "/images/miniese/hero/hero-light.png",
     "heroImageDark": "/images/miniese/hero/hero-dark.png",
     "homepage": {
@@ -33,8 +33,8 @@
     "defaultAuthor": "博主"
   },
   "appearance": {
-    "themeMode": "system",
-    "bodyWidth": 66,
+    "themeMode": "dark",
+    "bodyWidth": 80,
     "image": {
       "maxWidth": 800,
       "maxHeight": 600,
@@ -58,10 +58,10 @@
       "lightLightness": 55,
       "darkLightness": 65
     },
-    "backgroundImage": "/images/miniese/bg",
-    "backgroundImages": [],
-    "backgroundCarouselEnabled": false,
-    "backgroundOpacity": 100,
+    "backgroundImages": [
+      "/images/miniese/bg"
+    ],
+    "backgroundOpacity": 10,
     "markdownBgOpacity": 80,
     "markdownTextColorLight": "#1f2328",
     "markdownTextColorDark": "#f0f6fc",
