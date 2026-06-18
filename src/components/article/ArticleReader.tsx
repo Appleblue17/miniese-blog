@@ -471,21 +471,21 @@ export function ArticleReader({
           {loading ? (
             <>
               {/* Skeleton title */}
-              <div className="h-8 bg-muted rounded animate-pulse w-3/4" />
+              <div className="h-8 bg-muted rounded animate-pulse w-3/4 opacity-40" />
               {/* Skeleton author & date */}
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 opacity-40">
                 <div className="h-4 bg-muted rounded animate-pulse w-20" />
                 <div className="h-4 bg-muted rounded animate-pulse w-36" />
                 <div className="h-3 bg-muted rounded animate-pulse w-28" />
               </div>
               {/* Skeleton tags */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 opacity-40">
                 <div className="h-5 bg-muted rounded-full animate-pulse w-14" />
                 <div className="h-5 bg-muted rounded-full animate-pulse w-20" />
                 <div className="h-5 bg-muted rounded-full animate-pulse w-16" />
               </div>
               {/* Skeleton divider */}
-              <div className="h-px bg-border" />
+              <div className="h-px bg-border opacity-40" />
               {/* Skeleton summary */}
               {/* <div className="h-4 bg-muted rounded animate-pulse w-full" />
               <div className="h-4 bg-muted rounded animate-pulse w-5/6" /> */}

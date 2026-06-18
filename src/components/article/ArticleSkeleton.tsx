@@ -9,7 +9,7 @@
 export function ArticleSkeleton() {
   {/* Body + TOC row */}
   return (
-    <div className="flex gap-8 py-8">
+    <div className="flex gap-8 py-8 opacity-40">
       {/* Content skeleton */}
       <div className="min-w-0 flex-1 space-y-6">
         <div className="space-y-3">

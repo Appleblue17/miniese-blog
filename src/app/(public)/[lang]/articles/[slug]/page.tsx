@@ -19,6 +19,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { ArticleReader } from "@/components/article/ArticleReader";
 import { ArticleContent } from "@/components/article/ArticleContent";
+import { ArticleLoadingOverlay } from "@/components/article/ArticleLoadingOverlay";
 
 interface ArticleMeta {
   id: string;
@@ -80,6 +81,9 @@ export default function ArticlePage() {
             <ArticleContent loading lang={lang} slug={slug} />
           </div>
         </div>
+
+        {/* Overlay on top of skeletons — visible until body DOM appears */}
+        <ArticleLoadingOverlay lang={lang} />
       </div>
     );
   }
@@ -129,6 +133,10 @@ export default function ArticlePage() {
           <ArticleContent lang={lang} slug={slug} articleId={meta.id} />
         </div>
       </div>
+
+      {/* Overlay remains visible during step 2 (meta ready, body loading) */}
+      {/* Hides automatically when [data-article-body] enters the DOM */}
+      <ArticleLoadingOverlay lang={lang} />
     </div>
   );
 }
