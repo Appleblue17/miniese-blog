@@ -78,6 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { slug } = await params;
     const { searchParams } = new URL(request.url);
     const language = searchParams.get("lang");
+    const fields = searchParams.get("fields"); // "meta" | "body" | undefined
 
     if (language !== "zh" && language !== "en") {
       return NextResponse.json(
@@ -116,6 +117,53 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
+    // If fields=meta, return article metadata only (skip HTML rendering)
+    if (fields === "meta") {
+      return NextResponse.json({
+        article: {
+          id: article.id,
+          slug: article.slug,
+          title: article.title,
+          language: article.language,
+          summary: article.summary,
+          tags: article.tags,
+          author: article.author,
+          publishedAt: article.publishedAt?.toISOString() || null,
+          updatedAt: article.updatedAt.toISOString(),
+          changelog: article.changelog,
+          isAITranslated: article.isAITranslated,
+          originalId: article.originalId,
+        },
+      });
+    }
+
+    // If fields=body, return rendered HTML only (skip article metadata wrapper)
+    if (fields === "body") {
+      // Check if renderedContent has heading IDs (rehype-slug), and re-render if missing
+      let content = article.renderedContent;
+      if (content && !/<h[1-3][^>]*\bid\s*=/.test(content)) {
+        try {
+          const filePath = path.join(process.cwd(), article.contentPath);
+          const rawContent = await readFile(filePath, "utf-8");
+          const { content: mdBody } = parseFrontmatter(rawContent);
+          const pipeline: ContentType = article.contentType || "markdown";
+          const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
+          content = await renderMarkdown(linkedContent, pipeline);
+
+          await prisma.article.update({
+            where: { id: article.id },
+            data: { renderedContent: content },
+          });
+        } catch {
+          console.warn(`[rehype-slug] Failed to re-render article ${article.id}, using cached.`);
+        }
+      }
+
+      const html = content ? rewriteImagePaths(content, article.id) : "";
+      return NextResponse.json({ html });
+    }
+
+    // Default: return full article with metadata + rendered HTML
     // Check if renderedContent has heading IDs (rehype-slug), and re-render if missing
     let content = article.renderedContent;
     if (content && !/<h[1-3][^>]*\bid\s*=/.test(content)) {

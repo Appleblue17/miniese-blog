@@ -1,80 +1,90 @@
 /**
  * @file /{lang}/articles/{slug} - Article reading page.
  *
- * Displays a single published article with rendered HTML content.
- * Uses server-side data fetching via the internal API route.
+ * Client-side two-step rendering for incremental display:
+ * 1. ArticleReader loads with skeleton placeholders (loading prop).
+ * 2. After meta fetch completes → skeleton replaced by real header content.
+ * 3. ArticleContent internally fetches body → renders content + TOC.
+ *
+ * The article <article> element is always present, avoiding layout shifts.
+ * Skeletons match the exact structure of real content for smooth transition.
  */
 
-import { notFound } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { notFound, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { Metadata } from "next";
 
 import { ArticleReader } from "@/components/article/ArticleReader";
+import { ArticleContent } from "@/components/article/ArticleContent";
 
-interface Props {
-  params: Promise<{ lang: string; slug: string }>;
+interface ArticleMeta {
+  id: string;
+  slug: string;
+  title: string;
+  language: string;
+  summary: string | null;
+  tags: string[];
+  author: string;
+  publishedAt: string | null;
+  updatedAt: string;
+  changelog: string | null;
+  isAITranslated: boolean;
 }
 
-interface ArticleApiResponse {
-  article: {
-    id: string;
-    slug: string;
-    title: string;
-    language: string;
-    summary: string | null;
-    tags: string[];
-    author: string;
-    publishedAt: string | null;
-    updatedAt: string;
-    changelog: string | null;
-    isAITranslated: boolean;
-  };
-  html: string;
-}
+export default function ArticlePage() {
+  const params = useParams();
+  const lang = params.lang as string;
+  const slug = params.slug as string;
 
-async function fetchArticle(lang: string, slug: string): Promise<ArticleApiResponse | null> {
-  try {
-    const baseUrl = process.env.SITE_URL || "http://localhost:3000";
-    const url = `${baseUrl}/api/articles/${slug}?lang=${lang}`;
-    const res = await fetch(url, { cache: "no-store" });
+  const [meta, setMeta] = useState<ArticleMeta | null | "loading">("loading");
 
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+  useEffect(() => {
+    let cancelled = false;
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { lang, slug } = await params;
+    async function fetchMeta() {
+      try {
+        const res = await fetch(`/api/articles/${slug}?lang=${lang}&fields=meta`);
+        if (!res.ok) {
+          if (!cancelled) setMeta(null);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) setMeta(data.article || null);
+      } catch {
+        if (!cancelled) setMeta(null);
+      }
+    }
 
-  const data = await fetchArticle(lang, slug);
-  if (!data) return { title: "Not Found" };
+    fetchMeta();
 
-  return {
-    title: `${data.article.title} | Miniese's Blog`,
-    description: data.article.summary || undefined,
-    openGraph: {
-      title: data.article.title,
-      description: data.article.summary || undefined,
-      type: "article",
-      publishedTime: data.article.publishedAt || undefined,
-      tags: data.article.tags,
-    },
-  };
-}
+    return () => { cancelled = true; };
+  }, [lang, slug]);
 
-export default async function ArticlePage({ params }: Props) {
-  const { lang, slug } = await params;
-
-  // Validate language
   if (lang !== "zh" && lang !== "en") {
     notFound();
   }
 
-  const data = await fetchArticle(lang, slug);
-  if (!data) {
+  if (meta === "loading") {
+    return (
+      <div
+        className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12"
+        style={{ maxWidth: "var(--body-width, 48rem)" }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="hidden xl:block size-9 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <ArticleReader loading lang={lang} />
+            <ArticleContent loading lang={lang} slug={slug} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!meta) {
     notFound();
   }
 
@@ -83,8 +93,6 @@ export default async function ArticlePage({ params }: Props) {
       className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12"
       style={{ maxWidth: "var(--body-width, 48rem)" }}
     >
-      {/* Back button — on desktop, positioned to the left of the container using negative margin;
-          on mobile, inline at the top. Uses a flex layout to avoid float overlap issues. */}
       <div className="flex items-start gap-3">
         <Link
           href={`/${lang}/articles`}
@@ -94,8 +102,6 @@ export default async function ArticlePage({ params }: Props) {
           <ArrowLeft className="size-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          {/* Mobile back button — positioned at the top of the content area,
-              safe from the navbar hamburger (top-left) and ActionBar (top-right) */}
           <div className="lg:ml-0 ml-12 xl:hidden mb-4">
             <Link
               href={`/${lang}/articles`}
@@ -108,20 +114,19 @@ export default async function ArticlePage({ params }: Props) {
           </div>
 
           <ArticleReader
-            articleId={data.article.id}
-            title={data.article.title}
-            author={data.article.author}
-            publishedAt={data.article.publishedAt}
-            updatedAt={data.article.updatedAt}
-            tags={data.article.tags}
-            summary={data.article.summary}
-            html={data.html}
-            viewCount={0}
-            likes={0}
+            articleId={meta.id}
+            title={meta.title}
+            author={meta.author}
+            publishedAt={meta.publishedAt}
+            updatedAt={meta.updatedAt}
+            tags={meta.tags}
+            summary={meta.summary}
             lang={lang}
-            changelog={data.article.changelog}
-            isAITranslated={data.article.isAITranslated}
+            changelog={meta.changelog}
+            isAITranslated={meta.isAITranslated}
           />
+
+          <ArticleContent lang={lang} slug={slug} articleId={meta.id} />
         </div>
       </div>
     </div>

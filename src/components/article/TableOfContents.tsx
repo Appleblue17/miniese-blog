@@ -103,10 +103,13 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
     function updateActiveHeading() {
       if (isScrollingRef.current) return;
 
-      const article = document.querySelector("article");
-      if (!article) return;
+      // Look for headings inside the article body container (data-article-body)
+      // rather than just the first <article> element — there are now two <article>
+      // elements on the page (header in ArticleReader + body in ArticleContent).
+      const body = document.querySelector<HTMLElement>("[data-article-body]");
+      if (!body) return;
 
-      const headingEls = Array.from(article.querySelectorAll<HTMLElement>("h1[id], h2[id], h3[id]"));
+      const headingEls = Array.from(body.querySelectorAll<HTMLElement>("h1[id], h2[id], h3[id]"));
       if (headingEls.length === 0) return;
 
       const scrollTop = window.scrollY;
