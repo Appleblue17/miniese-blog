@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import { readFileSync } from "fs";
 import path from "path";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { ThemeInitScript } from "@/components/theme/ThemeInitScript";
 import { Navbar } from "@/components/layout/Navbar";
 import { ActionBar } from "@/components/layout/ActionBar";
 import { Footer } from "@/components/layout/Footer";
@@ -77,7 +77,6 @@ export default function RootLayout({
     <html
       lang="zh"
       suppressHydrationWarning
-      data-theme="light"
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
       <head>
@@ -91,28 +90,7 @@ export default function RootLayout({
         <link rel="stylesheet" href="/styles/github-markdown.css" />
       </head>
       <body className="bg-background text-foreground">
-        {/* Prevent FOUC: set dark class and data-theme before React hydrates */}
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var theme = localStorage.getItem('theme');
-                  var isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                  if (isDark) {
-                    document.documentElement.classList.add('dark');
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                    document.documentElement.setAttribute('data-theme', 'light');
-                  }
-                } catch(e) {}
-              })();
-            `,
-          }}
-        />
+        <ThemeInitScript />
 
         {/* Feather SVG sprite for Notesaw icons (hidden, referenced by <use href="#icon-name"/>) */}
         <div style={{ display: "none" }} dangerouslySetInnerHTML={{ __html: featherSprite }} />

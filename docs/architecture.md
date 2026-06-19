@@ -4,7 +4,11 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-19 (v0.9.4)
+**最后更新**：2026-06-19 (v0.9.5)
+
+### v0.9.5 2026-06-19
+- §2.6.3：新增 FOUC（Flash of Unstyled Content）预防方案说明——`ThemeInitScript` Client Component、`beforeInteractive` 策略、`suppressHydrationWarning` 原理
+- §3 目录结构：补充 `src/components/theme/ThemeInitScript.tsx`、`src/components/about/TechIcon.tsx`
 
 ### v0.9.4 2026-06-19
 - §2.5：新增外观配置系统说明——`SettingsApplier` 组件、CSS 变量注入机制、主题切换逻辑
@@ -231,6 +235,23 @@
 - 每次访问时先读取 `localStorage`，若没有值则回退到系统偏好
 - `SettingsApplier` 的第二个 `useEffect` 监听 `resolvedTheme` 变化，重新应用颜色 CSS 变量
 
+#### 2.6.3 FOUC（Flash of Unstyled Content）预防
+
+主题切换会带来 FOUC 问题：用户刷新页面时，HTML 默认以 light 模式渲染，然后 React hydration 后才切换到 dark 模式，导致页面闪烁。
+
+**预防方案**（`src/components/theme/ThemeInitScript.tsx`）：
+- 是一个 `"use client"` Client Component，内部使用 `next/script` 的 `strategy="beforeInteractive"` 策略
+- 在 `src/app/layout.tsx` 的 `<body>` 顶部以 `<ThemeInitScript />` 形式插入
+- 脚本在 React hydration **之前**同步执行：
+  1. 读取 `localStorage.getItem('theme')`
+  2. 若不存在则回退到 `matchMedia('(prefers-color-scheme: dark)')` 系统偏好
+  3. 根据结果在 `<html>` 上设置 `class="dark"` / 移除 `dark` class，以及 `data-theme="dark"` / `"light"` 属性
+
+**为什么要用 Client Component 包装**：
+- `layout.tsx` 是 Server Component，在其中直接使用 `<script>` 或 `next/script` 的 `<Script>` 组件都会导致 React hydration 警告（`Encountered a script tag while rendering React component`）
+- 将 `<Script>` 放在 `"use client"` 组件中，由客户端 hydration 管理，Next.js 框架正确兼容
+- `<html>` 标签上的 `suppressHydrationWarning` 属性允许服务端和客户端渲染的 class/属性存在差异（脚本在 hydration 前已同步执行并修正）
+
 ---
 
 ## 3. 项目目录结构
@@ -292,7 +313,8 @@ miniese-blog/
 │   │   ├── layout/             # 导航栏、页脚、ActionBar 等
 │   │   ├── article/            # 文章相关组件（TableOfContents、ArticleReader、ArticleCard）
 │   │   ├── admin/              # 管理面板组件（PublishForm、ArticleRowActions、StatusBadge、AdminArticleSearch）
-│   │   ├── theme/              # 主题组件（ThemeProvider、ThemeToggle）
+│   │   ├── theme/              # 主题组件（ThemeProvider、ThemeToggle、ThemeInitScript）
+│   │   ├── about/              # 关于页面组件（TechIcon）
 │   │   └── ai/                 # AI 对话窗口等
 │   ├── lib/
 │   │   ├── db.ts               # Prisma 客户端（全局单例）

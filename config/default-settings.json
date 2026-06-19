@@ -67,7 +67,7 @@
     "backgroundOpacityDark": 20,
     "backgroundColorLight": "#c4c4c4",
     "backgroundColorDark": "#060709",
-    "markdownBgOpacityLight": 70,
+    "markdownBgOpacityLight": 60,
     "markdownBgOpacityDark": 80,
     "markdownTextColorLight": "#1f2328",
     "markdownTextColorDark": "#f0f6fc",
