@@ -36,13 +36,13 @@
   },
   "appearance": {
     "themeMode": "system",
-    "bodyWidth": 66,
+    "bodyWidth": 80,
     "image": {
       "maxWidth": 800,
       "maxHeight": 600,
       "defaultWidthRatio": 60,
       "lightboxEnabled": true,
-      "captionIgnoreList": []
+      "captionIgnoreList": ["alt text"]
     },
     "primary": {
       "lightHue": 200,
@@ -63,8 +63,10 @@
     "backgroundImages": [
       "/images/miniese/bg"
     ],
-    "backgroundOpacityLight": 35,
+    "backgroundOpacityLight": 30,
     "backgroundOpacityDark": 20,
+    "backgroundColorLight": "#c4c4c4",
+    "backgroundColorDark": "#060709",
     "markdownBgOpacityLight": 70,
     "markdownBgOpacityDark": 80,
     "markdownTextColorLight": "#1f2328",

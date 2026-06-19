@@ -4,7 +4,12 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-16 (v0.9.3)
+**最后更新**：2026-06-19 (v0.9.4)
+
+### v0.9.4 2026-06-19
+- §2.5：新增外观配置系统说明——`SettingsApplier` 组件、CSS 变量注入机制、主题切换逻辑
+- §11.4：设置页外观 Tab 新增「页面背景颜色」配置项（独立于 Markdown 背景色）、「主题模式」按钮行为修正
+- §6.x：背景图片选择策略修正——首次加载时随机选取并稳定保持，切换 light/dark 时不更换背景图片
 
 ### v0.9.3 2026-06-16
 - §3 目录结构：补充 `src/app/api/tags/` API 路由
@@ -191,6 +196,40 @@
 | 邮件 | Resend SDK | 通知发送 |
 | 认证 | NextAuth.js v5 | Credentials（邮箱+密码）+ 可选 Google/GitHub OAuth，JWT session，Prisma 适配器 |
 | 文件存储 | 本地文件系统 | `content/` 目录 |
+
+### 2.6 外观配置系统
+
+站点外观通过 `config/default-settings.json` + `config/custom-settings.json` 配置，由 `config/settings.ts` 的 `AppSettings.appearance` 接口定义。
+
+#### 2.6.1 SettingsApplier 组件
+
+`src/components/layout/SettingsApplier.tsx` 负责将外观配置注入为 CSS 变量：
+
+| CSS 变量 | 来源 | 说明 |
+|----------|------|------|
+| `--background` | `appearance.backgroundColorLight/Dark` | 页面 body 背景色（OKLCH 格式，从 hex 映射） |
+| `--primary-hue/sat/lightness` | `appearance.primary.{light/dark}*` | 主题色 HSL 分量 |
+| `--accent-hue/sat/lightness` | `appearance.accent.{light/dark}*` | 强调色 HSL 分量 |
+| `--bg-image` | `appearance.backgroundImages` | 随机选取的背景图片 URL |
+| `--bg-opacity` | `appearance.backgroundOpacityLight/Dark` | 背景图片覆盖层透明度 |
+| `--body-width` | `appearance.bodyWidth` | 正文区域宽度 |
+| `--markdown-text-color` | `appearance.markdownTextColorLight/Dark` | Markdown 字体颜色 |
+| `--markdown-bg-color-global` | `appearance.markdownBgColorLight/Dark` | Markdown 背景色 |
+| `--markdown-bg-opacity` | `appearance.markdownBgOpacityLight/Dark` | Markdown 背景不透明度 |
+
+**背景图片选择策略**：
+- 首次页面加载时，从 `backgroundImages` 列表（支持目录展开）中随机选取一张图片，存入 `bgUrlRef` 稳定保持
+- 切换 light/dark 主题时不重新选择图片（避免不必要网络传输），仅更新 `--bg-opacity` 等颜色相关变量
+- 刷新页面时重新随机选取
+
+#### 2.6.2 主题模式
+
+`appearance.themeMode` 控制读者首次访问时的默认主题（`light` / `dark` / `system`），写入配置不直接影响当前页面。
+
+实际主题切换由 `next-themes` 的 `ThemeProvider` 管理：
+- 页面右上角明暗切换按钮（`ThemeToggle`）调用 `setTheme()`，写入 `localStorage`
+- 每次访问时先读取 `localStorage`，若没有值则回退到系统偏好
+- `SettingsApplier` 的第二个 `useEffect` 监听 `resolvedTheme` 变化，重新应用颜色 CSS 变量
 
 ---
 
@@ -1417,7 +1456,7 @@ SITE_URL="https://..."
 | `/admin/ai-tasks` | AI 任务列表（审查/翻译/发现/生成） |
 | `/admin/ai-tasks/[taskId]` | AI 任务详情（审查报告 / 翻译详情） |
 | `/admin/notifications` | 通知中心 |
-| `/admin/settings` | 站点设置 |
+| `/admin/settings` | 站点设置（外观 Tab 含主题模式、页面背景色、主题色/强调色 HSL 滑块、Markdown 样式、背景图片、图片设置等配置项） |
 
 ### 11.5 API 路由
 

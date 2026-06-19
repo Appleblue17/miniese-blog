@@ -16,8 +16,9 @@ export function SettingsApplier() {
   const { resolvedTheme } = useTheme();
   const settingsRef = useRef<AppearanceSettings | null>(null);
   const expandedRef = useRef<string[]>([]); // Cached expanded image URLs
+  const bgUrlRef = useRef<string>(""); // Stable bg URL for the page load
 
-  // Fetch settings once
+  // Fetch settings once — also picks a random background image
   useEffect(() => {
     let cancelled = false;
 
@@ -36,7 +37,20 @@ export function SettingsApplier() {
         if (!a) return;
 
         settingsRef.current = a;
-        await applySettingsAsync(a, resolvedTheme ?? "light", expandedRef);
+
+        // Expand background images and pick one (stable for this page load)
+        const bgImages = a.backgroundImages?.filter(Boolean) ?? [];
+        const expandedArrays = await Promise.all(
+          bgImages.map((p) => expandPathToImages(p)),
+        );
+        const allImages = expandedArrays.flat();
+        expandedRef.current = allImages;
+
+        if (allImages.length > 0) {
+          bgUrlRef.current = allImages[Math.floor(Math.random() * allImages.length)];
+        }
+
+        await applySettings(a, resolvedTheme ?? "light", bgUrlRef.current);
       } catch {
         // Silently fail — defaults from CSS will be used
       }
@@ -46,11 +60,14 @@ export function SettingsApplier() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-apply settings when theme changes (after settings have been fetched).
+  // Re-apply colors when theme changes — keeps the same background image
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", resolvedTheme ?? "light");
     if (settingsRef.current) {
-      applySettingsAsync(settingsRef.current, resolvedTheme ?? "light", expandedRef);
+      applyColorsSync(settingsRef.current, resolvedTheme === "dark");
+      const isDark = resolvedTheme === "dark";
+      const root = document.documentElement;
+      root.style.setProperty("--bg-opacity", `${(isDark ? (settingsRef.current.backgroundOpacityDark ?? 10) : (settingsRef.current.backgroundOpacityLight ?? 10)) / 100}`);
     }
   }, [resolvedTheme]);
 
@@ -119,36 +136,18 @@ async function expandPathToImages(p: string): Promise<string[]> {
 }
 
 /**
- * Applies settings to CSS variables. Async because it may need to expand
- * directory paths to individual image files.
+ * Applies settings to CSS variables, including background image.
+ * The bgUrl is pre-selected and stable for this page load.
  */
-async function applySettingsAsync(
+async function applySettings(
   a: AppearanceSettings,
   resolvedTheme: string,
-  expandedRef: React.MutableRefObject<string[]>,
+  bgUrl: string,
 ) {
   const isDark = resolvedTheme === "dark";
 
   // Apply colors synchronously first
   applyColorsSync(a, isDark);
-
-  // Expand background images (async) — each entry can be a file or directory
-  const bgImages = a.backgroundImages?.filter(Boolean) ?? [];
-  const expandedArrays = await Promise.all(
-    bgImages.map((p) => expandPathToImages(p)),
-  );
-  const allImages = expandedArrays.flat();
-
-  // Cache expanded results
-  expandedRef.current = allImages;
-
-  // Pick a random image from the expanded list
-  let bgUrl = "";
-  if (allImages.length > 0) {
-    const seed = `${resolvedTheme}-${Date.now()}`;
-    const idx = Math.abs(hashString(seed)) % allImages.length;
-    bgUrl = allImages[idx];
-  }
 
   const root = document.documentElement;
   if (bgUrl) {
@@ -206,15 +205,4 @@ function applyColorsSync(a: AppearanceSettings, isDark: boolean) {
   root.style.setProperty("--markdown-bg-color-global", bgColor);
 
   root.style.setProperty("--markdown-bg-opacity", `${(isDark ? (a.markdownBgOpacityDark ?? 80) : (a.markdownBgOpacityLight ?? 80))}%`);
-}
-
-/** Simple string hash for deterministic random selection */
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
 }

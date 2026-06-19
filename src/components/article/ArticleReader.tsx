@@ -466,7 +466,7 @@ export function ArticleReader({
       )}
 
       {/* Article header — renders skeleton while loading, real content when ready */}
-      <article className="flex flex-col gap-8">
+      <article className="flex flex-col gap-8 mb-8">
         <header className="flex flex-col gap-4">
           {loading ? (
             <>
@@ -494,7 +494,7 @@ export function ArticleReader({
             <>
               <h1 className="text-3xl font-bold leading-tight tracking-tight">{title}</h1>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-article-meta">
                 {author && (
                   <span className="inline-flex items-center gap-1.5">
                     <User className="size-3.5" />
@@ -507,16 +507,16 @@ export function ArticleReader({
                     {formatDate(publishedAt)}
                   </span>
                 )}
-                <span className="text-xs text-muted-foreground/60">
+                <span className="text-xs text-article-meta-subtle">
                   {lang === "zh" ? "更新于" : "Updated"} {updatedAt ? formatDate(updatedAt) : ""}
                 </span>
               </div>
 
               {tags && tags.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Tag className="size-3.5 text-muted-foreground" />
+                  <Tag className="size-3.5 text-article-meta" />
                   {tags.map((tag) => (
-                    <Badge key={tag} className="bg-primary-tag/15 text-primary-tag border-primary-tag/25">
+                    <Badge key={tag} className="bg-primary-tag-bg text-primary-tag border-primary-tag/30">
                       {tag}
                     </Badge>
                   ))}
@@ -527,15 +527,12 @@ export function ArticleReader({
 
               {summary && (
                 <div className="markdown-body-summary">
-                  <p className="text-sm leading-relaxed text-muted-foreground">{summary}</p>
+                  <p className="text-sm leading-relaxed text-article-meta">{summary}</p>
                 </div>
               )}
 
               {isAITranslated && (
-                <div
-                  className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm"
-                  style={{ color: "hsl(var(--accent-hue), var(--accent-sat), 80%)" }}
-                >
+                <div className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm text-article-ai-translate">
                   <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
                   </svg>
@@ -550,6 +547,7 @@ export function ArticleReader({
           )}
         </header>
 
+        {/* Divider between header and body — always present when not loading */}
         {!loading && changelog && (
           <>
             <hr className="border-border" />

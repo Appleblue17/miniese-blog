@@ -51,6 +51,8 @@ export interface AppSettings {
     backgroundImages: string[];
     backgroundOpacityLight: number;
     backgroundOpacityDark: number;
+    backgroundColorLight: string;
+    backgroundColorDark: string;
     markdownBgOpacityLight: number;
     markdownBgOpacityDark: number;
     markdownTextColorLight: string;

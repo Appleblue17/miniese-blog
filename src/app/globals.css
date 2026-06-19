@@ -56,7 +56,8 @@
   --color-accent-hsl-dark: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-dark));
   --color-accent-hsl-light: hsl(var(--accent-hue), var(--accent-sat), var(--accent-light-lightest));
   --color-ai-bg: var(--ai-bg);
-  --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), 75%);
+  --color-primary-tag: hsl(var(--primary-hue), var(--primary-sat), var(--primary-tag-lightness, 75%));
+  --color-primary-tag-bg: hsl(var(--primary-hue), var(--primary-sat), var(--primary-tag-bg-lightness, 92%));
 }
 
 :root {
@@ -106,11 +107,13 @@
   --accent-light: 55%;
   --accent-light-dark: 35%;
   --accent-light-lightest: 75%;
-  --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.5), 98%);
+  --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.5), 95%);
   --markdown-bg-opacity: 80%;
   --markdown-text-color: #1f2328;
   --markdown-bg-color-global: #ffffff;
   --body-width: 48rem;
+  --primary-tag-lightness: 40%;
+  --primary-tag-bg-lightness: 88%;
 }
 
 .dark {
@@ -157,6 +160,8 @@
   --accent-light-lightest: 85%;
   --ai-bg: hsl(var(--accent-hue), calc(var(--accent-sat) * 0.3), 15%);
   --markdown-text-color: #f0f6fc;
+  --primary-tag-lightness: 75%;
+  --primary-tag-bg-lightness: 22%;
 }
 
 @layer base {
@@ -218,5 +223,59 @@
   }
   50% {
     opacity: 0.7;
+  }
+}
+
+/* ── Article reader color tokens ───────────────────────────────────────
+
+   These use fixed oklch values for light/dark to ensure sufficient contrast
+   regardless of the theme's --muted-foreground variable.
+
+   Light:   #595959 (oklch 0.35) for meta text, #8e8e8e for subtle text
+   Dark:    #b0b0b0 (oklch 0.72) for meta text, #8a8a8a for subtle text
+   AI translate text: uses accent hue at higher saturation & darkness
+   ──────────────────────────────────────────────────────────────────────── */
+
+@layer utilities {
+  .text-article-meta {
+    color: oklch(0.35 0 0);
+  }
+  .dark .text-article-meta {
+    color: oklch(0.72 0 0);
+  }
+
+  .text-article-meta-subtle {
+    color: oklch(0.556 0 0);
+  }
+  .dark .text-article-meta-subtle {
+    color: oklch(0.556 0 0);
+  }
+
+  .text-article-ai-translate {
+    color: hsl(var(--accent-hue), var(--accent-sat), 30%);
+  }
+  .dark .text-article-ai-translate {
+    color: hsl(var(--accent-hue), var(--accent-sat), 75%);
+  }
+
+  .text-toc-title {
+    color: oklch(0.35 0 0);
+  }
+  .dark .text-toc-title {
+    color: oklch(0.7 0 0);
+  }
+
+  .text-toc-item {
+    color: oklch(0.45 0 0);
+  }
+  .dark .text-toc-item {
+    color: oklch(0.68 0 0);
+  }
+
+  .text-toc-item-subtle {
+    color: oklch(0.5 0 0);
+  }
+  .dark .text-toc-item-subtle {
+    color: oklch(0.6 0 0);
   }
 }

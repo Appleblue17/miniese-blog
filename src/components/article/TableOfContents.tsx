@@ -214,7 +214,7 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
         ref={navRef}
         className="hidden xl:block sticky top-24 w-56 shrink-0 max-h-[calc(100vh-8rem)] overflow-y-auto"
       >
-        <h4 className="text-xs font-semibold mb-3 text-muted-foreground uppercase tracking-wider">
+        <h4 className="text-xs font-semibold mb-3 text-toc-title uppercase tracking-wider">
           {t("目录", "Contents")}
         </h4>
         <ul className="space-y-0.5">
@@ -229,13 +229,13 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                 className={`block w-full text-left py-1.5 pr-2 border-l-2 transition-colors hover:text-foreground ${
                   activeId === item.id
                     ? "border-primary text-foreground font-semibold"
-                    : "border-transparent text-muted-foreground hover:border-muted-foreground/30"
+                    : "border-transparent text-toc-item hover:border-toc-item/30"
                 } ${
                   item.level === 1
                     ? "pl-2 text-sm font-medium"
                     : item.level === 2
                       ? "pl-5 text-sm"
-                      : "pl-8 text-xs text-muted-foreground/80"
+                      : "pl-8 text-xs text-toc-item-subtle"
                 }`}
               >
                 {item.text}
@@ -271,13 +271,13 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsOpen(false)} />
           <div className="relative w-full max-h-[60vh] overflow-y-auto rounded-t-2xl bg-background p-6 md:p-8 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              <h4 className="text-xs md:text-sm font-semibold text-toc-title uppercase tracking-wider">
                 {t("目录", "Contents")}
               </h4>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center justify-center size-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="flex items-center justify-center size-9 rounded-md text-toc-item hover:text-foreground hover:bg-accent"
               >
                 <svg
                   className="size-5"
@@ -299,13 +299,13 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                     className={`block w-full text-left py-2 px-2 rounded-md transition-colors ${
                       activeId === item.id
                         ? "bg-muted font-semibold text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        : "text-toc-item hover:text-foreground"
                     } ${
                       item.level === 1
                         ? "pl-2 font-medium"
                         : item.level === 2
                           ? "pl-5"
-                          : "pl-8 text-xs md:text-sm text-muted-foreground/80"
+                          : "pl-8 text-xs md:text-sm text-toc-item-subtle"
                     }`}
                   >
                     {item.text}

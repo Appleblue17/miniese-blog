@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     themeMode: "system", bodyWidth: 66, image: { maxWidth: 800, maxHeight: 600, defaultWidthRatio: 60, lightboxEnabled: true, captionIgnoreList: ["alt text"] },
     primary: { lightHue: 200, darkHue: 260, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
     accent: { lightHue: 280, darkHue: 280, lightSaturation: 70, darkSaturation: 70, lightLightness: 55, darkLightness: 65 },
-    backgroundImages: [], backgroundOpacityLight: 10, backgroundOpacityDark: 10, markdownBgOpacityLight: 80, markdownBgOpacityDark: 80,
+    backgroundImages: [], backgroundOpacityLight: 10, backgroundOpacityDark: 10, backgroundColorLight: "#ffffff", backgroundColorDark: "#0d1117", markdownBgOpacityLight: 80, markdownBgOpacityDark: 80,
     markdownTextColorLight: "#1f2328", markdownTextColorDark: "#f0f6fc",
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
@@ -230,7 +230,7 @@ export default function SettingsPage() {
   const [local, setLocal] = useState<AppSettings | null>(null);
   // Default prompts from default-settings.json (used for "恢复默认")
   const [defaultPrompts, setDefaultPrompts] = useState<Record<string, string> | null>(null);
-  const { setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -251,12 +251,8 @@ export default function SettingsPage() {
     if (!local) return;
     const a = local.appearance;
 
-    // Detect if we should use dark mode hues
-    const isDark =
-      a.themeMode === "dark" ||
-      (a.themeMode === "system" &&
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    // Detect if we should use dark mode hues — use resolvedTheme from next-themes
+    const isDark = resolvedTheme === "dark";
 
     const primaryHue = isDark ? a.primary.darkHue : a.primary.lightHue;
     const accentHue = isDark ? a.accent.darkHue : a.accent.lightHue;
@@ -301,11 +297,15 @@ export default function SettingsPage() {
     const bgOpacity = isDark ? (a.backgroundOpacityDark ?? 10) : (a.backgroundOpacityLight ?? 10);
     document.documentElement.style.setProperty("--bg-opacity", `${bgOpacity / 100}`);
 
+    // Sync page background color — use the value for the current theme
+    const pageBgColor = isDark ? (a.backgroundColorDark ?? "#0d1117") : (a.backgroundColorLight ?? "#ffffff");
+    document.documentElement.style.setProperty("--background", pageBgColor);
+
     // Sync image settings
     const img = a.image ?? {};
     document.documentElement.style.setProperty("--image-max-width", `${img.maxWidth ?? 800}px`);
     document.documentElement.style.setProperty("--image-width-ratio", `${img.defaultWidthRatio ?? 60}%`);
-  }, [local?.appearance]);
+  }, [local?.appearance, resolvedTheme]);
 
   const updateLocal = useCallback(
     <K extends keyof AppSettings>(section: K, key: string, value: unknown) => {
@@ -827,11 +827,6 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => {
                           updateLocal("appearance", "themeMode", opt.value);
-                          if (opt.value === "system") {
-                            setTheme("system");
-                          } else {
-                            setTheme(opt.value);
-                          }
                         }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-colors ${
                           a.themeMode === opt.value
@@ -848,7 +843,6 @@ export default function SettingsPage() {
                     isDefault={a.themeMode === DEFAULT_SETTINGS.appearance.themeMode}
                     onReset={() => {
                       resetField("appearance", "themeMode");
-                      setTheme(DEFAULT_SETTINGS.appearance.themeMode);
                     }}
                   />
                 </div>
@@ -1071,12 +1065,7 @@ export default function SettingsPage() {
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateLocal("appearance", "backgroundOpacityLight", v);
-                      const isDark =
-                        a.themeMode === "dark" ||
-                        (a.themeMode === "system" &&
-                          typeof window !== "undefined" &&
-                          window.matchMedia("(prefers-color-scheme: dark)").matches);
-                      if (!isDark) {
+                      if (resolvedTheme !== "dark") {
                         document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
                       }
                     }}
@@ -1112,12 +1101,7 @@ export default function SettingsPage() {
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateLocal("appearance", "backgroundOpacityDark", v);
-                      const isDark =
-                        a.themeMode === "dark" ||
-                        (a.themeMode === "system" &&
-                          typeof window !== "undefined" &&
-                          window.matchMedia("(prefers-color-scheme: dark)").matches);
-                      if (isDark) {
+                      if (resolvedTheme === "dark") {
                         document.documentElement.style.setProperty("--bg-opacity", `${v / 100}`);
                       }
                     }}
@@ -1128,6 +1112,56 @@ export default function SettingsPage() {
                 <div className="flex justify-between text-xs text-muted-foreground mt-1 ml-7">
                   <span>透明</span>
                   <span>不透明</span>
+                </div>
+              </div>
+
+              <SectionHeading>页面背景颜色</SectionHeading>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">背景颜色（浅色模式）</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="color"
+                      value={a.backgroundColorLight ?? "#ffffff"}
+                      onChange={(e) => updateLocal("appearance", "backgroundColorLight", e.target.value)}
+                      className="size-8 rounded border border-input cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={a.backgroundColorLight ?? "#ffffff"}
+                      onChange={(e) => updateLocal("appearance", "backgroundColorLight", e.target.value)}
+                      className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    />
+                  </div>
+                  <ResetButton
+                    isDefault={(a.backgroundColorLight ?? "#ffffff") === DEFAULT_SETTINGS.appearance.backgroundColorLight}
+                    onReset={() => resetField("appearance", "backgroundColorLight")}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-1">背景颜色（深色模式）</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="color"
+                      value={a.backgroundColorDark ?? "#0d1117"}
+                      onChange={(e) => updateLocal("appearance", "backgroundColorDark", e.target.value)}
+                      className="size-8 rounded border border-input cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={a.backgroundColorDark ?? "#0d1117"}
+                      onChange={(e) => updateLocal("appearance", "backgroundColorDark", e.target.value)}
+                      className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    />
+                  </div>
+                  <ResetButton
+                    isDefault={(a.backgroundColorDark ?? "#0d1117") === DEFAULT_SETTINGS.appearance.backgroundColorDark}
+                    onReset={() => resetField("appearance", "backgroundColorDark")}
+                  />
                 </div>
               </div>
 
@@ -1205,12 +1239,7 @@ export default function SettingsPage() {
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateLocal("appearance", "markdownBgOpacityLight", v);
-                      const isDark =
-                        a.themeMode === "dark" ||
-                        (a.themeMode === "system" &&
-                          typeof window !== "undefined" &&
-                          window.matchMedia("(prefers-color-scheme: dark)").matches);
-                      if (!isDark) {
+                      if (resolvedTheme !== "dark") {
                         document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
                       }
                     }}
@@ -1248,12 +1277,7 @@ export default function SettingsPage() {
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateLocal("appearance", "markdownBgOpacityDark", v);
-                      const isDark =
-                        a.themeMode === "dark" ||
-                        (a.themeMode === "system" &&
-                          typeof window !== "undefined" &&
-                          window.matchMedia("(prefers-color-scheme: dark)").matches);
-                      if (isDark) {
+                      if (resolvedTheme === "dark") {
                         document.documentElement.style.setProperty("--markdown-bg-opacity", `${v}%`);
                       }
                     }}
@@ -1429,11 +1453,7 @@ export default function SettingsPage() {
             <div className="lg:sticky lg:top-24 lg:self-start">
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">实时预览</h3>
               {(() => {
-                const isDark =
-                  a.themeMode === "dark" ||
-                  (a.themeMode === "system" &&
-                    typeof window !== "undefined" &&
-                    window.matchMedia("(prefers-color-scheme: dark)").matches);
+                const isDark = resolvedTheme === "dark";
 
                 const previewHeading = isDark
                   ? `hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))`

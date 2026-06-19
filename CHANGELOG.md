@@ -6,6 +6,7 @@
 ## [Unreleased]
 
 ### Added
+- 设置页「页面背景颜色」配置项 & UI（body 背景色可独立于 Markdown 背景色进行控制，支持浅色/深色模式分别设置）
 - 阶段 8：账号系统（注册、登录、密码管理、邮箱验证、个人设置）
 - 阶段 8：评论系统（API + CommentSection 前端组件，跨版本互通，60s 频率限制）
 - 阶段 8：UI 优化（button cursor-pointer，登录页重定向逻辑改进）
@@ -22,6 +23,9 @@
 - 阶段 9：上传时检测重名草稿（`GET /api/articles/draft/check-duplicate`）+ 确认对话框
 
 ### Changed
+- 设置页「主题模式」按钮不再改变当前管理员的页面显示（仅更新配置，控制读者首次访问的默认主题）；改用页面右上角明暗切换按钮控制当前页面
+- `SettingsApplier` 背景图片选择策略：首次加载时随机选取并稳定保持，切换 light/dark 时不更换图片（避免不必要网络传输）
+- `SettingsApplier` 主题切换时只更新颜色 + 透明度，不重新选择背景图片
 - 阶段 8：认证从 MVP 简单密码保护升级为 NextAuth.js v5（Credentials + 可选 OAuth）
 - 阶段 8：仪表盘路由保护方式更新（HTTP Basic Auth → NextAuth.js session）
 - 阶段 8：废弃的 `/admin/reviews` 迁移到 `/admin/ai-tasks`
