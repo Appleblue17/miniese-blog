@@ -925,12 +925,41 @@ const FEATURE_FLAGS: Record<string, string> = {
   generate: "wikiGenerate",
 };
 
+/**
+ * Safely updates an AiTask record only if it still exists.
+ * Returns true if the record was updated, false if it no longer exists.
+ */
+async function updateTaskIfExists(
+  taskId: string,
+  data: Prisma.AiTaskUpdateInput,
+): Promise<boolean> {
+  try {
+    const result = await prisma.aiTask.updateMany({
+      where: { id: taskId },
+      data,
+    });
+    return result.count > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function processJob(job: Job): Promise<Record<string, unknown>> {
   const { type, taskId } = job.data as {
     type: string;
     taskId: string;
     payload: Record<string, unknown>;
   };
+
+  // Check if the task record still exists (may have been deleted by user)
+  const existing = await prisma.aiTask.findUnique({
+    where: { id: taskId },
+    select: { id: true },
+  });
+  if (!existing) {
+    console.warn(`[Worker] Task ${taskId} not found in DB (deleted by user), skipping job`);
+    return { skipped: true, reason: "Task deleted by user" };
+  }
 
   // Check feature flag before processing
   const featureKey = FEATURE_FLAGS[type];
@@ -982,29 +1011,33 @@ workerQueue.process("*", 1, async (job) => {
   try {
     const result = await processJob(job);
 
-    // Mark as completed
-    await prisma.aiTask.update({
-      where: { id: taskId },
-      data: {
-        status: "completed",
-        output: result as JsonInput,
-        completedAt: new Date(),
-      },
+    // Mark as completed (only if record still exists)
+    const updated = await updateTaskIfExists(taskId, {
+      status: "completed",
+      output: result as JsonInput,
+      completedAt: new Date(),
     });
+
+    if (!updated) {
+      console.warn(`[Worker] Job ${job.id} (task ${taskId}) completed but record was deleted`);
+      return result;
+    }
 
     console.log(`[Worker] Job ${job.id} (task ${taskId}) completed successfully`);
     return result;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
-    // Mark as failed
-    await prisma.aiTask.update({
-      where: { id: taskId },
-      data: {
-        status: "failed",
-        error: errorMessage,
-      },
+    // Mark as failed (only if record still exists)
+    const updated = await updateTaskIfExists(taskId, {
+      status: "failed",
+      error: errorMessage,
     });
+
+    if (!updated) {
+      console.warn(`[Worker] Job ${job.id} (task ${taskId}) failed but record was deleted: ${errorMessage}`);
+      return { error: errorMessage };
+    }
 
     console.error(`[Worker] Job ${job.id} (task ${taskId}) failed: ${errorMessage}`);
     throw err; // Let Bull handle retry logic

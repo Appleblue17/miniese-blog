@@ -4,18 +4,17 @@
  * 展示 AI 任务列表，支持：
  * - 按类型切换筛选
  * - 每个任务可删除/重试（失败/跳过状态）
- * - 失败和跳过的任务单独折叠栏
- * - 批量重试和批量删除
+ * - 所有任务支持 checkbox 选中
+ * - 批量重试和批量删除（sticky bottom 操作栏）
  */
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Bot,
   Globe,
   Sparkles,
@@ -60,7 +59,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// --- Status badge ---
+// --- Helpers ---
 
 function isSkipped(task: AiTaskItem): boolean {
   return (
@@ -71,6 +70,8 @@ function isSkipped(task: AiTaskItem): boolean {
       (task.output as Record<string, unknown>).skipped === true)
   );
 }
+
+// --- Status badge ---
 
 function TaskStatusBadge({ task }: { task: AiTaskItem }) {
   if (isSkipped(task)) {
@@ -160,23 +161,17 @@ function getTaskSummary(task: AiTaskItem): string | null {
     }
     case "translate": {
       const count = (task.output as Record<string, unknown>)?.translatedCount;
-      if (typeof count === "number") {
-        return `${count} 段翻译`;
-      }
+      if (typeof count === "number") return `${count} 段翻译`;
       return null;
     }
     case "generate": {
       const count = (task.output as Record<string, unknown>)?.termsCount;
-      if (typeof count === "number") {
-        return `${count} 个词条`;
-      }
+      if (typeof count === "number") return `${count} 个词条`;
       return null;
     }
     case "discover": {
       const count = (task.output as Record<string, unknown>)?.candidateCount;
-      if (typeof count === "number") {
-        return `${count} 个候选词条`;
-      }
+      if (typeof count === "number") return `${count} 个候选词条`;
       return null;
     }
     default:
@@ -216,45 +211,89 @@ function TypeTabBar({ tabs, activeKey }: { tabs: TypeTabDef[]; activeKey: string
   );
 }
 
-// --- Action Buttons ---
+// --- Task Row (with checkbox) ---
 
-function TaskActions({
+function TaskRow({
   task,
+  checked,
+  onCheck,
   onDelete,
   onRetry,
   busy,
 }: {
   task: AiTaskItem;
+  checked: boolean;
+  onCheck: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
   onRetry: (id: string) => void;
   busy: boolean;
 }) {
+  const summary = getTaskSummary(task);
+  const skipped = isSkipped(task);
   const canRetry = task.status === "failed" || isSkipped(task);
-  const canDelete = true;
 
   return (
-    <div className="flex items-center gap-1 shrink-0">
-      {canRetry && (
+    <div
+      className={`flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ${
+        skipped
+          ? "border-amber-200 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/20"
+          : task.status === "failed"
+            ? "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20"
+            : "border-border bg-card"
+      } ${checked ? "ring-1 ring-primary/30" : ""}`}
+    >
+      {/* Checkbox */}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onCheck(task.id, e.target.checked)}
+        className="rounded border-border shrink-0 size-4"
+      />
+
+      {/* Content (clickable — links to detail page) */}
+      <Link
+        href={`/admin/ai-tasks/${task.id}`}
+        className="flex flex-col gap-1 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+      >
+        <div className="flex items-center gap-2">
+          <TaskTypeIcon type={task.type} />
+          <span className="font-medium truncate text-sm">
+            {task.articleTitle ?? <span className="italic text-muted-foreground">未知文章</span>}
+          </span>
+          <TaskStatusBadge task={task} />
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span>{TaskTypeLabel(task.type)}</span>
+          <span>创建 {formatDate(task.createdAt)}</span>
+          {task.completedAt && <span>完成 {formatDate(task.completedAt)}</span>}
+          {summary && <span>{summary}</span>}
+          {task.error && <span className="text-destructive truncate max-w-[200px]">错误: {task.error}</span>}
+          {skipped && (
+            <span className="text-amber-600 dark:text-amber-400">功能已关闭，可手动重试</span>
+          )}
+        </div>
+      </Link>
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-1 shrink-0">
+        {canRetry && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRetry(task.id);
+            }}
+            disabled={busy}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950"
+            title="重试"
+          >
+            <RotateCcw className="size-3" />
+            重试
+          </button>
+        )}
         <button
           type="button"
           onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRetry(task.id);
-          }}
-          disabled={busy}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950"
-          title="重试"
-        >
-          <RotateCcw className="size-3" />
-          重试
-        </button>
-      )}
-      {canDelete && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
             onDelete(task.id);
           }}
@@ -265,181 +304,63 @@ function TaskActions({
           <Trash2 className="size-3" />
           删除
         </button>
-      )}
+      </div>
     </div>
   );
 }
 
-// --- Task Row ---
-
-function TaskRow({
-  task,
-  onDelete,
-  onRetry,
-  busy,
-}: {
-  task: AiTaskItem;
-  onDelete: (id: string) => void;
-  onRetry: (id: string) => void;
-  busy: boolean;
-}) {
-  const summary = getTaskSummary(task);
-  const skipped = isSkipped(task);
-
-  return (
-    <Link
-      key={task.id}
-      href={`/admin/ai-tasks/${task.id}`}
-      className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted ${
-        skipped
-          ? "border-amber-200 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/20"
-          : task.status === "failed"
-            ? "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20"
-            : "border-border bg-card"
-      }`}
-    >
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <TaskTypeIcon type={task.type} />
-          <span className="font-medium truncate text-sm">{task.articleTitle ?? "未知文章"}</span>
-          <TaskStatusBadge task={task} />
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>{TaskTypeLabel(task.type)}</span>
-          <span>创建 {formatDate(task.createdAt)}</span>
-          {task.completedAt && <span>完成 {formatDate(task.completedAt)}</span>}
-          {summary && <span>{summary}</span>}
-          {task.error && <span className="text-destructive">错误: {task.error}</span>}
-          {skipped && (
-            <span className="text-amber-600 dark:text-amber-400">
-              功能已关闭，可手动重试
-            </span>
-          )}
-        </div>
-      </div>
-      <TaskActions task={task} onDelete={onDelete} onRetry={onRetry} busy={busy} />
-    </Link>
-  );
-}
-
-// --- Batch Actions Bar ---
+// --- Batch Actions Bar (sticky bottom) ---
 
 function BatchActionsBar({
   selectedIds,
+  totalCount,
   onBatchRetry,
   onBatchDelete,
+  onClearSelection,
   busy,
 }: {
-  selectedIds: string[];
+  selectedIds: Set<string>;
+  totalCount: number;
   onBatchRetry: (ids: string[]) => void;
   onBatchDelete: (ids: string[]) => void;
+  onClearSelection: () => void;
   busy: boolean;
 }) {
-  if (selectedIds.length === 0) return null;
+  if (selectedIds.size === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-4 py-2">
-      <span className="text-sm text-muted-foreground">
-        已选择 {selectedIds.length} 个任务
-      </span>
-      <div className="flex-1" />
-      <button
-        type="button"
-        onClick={() => onBatchRetry(selectedIds)}
-        disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
-        批量重试
-      </button>
-      <button
-        type="button"
-        onClick={() => onBatchDelete(selectedIds)}
-        disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-        批量删除
-      </button>
-    </div>
-  );
-}
-
-// --- Failed/Skipped Section ---
-
-function CollapsibleSection({
-  label,
-  icon,
-  tasks,
-  defaultOpen,
-  onDelete,
-  onRetry,
-  busy,
-  onSelect,
-  selectedIds,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  tasks: AiTaskItem[];
-  defaultOpen: boolean;
-  onDelete: (id: string) => void;
-  onRetry: (id: string) => void;
-  busy: boolean;
-  onSelect: (id: string, checked: boolean) => void;
-  selectedIds: string[];
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  if (tasks.length === 0) return null;
-
-  return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-4 py-2.5 bg-muted/50 text-sm font-medium hover:bg-muted transition-colors"
-      >
-        <ChevronDown
-          className={`size-4 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`}
-        />
-        {icon}
-        <span>{label}</span>
-        <span className="text-xs text-muted-foreground ml-1">({tasks.length})</span>
-      </button>
-      {open && (
-        <div className="flex flex-col gap-1 p-3">
-          {/* Select all checkbox */}
-          <label className="flex items-center gap-2 px-1 py-1 text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-            <input
-              type="checkbox"
-              checked={tasks.every((t) => selectedIds.includes(t.id))}
-              onChange={(e) => {
-                for (const t of tasks) onSelect(t.id, e.target.checked);
-              }}
-              className="rounded border-border"
-            />
-            全选
-          </label>
-          {tasks.map((task) => (
-            <div key={task.id} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(task.id)}
-                onChange={(e) => onSelect(task.id, e.target.checked)}
-                className="rounded border-border shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <TaskRow
-                  task={task}
-                  onDelete={onDelete}
-                  onRetry={onRetry}
-                  busy={busy}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="sticky bottom-0 z-10">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-background/95 backdrop-blur-sm px-4 py-3 shadow-lg">
+        <span className="text-sm text-muted-foreground shrink-0">
+          已选择 {selectedIds.size} / {totalCount} 个任务
+        </span>
+        <button
+          type="button"
+          onClick={onClearSelection}
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+        >
+          取消选择
+        </button>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => onBatchRetry([...selectedIds])}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+          批量重试
+        </button>
+        <button
+          type="button"
+          onClick={() => onBatchDelete([...selectedIds])}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+          批量删除
+        </button>
+      </div>
     </div>
   );
 }
@@ -481,7 +402,7 @@ function Pagination({
   };
 
   return (
-    <nav className="flex items-center justify-center gap-1 mt-6" aria-label="分页">
+    <nav className="flex items-center justify-center gap-1 mt-4" aria-label="分页">
       <Link
         href={currentPage > 1 ? pageHref(currentPage - 1) : "#"}
         className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm ${
@@ -534,10 +455,25 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
   const baseParams = new URLSearchParams();
   if (activeType !== "all") baseParams.set("type", activeType);
 
-  const normalTasks = tasks.filter((t) => t.status !== "failed" && !isSkipped(t) && t.articleTitle !== null);
-  const unknownTasks = tasks.filter((t) => t.status !== "failed" && !isSkipped(t) && t.articleTitle === null);
-  const failedTasks = tasks.filter((t) => t.status === "failed");
-  const skippedTasks = tasks.filter((t) => isSkipped(t));
+  // Group tasks by category for display
+  const groups = useMemo(() => {
+    const failed: AiTaskItem[] = [];
+    const skipped: AiTaskItem[] = [];
+    const normal: AiTaskItem[] = [];
+
+    for (const t of tasks) {
+      if (t.status === "failed") failed.push(t);
+      else if (isSkipped(t)) skipped.push(t);
+      else normal.push(t);
+    }
+
+    return { failed, skipped, normal };
+  }, [tasks]);
+
+  const allSelected = useMemo(
+    () => tasks.length > 0 && tasks.every((t) => selectedIds.has(t.id)),
+    [tasks, selectedIds],
+  );
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm("确定删除此任务？")) return;
@@ -545,7 +481,6 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
     try {
       const res = await fetch(`/api/admin/ai-tasks/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      // 使用 location.reload 确保获取最新数据，避免 RSC 缓存导致的分页偏移问题
       window.location.reload();
     } catch (err) {
       console.error("Delete failed:", err);
@@ -621,70 +556,95 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
     });
   }, []);
 
+  const handleSelectAll = useCallback(
+    (checked: boolean) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (checked) {
+          for (const t of tasks) next.add(t.id);
+        } else {
+          for (const t of tasks) next.delete(t.id);
+        }
+        return next;
+      });
+    },
+    [tasks],
+  );
+
+  const isEmpty = tasks.length === 0;
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <TypeTabBar tabs={TYPE_TABS} activeKey={activeType} />
 
-      {/* Failed tasks section */}
-      <CollapsibleSection
-        label="失败任务"
-        icon={<AlertCircle className="size-4 text-red-500" />}
-        tasks={failedTasks}
-        defaultOpen={failedTasks.length > 0}
-        onDelete={handleDelete}
-        onRetry={handleRetry}
-        busy={busy}
-        onSelect={handleSelect}
-        selectedIds={[...selectedIds]}
-      />
+      {/* Select all row */}
+      {!isEmpty && (
+        <label className="flex items-center gap-2 px-1 py-1 text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+            className="rounded border-border"
+          />
+          全选本页 ({tasks.length} 个任务)
+        </label>
+      )}
 
-      {/* Skipped tasks section */}
-      <CollapsibleSection
-        label="已跳过的任务"
-        icon={<SkipForward className="size-4 text-amber-500" />}
-        tasks={skippedTasks}
-        defaultOpen={skippedTasks.length > 0}
-        onDelete={handleDelete}
-        onRetry={handleRetry}
-        busy={busy}
-        onSelect={handleSelect}
-        selectedIds={[...selectedIds]}
-      />
+      {/* Failed tasks */}
+      {groups.failed.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 mb-2">
+            <AlertCircle className="size-3.5" />
+            失败任务 ({groups.failed.length})
+          </h3>
+          <div className="flex flex-col gap-1">
+            {groups.failed.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                checked={selectedIds.has(task.id)}
+                onCheck={handleSelect}
+                onDelete={handleDelete}
+                onRetry={handleRetry}
+                busy={busy}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Batch actions bar */}
-      <BatchActionsBar
-        selectedIds={[...selectedIds]}
-        onBatchRetry={handleBatchRetry}
-        onBatchDelete={handleBatchDelete}
-        busy={busy}
-      />
-
-      {/* Unknown tasks section (no article association) */}
-      <CollapsibleSection
-        label="其他任务（无关联文章）"
-        icon={<Bot className="size-4 text-muted-foreground" />}
-        tasks={unknownTasks}
-        defaultOpen={unknownTasks.length > 0}
-        onDelete={handleDelete}
-        onRetry={handleRetry}
-        busy={busy}
-        onSelect={handleSelect}
-        selectedIds={[...selectedIds]}
-      />
+      {/* Skipped tasks */}
+      {groups.skipped.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+            <SkipForward className="size-3.5" />
+            已跳过的任务 ({groups.skipped.length})
+          </h3>
+          <div className="flex flex-col gap-1">
+            {groups.skipped.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                checked={selectedIds.has(task.id)}
+                onCheck={handleSelect}
+                onDelete={handleDelete}
+                onRetry={handleRetry}
+                busy={busy}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Normal tasks */}
-      {normalTasks.length === 0 && failedTasks.length === 0 && skippedTasks.length === 0 && unknownTasks.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
-          <Bot className="size-12 opacity-40" />
-          <p className="text-lg">暂无任务</p>
-          <p className="text-sm">还没有 AI 任务记录。</p>
-        </div>
-      ) : (
+      {groups.normal.length > 0 && (
         <div className="flex flex-col gap-1">
-          {normalTasks.map((task) => (
+          {groups.normal.map((task) => (
             <TaskRow
               key={task.id}
               task={task}
+              checked={selectedIds.has(task.id)}
+              onCheck={handleSelect}
               onDelete={handleDelete}
               onRetry={handleRetry}
               busy={busy}
@@ -693,7 +653,28 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
         </div>
       )}
 
+      {/* Empty state */}
+      {isEmpty && (
+        <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
+          <Bot className="size-12 opacity-40" />
+          <p className="text-lg">暂无任务</p>
+          <p className="text-sm">还没有 AI 任务记录。</p>
+        </div>
+      )}
+
       <Pagination currentPage={currentPage} totalPages={totalPages} baseParams={baseParams} />
+
+      {/* Sticky bottom batch actions */}
+      <div className={isEmpty ? "" : "pb-2"}>
+        <BatchActionsBar
+          selectedIds={selectedIds}
+          totalCount={tasks.length}
+          onBatchRetry={handleBatchRetry}
+          onBatchDelete={handleBatchDelete}
+          onClearSelection={() => setSelectedIds(new Set())}
+          busy={busy}
+        />
+      </div>
     </div>
   );
 }

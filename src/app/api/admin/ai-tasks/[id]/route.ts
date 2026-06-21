@@ -28,6 +28,8 @@ export async function DELETE(
       const queue = getQueue();
       const job = await queue.getJob(id);
       if (job) {
+        // Discard first to stop active processing, then remove
+        await job.discard();
         await job.remove();
         console.log(`[Delete AI task] Removed Bull job ${id}`);
       }

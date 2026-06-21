@@ -38,16 +38,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "delete") {
-      // Remove Bull queue jobs first, then DB records
       for (const id of taskIds) {
         try {
           const queue = getQueue();
           const job = await queue.getJob(id);
           if (job) {
+            // Discard active jobs to prevent Worker from continuing processing
+            await job.discard();
             await job.remove();
           }
         } catch {
-          // best-effort
+          // best-effort — queue may be unavailable
         }
       }
       const result = await prisma.aiTask.deleteMany({
