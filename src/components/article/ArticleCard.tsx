@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Clock, Heart, User, Tag, FileText } from "lucide-react";
+import { Calendar, Eye, User, Tag, FileText, AlignLeft } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +30,16 @@ function formatDate(dateStr?: string): string {
 }
 
 /**
- * Estimates reading time based on title + summary length.
+ * Formats a byte count for display (B / KB / MB).
  */
-function estimateReadingTime(article: ArticleMeta): string {
-  const text = `${article.title} ${article.summary || ""}`;
-  const charCount = text.length;
-  const minutes = Math.max(1, Math.round(charCount / 500));
-  return `${minutes} min read`;
+function formatByteSize(bytes: number, _lang: string): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Map language code to display label */
@@ -46,8 +49,8 @@ function langLabel(code: string): string {
 
 export function ArticleCard({ article, lang }: ArticleCardProps) {
   return (
-    <Link href={`/${lang}/articles/${article.slug}`} className="block group">
-      <Card className="transition-shadow hover:shadow-md">
+    <Link href={`/${lang}/articles/${article.slug}`} className="block group h-full">
+      <Card className="h-full transition-shadow hover:shadow-md">
         <CardContent className="flex flex-col gap-3 pt-4">
           {/* Title row */}
           <div className="flex items-start gap-2.5">
@@ -63,12 +66,12 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
             </Badge>
           </div>
 
-          {/* Summary */}
-          {article.summary && (
+          {/* Summary - fixed 2-line height so metadata row stays aligned */}
+          {article.summary ? (
             <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">
               {article.summary}
             </p>
-          )}
+          ) : null}
 
           {/* Metadata row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -85,27 +88,29 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
               </span>
             )}
             <span className="inline-flex items-center gap-1">
-              <Clock className="size-3" />
-              {estimateReadingTime(article)}
+              <AlignLeft className="size-3" />
+              {formatByteSize(article.charCount ?? 0, lang)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Heart className="size-3" />
-              {article.likes}
+              <Eye className="size-3" />
+              {article.viewCount} views
             </span>
-            {article.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Tag className="size-3 shrink-0" />
-                {article.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    className="bg-primary-tag/15 text-primary-tag border-primary-tag/25 text-[10px]"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
           </div>
+
+          {/* Tags (separate row, like WikiCard) */}
+          {article.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Tag className="size-3 text-muted-foreground shrink-0" />
+              {article.tags.map((tag) => (
+                <Badge
+                  key={tag}
+                  className="bg-primary-tag/15 text-primary-tag border-primary-tag/25 text-[10px]"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>

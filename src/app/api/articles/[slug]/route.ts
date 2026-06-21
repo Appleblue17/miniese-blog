@@ -102,6 +102,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         publishedAt: true,
         updatedAt: true,
         changelog: true,
+        charCount: true,
+        viewCount: true,
         renderedContent: true,
         isAITranslated: true,
         originalId: true,
@@ -133,6 +135,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           changelog: article.changelog,
           isAITranslated: article.isAITranslated,
           originalId: article.originalId,
+          charCount: article.charCount,
+          viewCount: article.viewCount,
         },
       });
     }
@@ -203,6 +207,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         changelog: article.changelog,
         isAITranslated: article.isAITranslated,
         originalId: article.originalId,
+        charCount: article.charCount,
+        viewCount: article.viewCount,
       },
       html,
     });

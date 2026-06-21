@@ -279,3 +279,15 @@
     color: oklch(0.6 0 0);
   }
 }
+
+/* ── KaTeX overflow handling ───────────────────────────────────────── */
+
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-body .katex {
+  overflow-x: auto;
+  overflow-y: hidden;
+}

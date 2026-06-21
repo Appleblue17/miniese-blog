@@ -14,12 +14,20 @@ import type { WikiEntryMeta } from "@/types/wiki";
 
 // --- Type badge helpers ---
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS_ZH: Record<string, string> = {
   acronym: "缩写",
   concept: "概念",
   theorem: "定理",
   tech: "技术",
   other: "其他",
+};
+
+const TYPE_LABELS_EN: Record<string, string> = {
+  acronym: "Acronym",
+  concept: "Concept",
+  theorem: "Theorem",
+  tech: "Tech",
+  other: "Other",
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -30,8 +38,9 @@ const TYPE_COLORS: Record<string, string> = {
   other: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
-function getTypeLabel(type: string): string {
-  return TYPE_LABELS[type] || type;
+function getTypeLabel(type: string, lang: string): string {
+  const labels = lang === "en" ? TYPE_LABELS_EN : TYPE_LABELS_ZH;
+  return labels[type] || type;
 }
 
 function getTypeColor(type: string): string {
@@ -67,7 +76,7 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
                 <span
                   className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-tight ${getTypeColor(entry.type)}`}
                 >
-                  {getTypeLabel(entry.type)}
+                  {getTypeLabel(entry.type, lang)}
                 </span>
               )}
 
@@ -75,19 +84,19 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
               {entry.status === "creating" && (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-accent-hsl/10 px-1.5 py-0.5 text-[9px] font-medium text-accent-hsl leading-tight">
                   <Sparkles className="size-2.5" />
-                  生成中
+                  {lang === "en" ? "Generating" : "生成中"}
                 </span>
               )}
               {entry.status === "reviewed" && (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300 leading-tight">
                   <ShieldCheck className="size-2.5" />
-                  已审查
+                  {lang === "en" ? "Reviewed" : "已审查"}
                 </span>
               )}
               {entry.status === "unreviewed" && (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 leading-tight">
                   <Clock className="size-2.5" />
-                  待审查
+                  {lang === "en" ? "Unreviewed" : "待审查"}
                 </span>
               )}
 

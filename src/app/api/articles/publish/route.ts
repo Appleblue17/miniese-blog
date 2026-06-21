@@ -182,6 +182,12 @@ export async function POST(request: NextRequest) {
     // --- Validate image references ---
     const { content: mdBody } = parseFrontmatter(finalContent);
 
+    // Compute charCount: count bytes where CJK chars = 2 bytes, ASCII = 1 byte
+    const charCount = [...mdBody.replace(/\s/g, "")].reduce(
+      (acc, ch) => acc + (/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(ch) ? 2 : 1),
+      0,
+    );
+
     // Determine the source directory for image reference validation
     let sourceDir: string;
     if (fromFileSystem) {
@@ -304,6 +310,7 @@ export async function POST(request: NextRequest) {
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
+          charCount,
         },
       });
 
@@ -332,6 +339,7 @@ export async function POST(request: NextRequest) {
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
+          charCount,
           publishedAt: new Date(),
         },
       });
@@ -361,6 +369,7 @@ export async function POST(request: NextRequest) {
           changelog: changelog || null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
+          charCount,
           publishedAt: new Date(),
         },
       });

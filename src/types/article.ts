@@ -15,4 +15,5 @@ export interface ArticleMeta {
   author: string;
   viewCount: number;
   likes: number;
+  charCount?: number;
 }

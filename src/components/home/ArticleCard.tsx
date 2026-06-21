@@ -6,7 +6,11 @@
  */
 
 import Link from "next/link";
-import { Eye, ThumbsUp, Calendar } from "lucide-react";
+import { Eye, Calendar } from "lucide-react";
+
+function formatViews(count: number): string {
+  return `${count} views`;
+}
 
 interface ArticleCardProps {
   href: string;
@@ -15,7 +19,6 @@ interface ArticleCardProps {
   tags: string[];
   date: Date;
   viewCount: number;
-  likes: number;
   lang: string;
   compact?: boolean;
 }
@@ -27,7 +30,6 @@ export function ArticleCard({
   tags,
   date,
   viewCount,
-  likes,
   lang,
   compact,
 }: ArticleCardProps) {
@@ -57,14 +59,8 @@ export function ArticleCard({
             </span>
             <span className="flex items-center gap-1">
               <Eye className="size-2.5" />
-              {viewCount}
+              {formatViews(viewCount)}
             </span>
-            {likes > 0 && (
-              <span className="flex items-center gap-1">
-                <ThumbsUp className="size-2.5" />
-                {likes}
-              </span>
-            )}
           </div>
         </div>
         {tags.length > 0 && (
@@ -120,14 +116,8 @@ export function ArticleCard({
         </span>
         <span className="flex items-center gap-1">
           <Eye className="size-3" />
-          {viewCount}
+          {formatViews(viewCount)}
         </span>
-        {likes > 0 && (
-          <span className="flex items-center gap-1">
-            <ThumbsUp className="size-3" />
-            {likes}
-          </span>
-        )}
       </div>
     </Link>
   );

@@ -30,12 +30,20 @@ import type { WikiStatus } from "@/types/wiki";
 
 // --- Type badge helpers ---
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS_ZH: Record<string, string> = {
   acronym: "缩写",
   concept: "概念",
   theorem: "定理",
   tech: "技术",
   other: "其他",
+};
+
+const TYPE_LABELS_EN: Record<string, string> = {
+  acronym: "Acronym",
+  concept: "Concept",
+  theorem: "Theorem",
+  tech: "Tech",
+  other: "Other",
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -46,8 +54,9 @@ const TYPE_COLORS: Record<string, string> = {
   other: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
-function typeLabel(type: string): string {
-  return TYPE_LABELS[type] || type;
+function typeLabel(type: string, lang: string): string {
+  const labels = lang === "en" ? TYPE_LABELS_EN : TYPE_LABELS_ZH;
+  return labels[type] || type;
 }
 
 function typeColor(type: string): string {
@@ -186,7 +195,7 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeColor(entry.type)}`}
             >
-              {typeLabel(entry.type)}
+              {typeLabel(entry.type, lang)}
             </span>
           )}
           <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">

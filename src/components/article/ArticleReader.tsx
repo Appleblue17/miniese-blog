@@ -10,7 +10,7 @@
 "use client";
 
 import { useCallback, useState, useEffect, useRef } from "react";
-import { Calendar, User, Tag, GitCommit } from "lucide-react";
+import { Calendar, User, Tag, GitCommit, Eye, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ChatButton } from "@/components/ai/ChatButton";
@@ -30,6 +30,8 @@ interface ArticleReaderProps {
   lang: string;
   changelog?: string | null;
   isAITranslated?: boolean;
+  viewCount?: number;
+  charCount?: number;
   /**
    * When true, renders skeleton placeholders instead of actual content.
    * Used during the initial meta fetch so the title area is visible immediately
@@ -47,6 +49,19 @@ function formatDate(dateStr: string): string {
   });
 }
 
+/**
+ * Formats a byte count for display (B / KB / MB).
+ */
+function formatByteSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ArticleReader({
   articleId,
   title,
@@ -58,6 +73,8 @@ export function ArticleReader({
   lang,
   changelog,
   isAITranslated,
+  viewCount = 0,
+  charCount = 0,
   loading = false,
 }: ArticleReaderProps) {
   const [chatOpen, setChatOpen] = useState(false);
@@ -507,6 +524,14 @@ export function ArticleReader({
                     {formatDate(publishedAt)}
                   </span>
                 )}
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="size-3.5" />
+                  {viewCount} views
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <FileText className="size-3.5" />
+                  {formatByteSize(charCount)}
+                </span>
                 <span className="text-xs text-article-meta-subtle">
                   {lang === "zh" ? "更新于" : "Updated"} {updatedAt ? formatDate(updatedAt) : ""}
                 </span>

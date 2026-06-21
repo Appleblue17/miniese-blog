@@ -33,6 +33,8 @@ interface ArticleMeta {
   updatedAt: string;
   changelog: string | null;
   isAITranslated: boolean;
+  viewCount: number;
+  charCount: number;
 }
 
 export default function ArticlePage() {
@@ -62,6 +64,17 @@ export default function ArticlePage() {
     fetchMeta();
 
     return () => { cancelled = true; };
+  }, [lang, slug]);
+
+  // Increment view count on mount (once per session via sessionStorage on client side)
+  useEffect(() => {
+    const key = `viewed-${slug}-${lang}`;
+    if (typeof window !== "undefined" && !sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, "1");
+      fetch(`/api/articles/${slug}/view?lang=${lang}`, { method: "POST" }).catch(() => {
+        // Non-critical; ignore errors
+      });
+    }
   }, [lang, slug]);
 
   if (lang !== "zh" && lang !== "en") {
@@ -128,6 +141,8 @@ export default function ArticlePage() {
             lang={lang}
             changelog={meta.changelog}
             isAITranslated={meta.isAITranslated}
+            viewCount={meta.viewCount}
+            charCount={meta.charCount}
           />
 
           <ArticleContent lang={lang} slug={slug} articleId={meta.id} />

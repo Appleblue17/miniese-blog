@@ -103,6 +103,8 @@ export async function GET(request: NextRequest) {
           publishedAt: true,
           updatedAt: true,
           changelog: true,
+          charCount: true,
+          viewCount: true,
         },
       }),
       prisma.article.count({ where }),

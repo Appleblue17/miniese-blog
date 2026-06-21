@@ -81,6 +81,7 @@ model Article {
   author           String          @default("博主")
   viewCount        Int             @default(0)
   likes            Int             @default(0)
+  charCount        Int             @default(0)
 
   isAITranslated  Boolean         @default(false)
 

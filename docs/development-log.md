@@ -415,3 +415,33 @@
 - **遇到问题**：
   - 流式 SSE 解析：DeepSeek 部分实现发送累积内容而非增量 delta，需检测 `previousContent` 去掉已接收部分
   - KaTeX 公式选择修复的第一次尝试使用了 `createTreeWalker` 遍历节点，导致重复处理（既匹配到 `.katex` 元素又匹配到其子文本节点）。改用 `range.cloneContents()` 后在克隆 fragment 上操作，消除了重复问题
+
+### 任务 前端优化：公式溢出 + 阅读量 + 卡片样式 + 英文 label
+- **时间**：2026-06-21
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **公式溢出修复**：`globals.css` 为 `.katex-display` 和 `.katex` 添加 `overflow-x: auto` + `overflow-y: hidden`
+  - **阅读量 (viewCount)**：
+    - 新增 `POST /api/articles/[slug]/view` 端点，原子性 `increment: 1`
+    - 详情页 `ArticleReader` 显示 `{viewCount} views`（Eye 图标）
+    - 列表页 `ArticleCard` 显示 `{viewCount} views`
+    - 首页 `PopularArticles` + `ArticleCard` 显示 `{viewCount} views`
+    - sessionStorage 防刷（标签页级别，关闭重新打开可重新计数）
+    - **跨语言合并**：浏览中/英文版时通过 `originalId` 关联，两条记录同时 +1
+  - **卡片样式优化**：
+    - Tags 独立 flex-wrap 行（与 WikiCard 保持一致）
+    - 字数 → **byte 大小**（B/KB/MB），中文字符 2 byte、ASCII 1 byte
+    - **移除爱心（Heart/likes）** — ArticleCard（列表页）、home/ArticleCard（首页）、PopularArticles
+    - 卡片等高（`h-full` + `line-clamp-2`），信息条在标题/摘要下方固定位置，tags 在底部
+    - 信息条直接在标题下方（无 tag 时中间不留空）
+  - **英文 UI label**：
+    - WikiCard / WikiReader：`TYPE_LABELS_EN`，`getTypeLabel`/`typeLabel` 接受 `lang` 参数
+    - 状态文字中英切换（"Generating"/"生成中"等）
+  - **后端基础设施**：
+    - Prisma schema 添加 `charCount Int @default(0)` 字段 + 迁移已运行
+    - `publish/route.ts`：发布时计算 byte 数（CJK=2, ASCII=1）
+    - list API + detail API：`select` 包含 `charCount` 和 `viewCount`
+    - `scripts/backfill-char-count.ts`：补全 4 篇已有文章的 charCount（byte 算法重新计算）
+- **测试结果**：344/344 全部通过（27 个测试文件），`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - 无新增问题
