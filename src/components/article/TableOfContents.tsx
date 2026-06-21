@@ -212,7 +212,7 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
       {/* Desktop: sidebar TOC */}
       <nav
         ref={navRef}
-        className="hidden xl:block sticky top-24 w-56 shrink-0 max-h-[calc(100vh-8rem)] overflow-y-auto"
+        className="hidden xl:block sticky top-24 w-[min(18rem,22vw)] shrink-0 max-h-[calc(100vh-8rem)] overflow-y-auto"
       >
         <h4 className="text-xs font-semibold mb-3 text-toc-title uppercase tracking-wider">
           {t("目录", "Contents")}
@@ -226,10 +226,10 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                 }}
                 type="button"
                 onClick={() => handleClick(item.id)}
-                className={`block w-full text-left py-1.5 pr-2 border-l-2 transition-colors hover:text-foreground ${
+                className={`block w-full text-left py-1.5 pr-2 border-l-2 transition-colors ${
                   activeId === item.id
-                    ? "border-primary text-foreground font-semibold"
-                    : "border-transparent text-toc-item hover:border-toc-item/30"
+                    ? "border-primary bg-muted-foreground/15 font-semibold"
+                    : "border-transparent text-toc-item hover:border-toc-item/40 hover:bg-muted/50 hover:text-foreground cursor-pointer"
                 } ${
                   item.level === 1
                     ? "pl-2 text-sm font-medium"
@@ -299,7 +299,7 @@ export function TableOfContents({ html, lang = "zh" }: TableOfContentsProps) {
                     className={`block w-full text-left py-2 px-2 rounded-md transition-colors ${
                       activeId === item.id
                         ? "bg-muted font-semibold text-foreground"
-                        : "text-toc-item hover:text-foreground"
+                        : "text-toc-item hover:bg-muted/30 dark:hover:bg-muted hover:text-foreground"
                     } ${
                       item.level === 1
                         ? "pl-2 font-medium"

@@ -445,3 +445,16 @@
 - **测试结果**：344/344 全部通过（27 个测试文件），`npx tsc --noEmit` 编译通过
 - **遇到的问题**：
   - 无新增问题
+
+### 任务 TOC 交互优化：hover 效果 + dark mode 对比度 + 宽度自适应
+- **时间**：2026-06-21
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Hover 交互**：桌面端 TOC 目录项 hover 时显示浅色背景（`bg-muted/50`）+ 左边框由透明变为半可见（`border-toc-item/40`）+ 文字加深
+  - **移动端 hover**：bottom sheet 目录项同样添加 `hover:bg-muted/50`
+  - **Dark mode 对比度提升**：
+    - `text-toc-title`：亮度 0.70 → 0.75
+    - `text-toc-item`：亮度 0.68 → 0.78
+    - `text-toc-item-subtle`：亮度 0.60 → 0.65
+    - Light mode 同步微调：`text-toc-item` 亮度 0.45 → 0.40
+  - **宽度自适应**：`w-56` → `w-[min(18rem,22vw)]`，宽屏最大 288px，窄屏按 22% 视口等比缩放
