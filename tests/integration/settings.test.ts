@@ -154,7 +154,7 @@ describe("Settings API", () => {
     expect(settings.prompts.review).toContain("技术编辑");
     expect(settings.prompts.review).toContain("{{content}}");
     expect(settings.prompts.translate).toContain("翻译为 {{targetLang}}");
-    expect(settings.prompts.discovery).toContain("技术文档分析专家");
+    expect(settings.prompts.discovery).toContain("知识库编辑");
     expect(settings.prompts.generate).toContain("技术百科编辑");
 
     // Other settings unaffected

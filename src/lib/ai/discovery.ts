@@ -45,6 +45,24 @@ export interface DiscoveryCandidate {
 // ---------------------------------------------------------------------------
 
 /**
+ * Computes the recommended maximum number of candidate terms for a given
+ * article body length.
+ *
+ * Formula: min(3 + contentLength / 800, 10)
+ *
+ * For example:
+ * - 2000 chars → min(3 + 2.5, 10) = 5
+ * - 4000 chars → min(3 + 5, 10) = 8
+ * - 6400 chars → min(3 + 8, 10) = 10
+ *
+ * @param contentLength - Number of characters in the article body
+ * @returns Recommended max candidates (between 3 and 10)
+ */
+function computeMaxCandidates(contentLength: number): number {
+  return Math.min(3 + Math.floor(contentLength / 800), 10);
+}
+
+/**
  * Performs incremental term discovery using the unified diff pipeline.
  *
  * Only processes changed sub-chunks through the AI, reusing existing
@@ -160,10 +178,14 @@ export async function incrementalDiscover(
     const contextText = contextParts.join("\n");
     const targetText = targetParts.join("\n");
 
+    // Compute max candidates based on the full body length
+    const maxCandidates = computeMaxCandidates(newBody.length);
+
     const combinedPrompt = (customDiscoveryPrompt || "")
       .replace(/\{\{content\}\}/g, () => targetText)
       .replace(/\{\{context\}\}/g, () => contextText)
-      .replace(/\{\{language\}\}/g, () => (articleLang === "en" ? "English" : "Chinese"));
+      .replace(/\{\{language\}\}/g, () => (articleLang === "en" ? "English" : "Chinese"))
+      .replace(/\{\{maxCandidates\}\}/g, () => String(maxCandidates));
 
     try {
       const response = await callDeepSeek({
@@ -336,9 +358,11 @@ export async function discoverWikiCandidates(
 async function processChunk(chunkContent: string, language: string, customPrompt?: string): Promise<DiscoveryCandidate[]> {
   // Use the provided prompt (from settings) with placeholder substitution.
   // customPrompt is always provided by the worker (loaded from settings).
+  const maxCandidates = computeMaxCandidates(chunkContent.length);
   const combinedPrompt = (customPrompt || "")
     .replace(/\{\{content\}\}/g, () => chunkContent)
-    .replace(/\{\{language\}\}/g, () => language === "en" ? "English" : "Chinese");
+    .replace(/\{\{language\}\}/g, () => language === "en" ? "English" : "Chinese")
+    .replace(/\{\{maxCandidates\}\}/g, () => String(maxCandidates));
 
   const response = await callDeepSeek({
     prompt: combinedPrompt,
