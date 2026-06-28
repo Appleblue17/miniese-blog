@@ -80,10 +80,12 @@ export default async function EditDraftPage({ params }: Props) {
         "changelog",
       ]);
 
+      const fmFileType = (data.fileType || data.contentType || "") as "markdown" | "notesaw";
+
       initialMeta = {
         title: (data.title as string) || "",
         language: (data.language === "en" ? "en" : data.language === "zh" ? "zh" : "") as "zh" | "en" | "",
-        fileType: "", // Force manual selection — do not read from frontmatter
+        fileType: fmFileType, // Read from frontmatter, fall back to manual selection
         tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
         author: (data.author as string) || "博主",
         summary: (data.summary as string) || "",

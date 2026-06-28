@@ -237,7 +237,7 @@ export function PublishForm({
       parsedAuthor = (data.author as string) || result.author || "博主";
       parsedTags = Array.isArray(data.tags) ? (data.tags as string[]) : result.tags;
       parsedSummary = (data.summary as string) || result.summary;
-      parsedFileType = (data.fileType || data.contentType || "markdown") as "markdown" | "notesaw";
+      parsedFileType = (data.fileType || data.contentType || "") as "markdown" | "notesaw";
     } catch {
       parsedTitle = result.title || "";
       parsedLanguage = (result.language === "en" || result.language === "zh" ? result.language : "") as "zh" | "en" | "";
@@ -369,6 +369,10 @@ export function PublishForm({
 
   const handleRefreshPreview = useCallback(async () => {
     if (!fileContent) return;
+    if (!meta.fileType) {
+      setError("请先选择文件格式");
+      return;
+    }
     setPreviewLoading(true);
     setError(null);
     try {
@@ -1024,14 +1028,26 @@ export function PublishForm({
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium">预览</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshPreview}
-              disabled={previewLoading}
-            >
-              {previewLoading ? <Loader2 className="size-4 animate-spin" /> : "刷新预览"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {showPreview && previewHtml && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPreview(false)}
+                  className="gap-1 text-xs"
+                >
+                  隐藏预览
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshPreview}
+                disabled={previewLoading}
+              >
+                {previewLoading ? <Loader2 className="size-4 animate-spin" /> : "刷新预览"}
+              </Button>
+            </div>
           </div>
 
           {showPreview && previewHtml ? (

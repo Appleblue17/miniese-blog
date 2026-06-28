@@ -567,3 +567,55 @@
   - **修改文件**：`src/components/admin/PublishForm.tsx`
 - **测试结果**：`npx tsc --noEmit` 编译通过，无新增编译错误
 - **遇到的问题**：无
+
+### 任务 翻译版文章不再触发词条发现
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 移除 `processTranslate` 中翻译完成后对翻译版文章触发词条发现（`addJob("discover", ...)`）的步骤
+  - 删除不再使用的 `addJob` 导入
+  - 只对原版文章（发布时 `publish/route.ts` 的 `triggerAutoGenerate`）做词条发现
+  - **修改文件**：`src/worker.ts`
+
+### 任务 编辑草稿页：fileType 从 frontmatter 自动读取 + 预览未选择格式时提示 + 无 frontmatter 不上默认值
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **fileType 自动读取**：编辑草稿页 `initialMeta.fileType` 从 `""` 改为从 frontmatter 的 `fileType || contentType` 读取，有则自动填入，无则留空让用户选择
+  - **预览前检查 fileType**：`handleRefreshPreview` 中添加 `!meta.fileType` 检查，未选择时提示"请先选择文件格式"并阻止请求
+  - **无 frontmatter 不上默认值**：上传时 `parsedFileType` 的 fallback 从 `"markdown"` 改为 `""`，确保无 frontmatter 的文章不默认为 markdown
+  - **预览添加隐藏按钮**：预览展开后标题行右侧显示"隐藏预览"按钮，点击回到占位状态
+  - **修改文件**：`src/components/admin/PublishForm.tsx`、`src/app/(dashboard)/admin/articles/[id]/edit/page.tsx`
+
+### 任务 翻译同步 summary 和 changelog 到 DB
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - `processTranslate` 第 10 步（更新 DB 记录）新增 `summary` 和 `changelog` 字段的同步
+  - summary 已通过 DeepSeek 翻译并写入文件 frontmatter，现在也同步写入 DB
+  - changelog 保留原文写入文件 frontmatter，同时同步到 DB
+  - **修改文件**：`src/worker.ts`
+
+### 任务 编辑草稿页修复：翻译版词条发现移除 + frontmatter fileType 自动读取 + 预览格式提醒
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **翻译版取消自动词条发现**：`src/worker.ts` — `processTranslate` 移除翻译完成后触发 `addJob("discover")` 的逻辑，只对原版文章做词条发现
+  - **frontmatter fileType 自动读取**：`src/app/(dashboard)/admin/articles/[id]/edit/page.tsx` — `initialMeta.fileType` 从前端读取 `data.fileType || data.contentType`，有则自动填入，无则留空手动选择
+  - **frontmatter 无标记时不默认 markdown**：`src/components/admin/PublishForm.tsx` — `handleUpload` 中 `parsedFileType` 默认值从 `"markdown"` 改为 `""`（空串），让用户手动选择
+  - **预览格式提醒**：`src/components/admin/PublishForm.tsx` — `handleRefreshPreview` 开头新增 `meta.fileType` 检查，未选择时提示"请先选择文件格式"
+  - **预览隐藏按钮**：`src/components/admin/PublishForm.tsx` — 预览展开时标题栏右侧添加"隐藏预览"按钮，点击收起回到占位状态
+  - **翻译同步 summary 和 changelog 到 DB**：`src/worker.ts` — `processTranslate` 第 10 步 DB 更新新增 `summary` 字段（已翻译）和 `changelog` 字段（文件 frontmatter 中保留原文，同步写入 DB）
+- **测试结果**：`npx tsc --noEmit` 编译通过
+- **遇到的问题**：无
+
+### 任务 编辑草稿页修复：翻译版词条发现移除 + frontmatter fileType 自动读取 + 预览格式提醒 + 翻译同步 summary/changelog
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **翻译后不再触发词条发现**：删除 `src/worker.ts` 中 `processTranslate` 对翻译版文章的 `addJob("discover", ...)` 调用，仅对原版文章做词条发现
+  - **编辑页 fileType 自动读取**：`edit/page.tsx` 的 `initialMeta.fileType` 改为从 frontmatter 的 `fileType || contentType` 读取（有则自动填充，无则手动选择）
+  - **预览提醒文件格式**：`handleRefreshPreview` 中 `fileType` 为空时提示"请先选择文件格式"
+  - **前端上传默认值修正**：无 frontmatter 的文章上传后 `fileType` 留空而非默认 `"markdown"`
+  - **预览添加隐藏按钮**：预览展开时标题行右侧显示"隐藏预览"按钮
+  - **翻译同步 summary 和 changelog 到 DB**：`processTranslate` 第 10 步将翻译后的 `summary` 和文件中的 `changelog` 同步到数据库记录

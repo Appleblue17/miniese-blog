@@ -22,7 +22,6 @@ import { parseFrontmatter } from "./lib/articles/frontmatter";
 import { discoverWikiCandidates, incrementalDiscover } from "./lib/ai/discovery";
 import type { DiscoveryCandidate } from "./lib/ai/discovery";
 import { stripFrontmatter } from "./lib/ai/chunker/chunker";
-import { addJob } from "./lib/queue/producer";
 import { loadCustomPrompt } from "./lib/ai/promptLoader";
 import { getSettings } from "../config/settings";
 import { notifyAndMail } from "./lib/notifications";
@@ -195,8 +194,7 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
  * 8. Compute charCount from translated content
  * 9. Update article's DB record (title, language, isAITranslated, charCount)
  * 10. Re-render the target article to HTML
- * 11. Trigger term discovery for the translated article (fire-and-forget)
- * 12. Return translation stats including contentSnapshot for next incremental run
+ * 11. Return translation stats including contentSnapshot for next incremental run
  *
  * Payload required fields:
  * - `articleId`: ID of the source article (the one being translated FROM)
@@ -452,7 +450,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 10. Update target article's DB record (title, language, isAITranslated, charCount)
+  // 10. Update target article's DB record (title, language, isAITranslated, charCount, summary, changelog)
   const dbUpdateData: Record<string, unknown> = {
     isAITranslated: true,
     language: targetLang,
@@ -461,13 +459,26 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   if (translatedTitle) {
     dbUpdateData.title = translatedTitle;
   }
+  if (translatedSummary) {
+    dbUpdateData.summary = translatedSummary;
+  }
+  // Re-read final written content to get changelog if present
+  try {
+    const finalWritten = await fs.readFile(targetPath, "utf-8");
+    const { frontmatter } = parseFrontmatter(finalWritten);
+    if (frontmatter.changelog) {
+      dbUpdateData.changelog = frontmatter.changelog;
+    }
+  } catch {
+    // Non-fatal
+  }
   await prisma.article.update({
     where: { id: targetArticleIdStr },
     data: dbUpdateData,
   });
   console.log(
     `[Worker] Target article DB record updated: title="${translatedTitle || "(kept original)"}", ` +
-      `language=${targetLang}, charCount=${translatedCharCount}`,
+      `language=${targetLang}, charCount=${translatedCharCount}${translatedSummary ? `, summary="${translatedSummary}"` : ""}`,
   );
 
   // 11. Re-render the target article's Markdown content to HTML
@@ -504,18 +515,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 12. Trigger term discovery for the translated article (fire-and-forget)
-  addJob("discover", {
-    articleId: targetArticleIdStr,
-    articleSlug: sourceArticle.slug,
-    articleLang: targetLang,
-  }).catch((err) => {
-    console.warn(
-      `[Worker] Failed to trigger discovery for translated article ${targetArticleIdStr}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  });
-
-  // 12b. Notify admin about translation completion (fire-and-forget)
+  // 12. Notify admin about translation completion (fire-and-forget)
   notifyAndMail({
     type: "translation_complete",
     title: "翻译完成",
