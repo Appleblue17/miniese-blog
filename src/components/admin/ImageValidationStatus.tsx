@@ -48,9 +48,11 @@ export function ImageValidationStatus({
     setError(null);
 
     try {
-      const res = await fetch(
-        `/api/articles/images/${articleId}/verify?content=${encodeURIComponent(content)}`,
-      );
+      const res = await fetch(`/api/articles/images/${articleId}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "验证失败");
@@ -112,12 +114,16 @@ export function ImageValidationStatus({
   }
 
   // Missing images
+  const MAX_VISIBLE = 3;
+  const visibleNames = result.missing.slice(0, MAX_VISIBLE);
+  const remainingCount = result.missing.length - MAX_VISIBLE;
+
   return (
     <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-      <AlertTriangle className="size-3" />
-      <span>
+      <AlertTriangle className="size-3 shrink-0" />
+      <span className="flex items-center gap-1 flex-wrap">
         缺少 {result.missing.length} 张图片：
-        {result.missing.map((name, i) => (
+        {visibleNames.map((name, i) => (
           <span key={name}>
             {i > 0 && "、"}
             <code className="text-[10px] bg-amber-100 dark:bg-amber-900/30 px-1 rounded">
@@ -125,6 +131,23 @@ export function ImageValidationStatus({
             </code>
           </span>
         ))}
+        {remainingCount > 0 && (
+          <span className="relative group">
+            <span className="cursor-help underline decoration-dotted">
+              等 {result.missing.length} 张
+            </span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50">
+              <div className="bg-popover text-popover-foreground rounded-lg border shadow-lg px-3 py-2 text-xs whitespace-nowrap max-w-64">
+                <div className="font-medium mb-1">缺少的图片：</div>
+                {result.missing.map((name) => (
+                  <div key={name} className="font-mono">
+                    {name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </span>
+        )}
         ，请上传后再发布
       </span>
       <button

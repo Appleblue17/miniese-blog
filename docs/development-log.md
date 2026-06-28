@@ -552,3 +552,18 @@
 - **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
 - **遇到的问题**：
   - 无新增问题
+
+### 任务 编辑草稿页 UI 修复：重新上传按钮 + 下载文件名统一
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 1 — 编辑草稿页无法重新上传文件**：编辑模式下 `initialContent` 存在时 `step` 直接设为 `"review"`，跳过了上传步骤，缺少重新上传功能。
+    - 修复：在 Step 2（编辑草稿）的「文件信息」卡片中添加「重新上传」按钮（Upload 图标）
+    - 点击触发隐藏的 `<input type="file">`，选择文件后解析内容覆盖 `fileContent` 和 `fileName`
+    - 选择文件后将 `step` 重置为 `"upload"`，让用户重新确认元信息
+  - **Bug 2 — 下载文件名使用 `fileName`（草稿文件名如 `article.md`）**：编辑草稿页 `handleDownload` 使用 `fileName` 状态（文件路径最后一段），草稿文件都叫 `article.md`。
+    - 修复：`handleDownload` 改用 `meta.title` 生成文件名（去空格，替换非法字符，添加 `.md` 后缀）
+    - 与阅读页下载（`/api/articles/content?download=1`）和词条下载（`/api/wiki/content?download=1`）行为一致
+  - **修改文件**：`src/components/admin/PublishForm.tsx`
+- **测试结果**：`npx tsc --noEmit` 编译通过，无新增编译错误
+- **遇到的问题**：无

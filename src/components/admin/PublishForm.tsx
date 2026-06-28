@@ -531,6 +531,28 @@ export function PublishForm({
     }
     setError(null);
 
+    // Check image completeness before proceeding to confirm step
+    if (draftId) {
+      try {
+        const verifyRes = await fetch(`/api/articles/images/${draftId}/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: fileContent }),
+        });
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          if (!verifyData.valid && verifyData.missing?.length > 0) {
+            setError(
+              `图片未补齐：缺少 ${verifyData.missing.length} 张图片（${verifyData.missing.join("、")}），请上传后再发布`,
+            );
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Image validation failed (non-fatal):", err);
+      }
+    }
+
     // Generate diff against previous version (if updating)
     if (publishedId) {
       try {
@@ -607,23 +629,45 @@ export function PublishForm({
     }
   }, [fileName, fileContent, changelog, publishedId, draftId]);
 
+  // Re-upload ref and handler
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReupload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      if (!content) return;
+      setFileContent(content);
+      setFileName(file.name);
+    };
+    reader.readAsText(file);
+
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+  }, []);
+
   // Stats
   const lineCount = fileContent ? fileContent.split("\n").length : 0;
   const charCount = fileContent ? fileContent.length : 0;
 
-  // Download handler
+  // Download handler — use article title as filename (same as reading page)
   const handleDownload = useCallback(() => {
     if (!fileContent) return;
     const blob = new Blob([fileContent], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = fileName || "article.md";
+    const title = meta.title.trim() || "article";
+    const safeTitle = title.replace(/[\/\\?%*:|"<>]/g, "_");
+    a.download = `${safeTitle}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [fileContent, fileName]);
+  }, [fileContent, meta.title]);
 
   // Render meta editor (shared between step 1 and 2)
   const renderMetaEditor = () => (
@@ -936,6 +980,22 @@ export function PublishForm({
               {draftId && <Badge variant="outline">草稿</Badge>}
             </div>
             <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.markdown,.notesaw"
+                className="hidden"
+                onChange={handleReupload}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5 text-xs"
+              >
+                <Upload className="size-3.5" />
+                重新上传
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
