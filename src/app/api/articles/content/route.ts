@@ -42,15 +42,19 @@ export async function GET(request: NextRequest) {
       content = "";
     }
 
-    const fileName = article.contentPath.split("/").pop() || `${article.title}.md`;
+    // Use article title as the download filename for better readability
+    const safeTitle = article.title.replace(/[\/\\?%*:|"<>]/g, "_").trim() || "article";
+    const fileName = `${safeTitle}.md`;
 
     // Download mode: return file as attachment
     if (isDownload) {
+      // Use filename* (RFC 5987) for proper UTF-8 filename display
+      const asciiName = fileName.replace(/[^\x20-\x7E]/g, "_");
       return new NextResponse(content, {
         status: 200,
         headers: {
           "Content-Type": "text/markdown; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+          "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
         },
       });
     }

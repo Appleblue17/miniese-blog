@@ -481,6 +481,7 @@ async function triggerAutoTranslate(params: {
     const targetFullPath = path.join(process.cwd(), targetFilePath);
     await writeFile(targetFullPath, "", "utf-8");
 
+    // charCount is 0 initially — Worker will update it after translation
     translationArticle = await prisma.article.create({
       data: {
         slug,
@@ -497,6 +498,7 @@ async function triggerAutoTranslate(params: {
         isAITranslated: true,
         originalId: sourceArticleId,
         publishedAt: new Date(),
+        charCount: 0,
       },
       select: { id: true, isAITranslated: true },
     });

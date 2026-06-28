@@ -10,7 +10,7 @@
 "use client";
 
 import { useCallback, useState, useEffect, useRef } from "react";
-import { Calendar, User, Tag, GitCommit, Eye, FileText } from "lucide-react";
+import { Calendar, User, Tag, GitCommit, Eye, FileText, Download } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ChatButton } from "@/components/ai/ChatButton";
@@ -509,7 +509,19 @@ export function ArticleReader({
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-bold leading-tight tracking-tight">{title}</h1>
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-3xl font-bold leading-tight tracking-tight flex-1 min-w-0">{title}</h1>
+                {articleId && (
+                  <a
+                    href={`/api/articles/content?id=${articleId}&download=1`}
+                    download
+                    className="shrink-0 inline-flex items-center justify-center rounded-lg border border-border size-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors mt-1"
+                    title={lang === "zh" ? "下载源文件" : "Download source"}
+                  >
+                    <Download className="size-4" />
+                  </a>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-article-meta">
                 {author && (

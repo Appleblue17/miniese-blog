@@ -190,10 +190,11 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
  * 5. Translate frontmatter metadata (title, summary) via DeepSeek
  * 6. Rebuild frontmatter with translated title/summary and updated language
  * 7. Write translated content to the target language file
- * 8. Update article's DB record (title, language, isAITranslated)
- * 9. Re-render the target article to HTML
- * 10. Trigger term discovery for the translated article (fire-and-forget)
- * 11. Return translation stats
+ * 8. Compute charCount from translated content
+ * 9. Update article's DB record (title, language, isAITranslated, charCount)
+ * 10. Re-render the target article to HTML
+ * 11. Trigger term discovery for the translated article (fire-and-forget)
+ * 12. Return translation stats
  *
  * Payload required fields:
  * - `articleId`: ID of the source article (the one being translated FROM)
@@ -412,10 +413,27 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   await fs.writeFile(targetPath, finalContent, "utf-8");
   console.log(`[Worker] Translated content written to: ${targetArticle.contentPath}`);
 
-  // 9. Update target article's DB record (title, language, isAITranslated)
+  // 9. Compute charCount from the translated content
+  //    (excluding frontmatter and whitespace, CJK chars = 2 bytes, ASCII = 1 byte)
+  let translatedCharCount = 0;
+  try {
+    const writtenContent = await fs.readFile(targetPath, "utf-8");
+    const { content: mdBody } = parseFrontmatter(writtenContent);
+    translatedCharCount = [...mdBody.replace(/\s/g, "")].reduce(
+      (acc, ch) => acc + (/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(ch) ? 2 : 1),
+      0,
+    );
+  } catch (err) {
+    console.warn(
+      `[Worker] Failed to compute charCount: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // 10. Update target article's DB record (title, language, isAITranslated, charCount)
   const dbUpdateData: Record<string, unknown> = {
     isAITranslated: true,
     language: targetLang,
+    charCount: translatedCharCount,
   };
   if (translatedTitle) {
     dbUpdateData.title = translatedTitle;
@@ -425,10 +443,11 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     data: dbUpdateData,
   });
   console.log(
-    `[Worker] Target article DB record updated: title="${translatedTitle || "(kept original)"}", language=${targetLang}`,
+    `[Worker] Target article DB record updated: title="${translatedTitle || "(kept original)"}", ` +
+      `language=${targetLang}, charCount=${translatedCharCount}`,
   );
 
-  // 10. Re-render the target article's Markdown content to HTML
+  // 11. Re-render the target article's Markdown content to HTML
   //    The public page reads `renderedContent` from the database,
   //    so we need to update it after writing the translated file.
   //    Use the source article's contentType — the content format
@@ -462,7 +481,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 11. Trigger term discovery for the translated article (fire-and-forget)
+  // 12. Trigger term discovery for the translated article (fire-and-forget)
   addJob("discover", {
     articleId: targetArticleIdStr,
     articleSlug: sourceArticle.slug,
@@ -473,7 +492,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
-  // 11b. Notify admin about translation completion (fire-and-forget)
+  // 12b. Notify admin about translation completion (fire-and-forget)
   notifyAndMail({
     type: "translation_complete",
     title: "翻译完成",
@@ -487,7 +506,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
-  // 12. Return result including the full translation map for future incremental runs
+  // 13. Return result including the full translation map for future incremental runs
   //     and translatedGroups for the detail page display
   return {
     articleId: articleIdStr,

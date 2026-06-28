@@ -18,6 +18,7 @@ export default defineConfig({
     },
     env: {
       DATABASE_URL: process.env.DATABASE_URL || "postgresql://dev:devpass@localhost:5432/miniese",
+      REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
     },
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/integration/**/*.test.ts"],
     coverage: {

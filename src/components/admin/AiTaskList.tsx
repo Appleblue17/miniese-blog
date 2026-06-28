@@ -24,6 +24,7 @@ import {
   AlertCircle,
   SkipForward,
 } from "lucide-react";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import type { AiTaskItem } from "@/lib/ai/task-utils";
 
 interface AiTaskListProps {
@@ -452,6 +453,15 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
   const [busy, setBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: React.ReactNode;
+    confirmLabel?: string;
+    confirmVariant?: "default" | "destructive" | "warning";
+    onConfirm: () => void;
+  } | null>(null);
+
   const baseParams = new URLSearchParams();
   if (activeType !== "all") baseParams.set("type", activeType);
 
@@ -475,19 +485,29 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
     [tasks, selectedIds],
   );
 
-  const handleDelete = useCallback(async (id: string) => {
-    if (!confirm("确定删除此任务？")) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/ai-tasks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      window.location.reload();
-    } catch (err) {
-      console.error("Delete failed:", err);
-      alert("删除失败");
-    } finally {
-      setBusy(false);
-    }
+  const handleDelete = useCallback((id: string) => {
+    setConfirmModal({
+      title: "确认删除任务",
+      message: "确定要删除此 AI 任务吗？此操作不可撤销。",
+      confirmLabel: "确认删除",
+      confirmVariant: "destructive",
+      onConfirm: () => {
+        setConfirmModal(null);
+        (async () => {
+          setBusy(true);
+          try {
+            const res = await fetch(`/api/admin/ai-tasks/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Delete failed");
+            window.location.reload();
+          } catch (err) {
+            console.error("Delete failed:", err);
+            alert("删除失败");
+          } finally {
+            setBusy(false);
+          }
+        })();
+      },
+    });
   }, []);
 
   const handleRetry = useCallback(async (id: string) => {
@@ -507,44 +527,64 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
     }
   }, []);
 
-  const handleBatchRetry = useCallback(async (ids: string[]) => {
-    if (!confirm(`确定重试 ${ids.length} 个任务？`)) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/admin/ai-tasks/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "retry", taskIds: ids }),
-      });
-      if (!res.ok) throw new Error("Batch retry failed");
-      setSelectedIds(new Set());
-      window.location.reload();
-    } catch (err) {
-      console.error("Batch retry failed:", err);
-      alert("批量重试失败");
-    } finally {
-      setBusy(false);
-    }
+  const handleBatchRetry = useCallback((ids: string[]) => {
+    setConfirmModal({
+      title: "确认批量重试",
+      message: `确定要重试 ${ids.length} 个任务吗？`,
+      confirmLabel: "确认重试",
+      confirmVariant: "warning",
+      onConfirm: () => {
+        setConfirmModal(null);
+        (async () => {
+          setBusy(true);
+          try {
+            const res = await fetch("/api/admin/ai-tasks/batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "retry", taskIds: ids }),
+            });
+            if (!res.ok) throw new Error("Batch retry failed");
+            setSelectedIds(new Set());
+            window.location.reload();
+          } catch (err) {
+            console.error("Batch retry failed:", err);
+            alert("批量重试失败");
+          } finally {
+            setBusy(false);
+          }
+        })();
+      },
+    });
   }, []);
 
-  const handleBatchDelete = useCallback(async (ids: string[]) => {
-    if (!confirm(`确定删除 ${ids.length} 个任务？此操作不可撤销。`)) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/admin/ai-tasks/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", taskIds: ids }),
-      });
-      if (!res.ok) throw new Error("Batch delete failed");
-      setSelectedIds(new Set());
-      window.location.reload();
-    } catch (err) {
-      console.error("Batch delete failed:", err);
-      alert("批量删除失败");
-    } finally {
-      setBusy(false);
-    }
+  const handleBatchDelete = useCallback((ids: string[]) => {
+    setConfirmModal({
+      title: "确认批量删除",
+      message: `确定要删除 ${ids.length} 个任务吗？此操作不可撤销。`,
+      confirmLabel: "确认删除",
+      confirmVariant: "destructive",
+      onConfirm: () => {
+        setConfirmModal(null);
+        (async () => {
+          setBusy(true);
+          try {
+            const res = await fetch("/api/admin/ai-tasks/batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "delete", taskIds: ids }),
+            });
+            if (!res.ok) throw new Error("Batch delete failed");
+            setSelectedIds(new Set());
+            window.location.reload();
+          } catch (err) {
+            console.error("Batch delete failed:", err);
+            alert("批量删除失败");
+          } finally {
+            setBusy(false);
+          }
+        })();
+      },
+    });
   }, []);
 
   const handleSelect = useCallback((id: string, checked: boolean) => {
@@ -593,10 +633,32 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
       {/* Failed tasks */}
       {groups.failed.length > 0 && (
         <div>
-          <h3 className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 mb-2">
-            <AlertCircle className="size-3.5" />
-            失败任务 ({groups.failed.length})
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+              <AlertCircle className="size-3.5" />
+              失败任务 ({groups.failed.length})
+            </h3>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleBatchRetry(groups.failed.map((t) => t.id))}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950"
+              >
+                {busy ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+                一键重试
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchDelete(groups.failed.map((t) => t.id))}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950"
+              >
+                {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+                一键删除
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col gap-1">
             {groups.failed.map((task) => (
               <TaskRow
@@ -616,10 +678,32 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
       {/* Skipped tasks */}
       {groups.skipped.length > 0 && (
         <div>
-          <h3 className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-            <SkipForward className="size-3.5" />
-            已跳过的任务 ({groups.skipped.length})
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <SkipForward className="size-3.5" />
+              已跳过的任务 ({groups.skipped.length})
+            </h3>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleBatchRetry(groups.skipped.map((t) => t.id))}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950"
+              >
+                {busy ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+                一键重试
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchDelete(groups.skipped.map((t) => t.id))}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950"
+              >
+                {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+                一键删除
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col gap-1">
             {groups.skipped.map((task) => (
               <TaskRow
@@ -675,6 +759,20 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
           busy={busy}
         />
       </div>
+
+      {/* Confirm modal */}
+      {confirmModal && (
+        <ConfirmModal
+          open
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmLabel={confirmModal.confirmLabel}
+          confirmVariant={confirmModal.confirmVariant}
+          loading={busy}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 }

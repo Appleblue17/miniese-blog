@@ -459,6 +459,26 @@
     - Light mode 同步微调：`text-toc-item` 亮度 0.45 → 0.40
   - **宽度自适应**：`w-56` → `w-[min(18rem,22vw)]`，宽屏最大 288px，窄屏按 22% 视口等比缩放
 
+### 任务 前端优化：文章加载卡死修复 + ConfirmModal 重构 + 下载源文件按钮
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 修复 — 文章加载卡死**：body fetch 失败（网络错误/500/翻译未完成）时 `ArticleLoadingOverlay` 永远不消失，用户无法操作。
+    - `page.tsx`：`fetchMeta` 网络错误时立即 `setLoadError(true)`（不再等 20 秒超时），404 仍 `notFound()`，其他错误立即显示错误界面
+    - `ArticleContent.tsx`：新增 `onBodyError` 回调 + `fetchFailed` 状态，失败时渲染 `data-article-body="true"` 让 overlay 检测到并淡出，显示"文章内容加载失败"+ 重试按钮
+    - `ArticleLoadingOverlay.tsx`：新增 `forceHide` prop，body fetch 失败时立即触发 overlay 淡出
+  - **ConfirmModal 组件**：新建 `src/components/ui/ConfirmModal.tsx` — 可复用居中确认弹窗
+    - 三种颜色变体：`default`（primary）、`destructive`（红色）、`warning`（琥珀色）
+    - 加载状态支持（按钮 spinner，禁止 backdrop/Escape 关闭）
+    - 替换 `AiTaskList.tsx` 中 3 处 `window.confirm()`（单任务删除、批量重试、批量删除）
+  - **下载源文件按钮**：
+    - 文章阅读页、词条阅读页标题右侧（右上角）添加纯图标下载按钮（Download 图标，`size-9` 圆角边框）
+    - 文章下载：`/api/articles/content?id={articleId}&download=1`（已有 API，改进文件名逻辑）
+    - 词条下载：新建 `src/app/api/wiki/content/route.ts` — `GET /api/wiki/content?name=xxx&lang=zh&download=1`
+    - 文件名使用文章标题/词条名称 + `.md`（而非从 `contentPath` 提取的文件名）
+    - `Content-Disposition` 使用 RFC 5987 标准（`filename*=UTF-8''`）支持中文文件名正确显示
+- **测试结果**：`npx tsc --noEmit` 编译通过，无新错误
+
 ### 任务 后端 AI 任务重构 + 翻译版删除快照修复
 - **时间**：2026-06-28
 - **状态**：✅ 完成

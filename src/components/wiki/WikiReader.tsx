@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Clock,
   Tag,
+  Download,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { renderMarkdown } from "@/lib/markdown/renderer";
@@ -160,11 +161,19 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
     <article className="flex flex-col gap-6">
       {/* 1. Title area */}
       <header className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <BookOpen className="size-6 shrink-0 text-primary" />
+        <div className="flex items-start gap-3">
+          <BookOpen className="size-6 shrink-0 text-primary mt-1" />
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">{entry.name}</h1>
           </div>
+          <a
+            href={`/api/wiki/content?name=${encodeURIComponent(entry.name)}&lang=${entry.language}&download=1`}
+            download
+            className="shrink-0 inline-flex items-center justify-center rounded-lg border border-border size-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors mt-1"
+            title={lang === "zh" ? "下载源文件" : "Download source"}
+          >
+            <Download className="size-4" />
+          </a>
         </div>
 
         {/* Aliases */}

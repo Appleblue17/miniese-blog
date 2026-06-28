@@ -23,13 +23,22 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface ArticleLoadingOverlayProps {
   lang: string;
+  /** If true, immediately hide the overlay (e.g., body fetch failed) */
+  forceHide?: boolean;
 }
 
 // ─── Overlay component ───────────────────────────────────────────────────────
 
-export function ArticleLoadingOverlay({ lang }: ArticleLoadingOverlayProps) {
+export function ArticleLoadingOverlay({ lang, forceHide = false }: ArticleLoadingOverlayProps) {
   const [phase, setPhase] = useState<"visible" | "fading" | "hidden">("visible");
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Immediately hide when forceHide is true
+  useEffect(() => {
+    if (forceHide) {
+      setPhase("fading");
+    }
+  }, [forceHide]);
 
   // Watch for [data-article-body] entering the DOM
   useEffect(() => {
