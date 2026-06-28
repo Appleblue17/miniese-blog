@@ -41,7 +41,7 @@ export interface DiscoveryCandidate {
 }
 
 // ---------------------------------------------------------------------------
-// Incremental discovery (new — uses unified pipeline)
+// Incremental discovery (uses unified pipeline)
 // ---------------------------------------------------------------------------
 
 /**
@@ -54,26 +54,29 @@ export interface DiscoveryCandidate {
  * @param newSourceContent - Current version of article body
  * @param existingCandidatesMap - Previous discovery results (content → DiscoveryCandidate[])
  * @param articleLang - Language code ("zh" | "en")
+ * @param articleId - Article ID for dedup against existing proposals
  * @param customDiscoveryPrompt - Optional custom prompt template
  * @param onProgress - Optional progress callback
- * @returns Deduplicated candidates + contentSnapshot for next run
+ * @returns Deduplicated candidates + contentSnapshot + existingCandidatesMap for next run
  */
 export async function incrementalDiscover(
   oldSourceContent: string,
   newSourceContent: string,
   existingCandidatesMap: Record<string, DiscoveryCandidate[]>,
   articleLang: string,
+  articleId: string,
   customDiscoveryPrompt?: string,
   onProgress?: ProgressCallback,
 ): Promise<{
   candidates: DiscoveryCandidate[];
   contentSnapshot: string;
+  existingCandidatesMap: Record<string, DiscoveryCandidate[]>;
 }> {
   const newBody = stripFrontmatter(newSourceContent);
   const oldBody = stripFrontmatter(oldSourceContent);
 
   if (!newBody.trim()) {
-    return { candidates: [], contentSnapshot: newBody };
+    return { candidates: [], contentSnapshot: newBody, existingCandidatesMap: {} };
   }
 
   const newLines = newBody.split("\n");
@@ -89,18 +92,13 @@ export async function incrementalDiscover(
       allReused.push(...candidates);
     }
 
-    // Filter by DB state (existing wiki entries + proposals)
-    const filtered = await deduplicateWithExisting(
-      deduplicateByTerm(allReused),
-      articleLang,
-      null, // No articleId filter needed (no new proposals to check against)
-    );
+    const deduped = deduplicateByTerm(allReused);
+    const filtered = await deduplicateWithExisting(deduped, articleLang, articleId);
 
-    return { candidates: filtered, contentSnapshot: newBody };
+    return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap };
   }
 
   // ---- Step 3: Build line-level lookup for candidate reuse ----
-  // Maps a single source line to the DiscoveryCandidate[] found for it
   const lineToCandidates = new Map<string, DiscoveryCandidate[]>();
   for (const [sourceText, candidates] of Object.entries(existingCandidatesMap)) {
     const sourceLines = sourceText.split("\n");
@@ -124,16 +122,17 @@ export async function incrementalDiscover(
   let processedSubChunks = 0;
   onProgress?.(0, totalSubChunks);
 
-  // Collect results: candidates from changed chunks
+  // Collect results and build the new existingCandidatesMap
+  // Key design: each subchunk content maps to the candidates found for it
   const newCandidates: DiscoveryCandidate[] = [];
-  // Track which original content keys we've already reused to avoid double-counting
+  const newExistingMap: Record<string, DiscoveryCandidate[]> = {};
   const reusedKeys = new Set<string>();
 
   for (const subChunk of allSubChunks) {
-    // Check if this exact content was previously discovered
     const existing = existingCandidatesMap[subChunk.content];
     if (existing) {
       newCandidates.push(...existing);
+      newExistingMap[subChunk.content] = existing;
       reusedKeys.add(subChunk.content);
       processedSubChunks++;
       onProgress?.(processedSubChunks, totalSubChunks);
@@ -176,10 +175,12 @@ export async function incrementalDiscover(
 
       const candidates = parseDiscoveryResponse(response.content);
       newCandidates.push(...candidates);
+      newExistingMap[subChunk.content] = candidates;
     } catch (err) {
       console.warn(
         `[Discovery] Failed to process chunk at line ${subChunk.startLine}: ${err instanceof Error ? err.message : String(err)}`,
       );
+      newExistingMap[subChunk.content] = [];
     }
 
     processedSubChunks++;
@@ -198,17 +199,25 @@ export async function incrementalDiscover(
       if (exact) {
         if (!reusedKeys.has(sc.content)) {
           newCandidates.push(...exact);
+          newExistingMap[sc.content] = exact;
           reusedKeys.add(sc.content);
         }
         continue;
       }
 
-      // Fall back: line-level lookup
+      // Fall back: line-level lookup — collect unique candidates
+      const seenInRange = new Set<string>();
       for (let lineNum = sc.startLine; lineNum <= sc.endLine; lineNum++) {
         const line = newLines[lineNum - 1];
         const candidates = lineToCandidates.get(line);
         if (candidates) {
-          newCandidates.push(...candidates);
+          for (const c of candidates) {
+            const key = c.term.toLowerCase().trim();
+            if (!seenInRange.has(key)) {
+              seenInRange.add(key);
+              newCandidates.push(c);
+            }
+          }
         }
       }
     }
@@ -216,33 +225,27 @@ export async function incrementalDiscover(
 
   // ---- Step 6: Deduplicate and filter ----
   const uniqueCandidates = deduplicateByTerm(newCandidates);
+  const filtered = await deduplicateWithExisting(uniqueCandidates, articleLang, articleId);
 
-  // Filter against DB state (existing wiki entries + proposals)
-  const filtered = await deduplicateWithExisting(uniqueCandidates, articleLang, null);
-
-  // Build the existingCandidatesMap for next run
-  // (simplified: keyed by sub-chunk content → candidates found)
-  // We reconstruct from the unchanged ranges' exact matches + new chunks
-
-  return { candidates: filtered, contentSnapshot: newBody };
+  return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap: newExistingMap };
 }
 
 /**
- * Deduplicates candidates against existing wiki entries in the DB.
- * Combines filterExistingWikiEntries and checks all-status proposals.
- * When articleId is null, skips proposal filtering (reuse path where
- * proposals were already counted).
+ * Deduplicates candidates against existing wiki entries and proposals.
  */
 async function deduplicateWithExisting(
   candidates: DiscoveryCandidate[],
   language: string,
-  articleId: string | null,
+  articleId: string,
 ): Promise<DiscoveryCandidate[]> {
   if (candidates.length === 0) return [];
 
-  // Filter against wiki entries
+  // Filter against existing wiki entries in DB
   const afterEntries = await filterExistingWikiEntries(candidates, language);
-  return afterEntries;
+  if (afterEntries.length === 0) return [];
+
+  // Filter against existing proposals for the same article
+  return filterPendingProposals(afterEntries, articleId);
 }
 
 /**

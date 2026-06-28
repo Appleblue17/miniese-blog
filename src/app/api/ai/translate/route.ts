@@ -20,8 +20,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/db";
 import { addJob } from "@/lib/queue/producer";
 
@@ -96,29 +94,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // --- Read old source content from file for incremental diff ---
-    const sourcePath = path.join(process.cwd(), sourceArticle.contentPath);
-    let currentSourceContent: string;
-    try {
-      currentSourceContent = await readFile(sourcePath, "utf-8");
-    } catch {
-      // File may not exist in test environment — that's fine, proceed with empty content
-      currentSourceContent = "";
-    }
-
-    // --- Get the previous (old) content for diff ---
-    // We need the old source content. We try to find it from the latest
-    // completed translate task's metadata, but since this is a manual trigger,
-    // we pass empty oldSourceContent which will trigger a full translation
-    // (the worker will read the file itself for current content).
-    // For incremental, the old source content needs to come from the
-    // article's previous file content. Since we can't know what changed,
-    // we pass an empty string — the worker handles this by using the
-    // existing translations from the latest task and treating all content
-    // as new (falling back to full translation if none exist).
-    const oldSourceContent = "";
-
     // --- Create the translation job ---
+    // The worker handles incremental diff internally by loading the previous
+    // translate task's contentSnapshot from the DB, so we don't need to
+    // pass oldSourceContent as a payload parameter anymore.
     let taskId: string;
     try {
       taskId = await addJob("translate", {
@@ -126,7 +105,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         targetArticleId: targetArticle.id,
         sourceLanguage,
         targetLanguage,
-        oldSourceContent,
       });
     } catch (err) {
       // Redis may not be available (e.g. in test environment).
@@ -140,7 +118,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             targetArticleId: targetArticle.id,
             sourceLanguage,
             targetLanguage,
-            oldSourceContent,
           },
           articleId: sourceArticle.id,
         },

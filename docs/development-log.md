@@ -533,3 +533,22 @@
 - **测试结果**：`npx tsc --noEmit` 编译通过（无新增编译错误），全部既有测试回归通过
 - **遇到的问题**：
   - 无新增问题
+
+### 任务 增量管道统一第三阶段：审查修复 — existingCandidatesMap 未持久化 & 重复发现
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 1 — Discovery 增量永不生效**：`processDiscover` 返回空 `existingCandidates`（`{}`），因为 `incrementalDiscover` 没有构建并返回。
+    - `src/lib/ai/discovery.ts`：`incrementalDiscover()` 返回类型新增 `existingCandidatesMap: Record<string, DiscoveryCandidate[]>`，函数内部在为每个 subchunk 处理（exact match、AI 调用）时同步构建该 map
+    - `src/worker.ts`：`processDiscover` 返回值使用 `result.existingCandidatesMap` 而非空对象
+  - **Bug 2 — `incrementalDiscover` 不过滤已有 proposals**：`deduplicateWithExisting` 传入 `articleId = null` 跳过 `filterPendingProposals()`。
+    - `src/lib/ai/discovery.ts`：`deduplicateWithExisting` 改为始终接收 `articleId`，始终调用 `filterExistingWikiEntries` + `filterPendingProposals`
+    - `incrementalDiscover` 新增 `articleId` 参数（必填），传递到 `deduplicateWithExisting`
+    - no-changes 路径也通过 `articleId` 过滤 proposal
+  - **Bug 3 — unchanged ranges line-level fallback 重复添加候选**：
+    - `discovery.ts`：line-level fallback 添加 `seenInRange` Set 确保同一 term 只添加一次
+  - **清理遗留代码**：
+    - `src/app/api/ai/translate/route.ts`：移除 `oldSourceContent` payload 参数（worker 已改从 DB 读取）、移除未使用的 `readFile` 和 `path` 导入
+- **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - 无新增问题

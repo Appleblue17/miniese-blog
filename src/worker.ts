@@ -930,6 +930,7 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     content,
     existingCandidatesMap,
     langStr,
+    articleIdStr,
     customDiscoveryPrompt,
   );
 
@@ -964,14 +965,9 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
 
   console.log(`[Worker] Discovery complete: ${storedCount}/${result.candidates.length} candidates stored`);
 
-  // 5. Build existingCandidatesMap for next run — keyed by sub-chunk content
-  //    We reconstruct from the full content by splitting it into sub-chunks
-  //    and mapping known candidate terms back to their content.
-  //
-  //    For simplicity, store a map of candidate terms (lowercased) for reuse
-  //    in the next incremental run. The actual map built by incrementalDiscover
-  //    uses content keys, but we can't reconstruct that here. Instead, store
-  //    the contentSnapshot for the next diff.
+  // 5. Compute body-only content snapshot for next incremental run.
+  //    We use stripFrontmatter here so the snapshot is the body only,
+  //    matching what incrementalDiscover returns.
   const contentSnapshot = stripFrontmatter(content);
 
   // 6. Notify admin about discovery completion (fire-and-forget)
@@ -988,7 +984,9 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
-  // 7. Return summary including contentSnapshot for next incremental run
+  // 7. Return summary including contentSnapshot + existingCandidatesMap
+  //    for the next incremental run. incrementalDiscover builds the map
+  //    keyed by sub-chunk content → candidates found.
   return {
     articleId: articleIdStr,
     discoveredAt: new Date().toISOString(),
@@ -1000,9 +998,7 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
       importance: c.importance,
     })),
     contentSnapshot,
-    // Store an empty existingCandidates map — incrementalDiscover will
-    // rebuild it from the contentSnapshot on the next run.
-    existingCandidates: {} as Record<string, DiscoveryCandidate[]>,
+    existingCandidates: result.existingCandidatesMap,
   };
 }
 
