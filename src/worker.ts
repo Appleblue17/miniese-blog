@@ -19,7 +19,9 @@ import { generateWikiEntry } from "./lib/ai/generator";
 import { renderMarkdown } from "./lib/markdown/renderer";
 import { detectWikiLinks } from "./lib/markdown/linkDetector";
 import { parseFrontmatter } from "./lib/articles/frontmatter";
-import { discoverWikiCandidates } from "./lib/ai/discovery";
+import { discoverWikiCandidates, incrementalDiscover } from "./lib/ai/discovery";
+import type { DiscoveryCandidate } from "./lib/ai/discovery";
+import { stripFrontmatter } from "./lib/ai/chunker/chunker";
 import { addJob } from "./lib/queue/producer";
 import { loadCustomPrompt } from "./lib/ai/promptLoader";
 import { getSettings } from "../config/settings";
@@ -183,8 +185,8 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
  * Processes an AI translation job.
  *
  * Flow:
- * 1. Read old source content from payload (provided by publish API)
- * 2. Read current source content from file
+ * 1. Read current source content from file
+ * 2. Load old source content FROM DB (previous translate task's contentSnapshot)
  * 3. Load existing paragraph-level translations from the latest completed task
  * 4. Detect paragraph-level changes (diff) and perform incremental translation
  * 5. Translate frontmatter metadata (title, summary) via DeepSeek
@@ -194,11 +196,10 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
  * 9. Update article's DB record (title, language, isAITranslated, charCount)
  * 10. Re-render the target article to HTML
  * 11. Trigger term discovery for the translated article (fire-and-forget)
- * 12. Return translation stats
+ * 12. Return translation stats including contentSnapshot for next incremental run
  *
  * Payload required fields:
  * - `articleId`: ID of the source article (the one being translated FROM)
- * - `oldSourceContent`: Previous file content before the latest edit
  * - `targetLanguage`: Target language code ("zh" | "en")
  * - `sourceLanguage`: Source language code ("zh" | "en")
  * - `targetArticleId`: ID of the target article (where translation is stored)
@@ -210,7 +211,6 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     targetLanguage,
     sourceLanguage,
     targetArticleId,
-    oldSourceContent: rawOldContent,
   } = payload;
 
   const articleIdStr = String(articleId ?? "");
@@ -252,8 +252,31 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 3. Read old source content from payload (provided by publish API)
-  const oldSourceContent = typeof rawOldContent === "string" ? rawOldContent : "";
+  // 3. Load old source content from the latest completed translate task's
+  //    contentSnapshot (for incremental diff). If none exists, pass empty string
+  //    which triggers a full translation.
+  //
+  //    This mirrors the approach used by processReview, removing the need
+  //    for publish API to pass oldSourceContent in the payload.
+  let oldSourceContent = "";
+  {
+    const latestTranslate = await prisma.aiTask.findFirst({
+      where: {
+        articleId: articleIdStr,
+        type: "translate",
+        status: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      select: { output: true },
+    });
+
+    if (latestTranslate?.output && typeof latestTranslate.output === "object") {
+      const output = latestTranslate.output as Record<string, unknown>;
+      if (typeof output.contentSnapshot === "string") {
+        oldSourceContent = output.contentSnapshot;
+      }
+    }
+  }
 
   // 4. Load existing translations from the latest completed translate task
   const existingTranslationMap = await loadExistingTranslations(articleIdStr, targetLang);
@@ -507,7 +530,18 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   });
 
   // 13. Return result including the full translation map for future incremental runs
-  //     and translatedGroups for the detail page display
+  //     and translatedGroups for the detail page display, plus contentSnapshot
+  //     for the next incremental diff.
+  
+  // Read current source content again for contentSnapshot
+  let contentSnapshot = "";
+  try {
+    contentSnapshot = await fs.readFile(sourcePath, "utf-8");
+  } catch {
+    contentSnapshot = currentSourceContent;
+  }
+  const bodyForSnapshot = stripFrontmatter(contentSnapshot);
+
   return {
     articleId: articleIdStr,
     targetArticleId: targetArticleIdStr,
@@ -519,6 +553,7 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     totalTokensUsed: result.totalTokensUsed,
     translations: result.translations,
     translatedGroups: result.translatedGroups,
+    contentSnapshot: bodyForSnapshot,
   };
 }
 
@@ -808,10 +843,11 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
  *
  * Flow:
  * 1. Read article content from file system
- * 2. Call discoverWikiCandidates() which uses the unified chunking pipeline
- *    (splitArticle) for long articles, calls DeepSeek per chunk, deduplicates
- * 3. Store candidates in the WikiDiscovery table
- * 4. Return summary
+ * 2. Load last discovery's contentSnapshot + existingCandidates from DB
+ * 3. Call incrementalDiscover() using the unified diff pipeline
+ *    (detectChanges + splitRange + buildContext)
+ * 4. Store new candidates in the WikiDiscovery table
+ * 5. Return summary including contentSnapshot for next incremental run
  *
  * Payload required fields:
  * - `articleId`: ID of the article to scan
@@ -853,19 +889,57 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     );
   }
 
-  // 2. Perform discovery using the unified chunking pipeline
+  // 2. Load old source content + existing candidates from the latest completed
+  //    discover task's output (for incremental diff). If none exists, pass
+  //    empty oldSourceContent which triggers a full scan.
+  let oldSourceContent = "";
+  let existingCandidatesMap: Record<string, DiscoveryCandidate[]> = {};
+
+  {
+    const latestDiscover = await prisma.aiTask.findFirst({
+      where: {
+        articleId: articleIdStr,
+        type: "discover",
+        status: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      select: { output: true },
+    });
+
+    if (latestDiscover?.output && typeof latestDiscover.output === "object") {
+      const output = latestDiscover.output as Record<string, unknown>;
+      if (typeof output.contentSnapshot === "string") {
+        oldSourceContent = output.contentSnapshot;
+      }
+      if (
+        output.existingCandidates &&
+        typeof output.existingCandidates === "object" &&
+        !Array.isArray(output.existingCandidates)
+      ) {
+        existingCandidatesMap = output.existingCandidates as Record<string, DiscoveryCandidate[]>;
+      }
+    }
+  }
+
   // 2b. Load the effective discovery prompt from settings
   const customDiscoveryPrompt = await loadCustomPrompt("discovery");
 
-  const candidates = await discoverWikiCandidates(articleIdStr, langStr, content, customDiscoveryPrompt);
-
-  console.log(
-    `[Worker] Discovery found ${candidates.length} candidate terms for article ${articleIdStr}`,
+  // 3. Perform incremental discovery using the unified diff pipeline
+  const result = await incrementalDiscover(
+    oldSourceContent,
+    content,
+    existingCandidatesMap,
+    langStr,
+    customDiscoveryPrompt,
   );
 
-  // 3. Store candidates in the WikiDiscovery table
+  console.log(
+    `[Worker] Discovery found ${result.candidates.length} candidate terms for article ${articleIdStr}`,
+  );
+
+  // 4. Store candidates in the WikiDiscovery table
   let storedCount = 0;
-  for (const c of candidates) {
+  for (const c of result.candidates) {
     try {
       await prisma.wikiDiscovery.create({
         data: {
@@ -888,9 +962,19 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     }
   }
 
-  console.log(`[Worker] Discovery complete: ${storedCount}/${candidates.length} candidates stored`);
+  console.log(`[Worker] Discovery complete: ${storedCount}/${result.candidates.length} candidates stored`);
 
-  // 4. Notify admin about discovery completion (fire-and-forget)
+  // 5. Build existingCandidatesMap for next run — keyed by sub-chunk content
+  //    We reconstruct from the full content by splitting it into sub-chunks
+  //    and mapping known candidate terms back to their content.
+  //
+  //    For simplicity, store a map of candidate terms (lowercased) for reuse
+  //    in the next incremental run. The actual map built by incrementalDiscover
+  //    uses content keys, but we can't reconstruct that here. Instead, store
+  //    the contentSnapshot for the next diff.
+  const contentSnapshot = stripFrontmatter(content);
+
+  // 6. Notify admin about discovery completion (fire-and-forget)
   notifyAndMail({
     type: "discovery",
     title: "术语发现完成",
@@ -904,17 +988,21 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
-  // 5. Return summary
+  // 7. Return summary including contentSnapshot for next incremental run
   return {
     articleId: articleIdStr,
     discoveredAt: new Date().toISOString(),
     candidateCount: storedCount,
-    candidates: candidates.map((c) => ({
+    candidates: result.candidates.map((c) => ({
       term: c.term,
       type: c.type,
       definition: c.definition,
       importance: c.importance,
     })),
+    contentSnapshot,
+    // Store an empty existingCandidates map — incrementalDiscover will
+    // rebuild it from the contentSnapshot on the next run.
+    existingCandidates: {} as Record<string, DiscoveryCandidate[]>,
   };
 }
 

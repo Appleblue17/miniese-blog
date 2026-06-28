@@ -226,19 +226,8 @@ export async function POST(request: NextRequest) {
     const linkedContent = await detectWikiLinks({ lang: language, content: mdBody });
     const html = await renderMarkdown(linkedContent, pipeline);
 
-    let oldSourceContent = "";
-
     // --- Move directory to published location ---
     // Published: content/articles/{lang}/{slug}/article.md + images/
-
-    // For updates, capture old content before overwriting
-    if (draftOfId) {
-      try {
-        oldSourceContent = await readFile(targetArticlePath, "utf-8");
-      } catch {
-        oldSourceContent = "";
-      }
-    }
 
     if (fromFileSystem) {
       // Write updated frontmatter to the draft's article.md first
@@ -380,7 +369,6 @@ export async function POST(request: NextRequest) {
       sourceArticleId: article.id,
       sourceLanguage: language,
       slug: article.slug,
-      oldSourceContent,
     }).catch((err) => {
       console.error("Auto-translate trigger failed (non-fatal):", err);
     });
@@ -411,9 +399,8 @@ async function triggerAutoTranslate(params: {
   sourceArticleId: string;
   sourceLanguage: string;
   slug: string;
-  oldSourceContent: string;
 }): Promise<void> {
-  const { sourceArticleId, sourceLanguage, slug, oldSourceContent } = params;
+  const { sourceArticleId, sourceLanguage, slug } = params;
   const targetLanguage = sourceLanguage === "zh" ? "en" : "zh";
   const targetLang = targetLanguage as "zh" | "en";
   const targetDir = path.join(process.cwd(), "content", "articles", targetLanguage);
@@ -531,7 +518,6 @@ async function triggerAutoTranslate(params: {
     targetArticleId: translationArticle.id,
     sourceLanguage,
     targetLanguage,
-    oldSourceContent,
   });
 }
 

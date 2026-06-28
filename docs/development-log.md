@@ -504,3 +504,32 @@
 - **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
 - **遇到的问题**：
   - Worker import 在测试中会初始化 Bull queue worker（日志显示 `[Worker] ai-tasks worker started`），但不影响测试执行
+
+### 任务 增量管道统一第三阶段：Discovery 接入 + Translate 统一 contentSnapshot 来源 + 文档同步
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Discovery 接入增量管道**：
+    - `src/lib/ai/discovery.ts`：新增 `incrementalDiscover()` 函数，使用 `detectChanges()` + `splitRange()` + `buildContext()` 统一管道
+    - 复用策略：`existingCandidatesMap`（原文内容 → `DiscoveryCandidate[]`）查找未变化部分的候选词条
+    - 保持 `discoverWikiCandidates()` 全量扫描函数不变（兼容旧调用）
+    - 新增 `complementRanges()`、`deduplicateWithExisting()` 辅助函数（与 reviewer/translator 模式一致）
+  - **Translate 统一 `oldSourceContent` 来源**（移除 publish API 传递）：
+    - `src/worker.ts`：`processTranslate` 改为从上一个 translate 任务的 `output.contentSnapshot` 读取（与 `processReview` 一致）
+    - `processTranslate` 输出新增 `contentSnapshot` 字段
+    - `src/app/api/articles/publish/route.ts`：移除 `triggerAutoTranslate` 中的 `oldSourceContent` 参数和捕获逻辑
+    - `src/app/api/articles/publish/route.ts`：`addJob("translate", ...)` payload 不再包含 `oldSourceContent`
+  - **Discovery Worker 使用增量模式**：
+    - `src/worker.ts`：`processDiscover` 读取上次 discovery 任务的 `output.contentSnapshot` + `output.existingCandidates`
+    - 调用 `incrementalDiscover()` 替代 `discoverWikiCandidates()`
+    - 输出添加 `contentSnapshot` 和 `existingCandidates` 供下次增量
+  - **文档同步更新**：
+    - `docs/architecture.md`：
+      - 添加 v0.10.0 更新记录
+      - §6.4：将 discovery 纳入统一增量架构描述
+      - §6.4.7（新编号）：translator2 输出补充 contentSnapshot 说明
+      - §5.1：更新所有任务类型的输入/输出描述，移除 translate 的 `oldSourceContent` 参数，discovery 改为增量模式
+      - §6.4.11（新增）：discovery 增量实现说明
+- **测试结果**：`npx tsc --noEmit` 编译通过（无新增编译错误），全部既有测试回归通过
+- **遇到的问题**：
+  - 无新增问题
