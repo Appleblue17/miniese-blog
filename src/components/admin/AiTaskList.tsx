@@ -24,7 +24,7 @@ import {
   AlertCircle,
   SkipForward,
 } from "lucide-react";
-import type { AiTaskItem } from "@/app/api/admin/ai-tasks/route";
+import type { AiTaskItem } from "@/lib/ai/task-utils";
 
 interface AiTaskListProps {
   tasks: AiTaskItem[];

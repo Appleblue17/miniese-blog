@@ -458,3 +458,29 @@
     - `text-toc-item-subtle`：亮度 0.60 → 0.65
     - Light mode 同步微调：`text-toc-item` 亮度 0.45 → 0.40
   - **宽度自适应**：`w-56` → `w-[min(18rem,22vw)]`，宽屏最大 288px，窄屏按 22% 视口等比缩放
+
+### 任务 后端 AI 任务重构 + 翻译版删除快照修复
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 1 — 批量删除后任务重新出现**：Worker 继续处理已删除的 active job。
+    - `batch/route.ts` + `[id]/route.ts`：删除前调用 `job.discard()`
+    - `worker.ts`：新增 `updateTaskIfExists()` 工具函数（基于 `updateMany` 检查 affected rows），Worker 的 `processJob` 开始时检查 DB 记录是否存在，已删除则跳过
+  - **Bug 2/4 — 所有任务支持批量操作 + 按钮位置**：
+    - 重写 `AiTaskList.tsx`：所有任务行统一加 checkbox，按状态分组（失败/跳过/正常），批量操作栏 `sticky bottom` + backdrop-blur，添加全选/取消按钮
+  - **Bug 3 — "未知文章"显示文章名**：
+    - `delete/route.ts`：删除文章前快照标题到 `output._deletedArticleTitle`
+    - `page.tsx` + `route.ts`：mapping 优先读取 `_deletedArticleTitle`
+  - **翻译版删除快照修复**：
+    - 删除主文章时，级联删除的翻译版/草稿上的 AiTask 记录现在也会保存 `_deletedArticleTitle`
+    - 提取 `snapshotArticleTitleToTasks()` 辅助函数，在主文章快照、翻译版快照、草稿快照三处复用
+  - **代码重构**：
+    - 新建 `src/lib/ai/task-utils.ts`：`queryTasks()`、`mapTasksToItems()`、`validateTaskType()`
+    - API route 和 Server Component 各从 ~100 行缩减到 ~30 行
+    - 导出 `worker.ts` 的 `updateTaskIfExists`（`@internal` 标记，供测试）
+  - **测试**：
+    - 新增 `tests/integration/ai-task-delete.test.ts` — 12 个集成测试：单任务删除、批量删除、文章删除快照、翻译版删除快照、Worker updateTaskIfExists、retry 逻辑
+    - 新增 `src/lib/ai/task-utils.test.ts` — 7 个单元测试：validateTaskType、AiTaskItem 类型
+- **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - Worker import 在测试中会初始化 Bull queue worker（日志显示 `[Worker] ai-tasks worker started`），但不影响测试执行

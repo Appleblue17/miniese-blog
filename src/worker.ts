@@ -928,8 +928,10 @@ const FEATURE_FLAGS: Record<string, string> = {
 /**
  * Safely updates an AiTask record only if it still exists.
  * Returns true if the record was updated, false if it no longer exists.
+ *
+ * @internal Exported for testing purposes.
  */
-async function updateTaskIfExists(
+export async function updateTaskIfExists(
   taskId: string,
   data: Prisma.AiTaskUpdateInput,
 ): Promise<boolean> {

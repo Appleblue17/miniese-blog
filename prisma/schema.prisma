@@ -161,7 +161,7 @@ model AiTask {
   completedAt DateTime?
 
   articleId String?
-  article   Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
 
 model Comment {
@@ -273,7 +273,7 @@ model WikiDiscovery {
   wikiEntry     WikiEntry?      @relation(fields: [wikiEntryId], references: [id], onDelete: SetNull)
   failedReason  String?         // Reason if generation failed
 
-  article       Article?        @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  article       Article?        @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, term])
   @@index([articleId, term])

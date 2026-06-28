@@ -7,6 +7,8 @@
  *   - Any linked draft records and their files
  *   - Related wiki links (cascaded by Prisma)
  *   - Related comments (cascaded by Prisma)
+ *   - Related AiTask records (cascaded by Prisma)
+ *   - Related WikiDiscovery records (cascaded by Prisma)
  *
  * Request body: { id }
  *
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Delete the article (cascade will handle wikiLinks and comments)
+    // Delete the article (cascade will handle AiTask, WikiDiscovery, wikiLinks, comments)
     await prisma.article.delete({
       where: { id },
     });
