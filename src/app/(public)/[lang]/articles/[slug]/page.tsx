@@ -188,13 +188,12 @@ export default function ArticlePage() {
             tags={meta.tags}
             summary={meta.summary}
             lang={lang}
-            changelog={meta.changelog}
             isAITranslated={meta.isAITranslated}
             viewCount={meta.viewCount}
             charCount={meta.charCount}
           />
 
-          <ArticleContent lang={lang} slug={slug} articleId={meta.id} onBodyError={() => setBodyLoadError(true)} />
+          <ArticleContent lang={lang} slug={slug} articleId={meta.id} changelog={meta.changelog} onBodyError={() => setBodyLoadError(true)} />
         </div>
       </div>
 

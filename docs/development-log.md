@@ -619,3 +619,25 @@
   - **前端上传默认值修正**：无 frontmatter 的文章上传后 `fileType` 留空而非默认 `"markdown"`
   - **预览添加隐藏按钮**：预览展开时标题行右侧显示"隐藏预览"按钮
   - **翻译同步 summary 和 changelog 到 DB**：`processTranslate` 第 10 步将翻译后的 `summary` 和文件中的 `changelog` 同步到数据库记录
+
+### 任务 文章阅读页优化：changelog 移至文末 + 累积追加 + 翻译只翻最新条 + 布局微调
+- **时间**：2026-06-28
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **changelog 移至文末**：`ArticleReader.tsx` 移除 header 中的 changelog 区块和相关 import；`ArticleContent.tsx` 新增 `changelog` prop，在 footer（正文与评论区之间）渲染 changelog 卡片
+  - **changelog 时间显示优化**：每行提取 `[日期]` 前缀用 `text-xs text-muted-foreground/60` 显示，正文不重复日期
+  - **文章列表卡片移除摘要**：`ArticleCard.tsx` 删除 summary 区块及相关图标
+  - **changelog 累积追加**：`publish/route.ts` 新增 `mergeChangelog()`，新 changelog 带 `[日期]` 前缀拼在前面；从 DB 读取现有值合并
+  - **翻译版创建时 summary 留空**：`triggerAutoTranslate` 创建翻译版时 `summary: null`（等 worker 翻译后填），不再复制源文章摘要
+  - **翻译版创建时同步 changelog**：`triggerAutoTranslate` 创建翻译版时 `changelog: sourceArticle.changelog`（从源文章同步）
+  - **翻译版文件跳过 changelog**：`worker.ts` 重建 frontmatter 时跳过 `changelog` 字段（不写入翻译版文件）
+  - **翻译版 changelog 只翻译最新条**：`worker.ts` 读取源文章 changelog → 分割成行 → 只对第一行（最新条目）调用 DeepSeek 翻译正文 → `[日期]` 前缀和历史条目保持原文
+  - **页面间距缩小**：`ArticleReader.tsx` article 的 `mb-8` → `mb-4`；`ArticleContent.tsx` article 和 footer 的 `gap-8` → `gap-6`
+- **修改文件**：
+  - `src/components/article/ArticleReader.tsx`
+  - `src/components/article/ArticleContent.tsx`
+  - `src/components/article/ArticleCard.tsx`
+  - `src/app/(public)/[lang]/articles/[slug]/page.tsx`
+  - `src/app/api/articles/publish/route.ts`
+  - `src/worker.ts`
+- **测试结果**：`npx tsc --noEmit` 编译通过

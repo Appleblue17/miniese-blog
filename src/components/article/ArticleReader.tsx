@@ -10,7 +10,7 @@
 "use client";
 
 import { useCallback, useState, useEffect, useRef } from "react";
-import { Calendar, User, Tag, GitCommit, Eye, FileText, Download } from "lucide-react";
+import { Calendar, User, Tag, Eye, FileText, Download } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ChatButton } from "@/components/ai/ChatButton";
@@ -28,7 +28,6 @@ interface ArticleReaderProps {
   tags?: string[];
   summary?: string | null;
   lang: string;
-  changelog?: string | null;
   isAITranslated?: boolean;
   viewCount?: number;
   charCount?: number;
@@ -71,7 +70,6 @@ export function ArticleReader({
   tags,
   summary,
   lang,
-  changelog,
   isAITranslated,
   viewCount = 0,
   charCount = 0,
@@ -483,7 +481,7 @@ export function ArticleReader({
       )}
 
       {/* Article header — renders skeleton while loading, real content when ready */}
-      <article className="flex flex-col gap-8 mb-8">
+      <article className="flex flex-col gap-8 mb-4">
         <header className="flex flex-col gap-4">
           {loading ? (
             <>
@@ -560,14 +558,6 @@ export function ArticleReader({
                 </div>
               )}
 
-              {summary && <hr className="border-border" />}
-
-              {summary && (
-                <div className="markdown-body-summary">
-                  <p className="text-sm leading-relaxed text-article-meta">{summary}</p>
-                </div>
-              )}
-
               {isAITranslated && (
                 <div className="flex items-center gap-2 rounded-lg border border-accent-hsl/30 bg-ai-bg px-4 py-3 text-sm text-article-ai-translate">
                   <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -580,26 +570,16 @@ export function ArticleReader({
                   </span>
                 </div>
               )}
+              
+              {summary && (
+                <div className="markdown-body-summary">
+                  <p className="text-sm leading-relaxed text-article-meta">{summary}</p>
+                </div>
+              )}
             </>
           )}
         </header>
 
-        {/* Divider between header and body — always present when not loading */}
-        {!loading && changelog && (
-          <>
-            <hr className="border-border" />
-            <div className="flex items-start gap-3 rounded-lg border border-border p-4">
-              <GitCommit className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="font-medium">{lang === "zh" ? "更新记录" : "Changelog"}</p>
-                <p className="text-muted-foreground mt-1 whitespace-pre-wrap break-words">
-                  <span className="text-xs text-muted-foreground/60 mr-2">{updatedAt ? formatDate(updatedAt) : ""}</span>
-                  {changelog}
-                </p>
-              </div>
-            </div>
-          </>
-        )}
       </article>
     </>
   );

@@ -488,7 +488,7 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
   const handleDelete = useCallback((id: string) => {
     setConfirmModal({
       title: "确认删除任务",
-      message: "确定要删除此 AI 任务吗？此操作不可撤销。",
+      message: "确定要删除此助手任务吗？此操作不可撤销。",
       confirmLabel: "确认删除",
       confirmVariant: "destructive",
       onConfirm: () => {
@@ -742,7 +742,7 @@ export function AiTaskList({ tasks, activeType, currentPage, totalPages }: AiTas
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <Bot className="size-12 opacity-40" />
           <p className="text-lg">暂无任务</p>
-          <p className="text-sm">还没有 AI 任务记录。</p>
+          <p className="text-sm">还没有助手任务记录。</p>
         </div>
       )}
 

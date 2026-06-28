@@ -34,6 +34,23 @@ const DRAFTS_DIR = path.join(process.cwd(), "content", "articles", "drafts");
 const PUBLISHED_DIR = (lang: string) =>
   path.join(process.cwd(), "content", "articles", lang);
 
+/**
+ * Merges a new changelog entry with existing ones.
+ * New entries are prepended with a date prefix.
+ * Returns the new entry alone if no existing changelog.
+ */
+function mergeChangelog(newEntry: string | null | undefined, existingChangelog: string | null | undefined): string | null {
+  if (!newEntry) return existingChangelog || null;
+  const dateStr = new Date().toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const formatted = `[${dateStr}] ${newEntry}`;
+  if (!existingChangelog) return formatted;
+  return `${formatted}\n${existingChangelog}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -284,6 +301,13 @@ export async function POST(request: NextRequest) {
 
     if (draftOfId) {
       // --- Update existing published article ---
+      // Read existing changelog for cumulative merge
+      const existingArticle = await prisma.article.findUnique({
+        where: { id: draftOfId },
+        select: { changelog: true },
+      });
+      const mergedChangelog = mergeChangelog(changelog, existingArticle?.changelog);
+
       article = await prisma.article.update({
         where: { id: draftOfId },
         data: {
@@ -296,7 +320,7 @@ export async function POST(request: NextRequest) {
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
           defaultImageAccessGroup: defaultImageAccessGroup || [],
-          changelog: changelog || null,
+          changelog: mergedChangelog,
           author: frontmatter.author || "博主",
           contentType: pipeline,
           charCount,
@@ -325,7 +349,7 @@ export async function POST(request: NextRequest) {
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
           defaultImageAccessGroup: defaultImageAccessGroup || [],
-          changelog: changelog || null,
+          changelog: changelog ? `[${new Date().toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}] ${changelog}` : null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
           charCount,
@@ -355,7 +379,7 @@ export async function POST(request: NextRequest) {
           status: "published",
           accessGroup: frontmatter.accessGroup || [],
           defaultImageAccessGroup: defaultImageAccessGroup || [],
-          changelog: changelog || null,
+          changelog: changelog ? `[${new Date().toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}] ${changelog}` : null,
           author: frontmatter.author || "博主",
           contentType: pipeline,
           charCount,
@@ -430,6 +454,7 @@ async function triggerAutoTranslate(params: {
         defaultImageAccessGroup: true,
         contentType: true,
         contentPath: true,
+        changelog: true,
       },
     });
 
@@ -480,7 +505,8 @@ async function triggerAutoTranslate(params: {
         author: sourceArticle.author || "博主",
         accessGroup: sourceArticle.accessGroup || [],
         defaultImageAccessGroup: sourceArticle.defaultImageAccessGroup || [],
-        summary: sourceArticle.summary,
+        summary: null, // Worker will translate and update
+        changelog: sourceArticle.changelog, // Sync changelog from source
         contentType: sourceArticle.contentType || "markdown",
         isAITranslated: true,
         originalId: sourceArticleId,

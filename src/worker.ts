@@ -392,10 +392,10 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
       } else if (key === "slug") {
         // Keep slug unchanged (same slug, different language)
         newFrontmatterLines.push(`slug: ${value}`);
+      } else if (key === "changelog") {
+        // Skip changelog in translated file — synced from source at DB level
+        continue;
       } else if (Array.isArray(value)) {
-        const items = value.map((v: unknown) => String(v));
-        newFrontmatterLines.push(`${key}: [${items.join(", ")}]`);
-      } else if (typeof value === "string" && /[:\-#\[\]{}%,&*?|<>!@`"'\s]/.test(value)) {
         newFrontmatterLines.push(`${key}: "${String(value).replace(/"/g, '\\"')}"`);
       } else if (value !== undefined && value !== null) {
         newFrontmatterLines.push(`${key}: ${String(value)}`);
@@ -462,12 +462,48 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
   if (translatedSummary) {
     dbUpdateData.summary = translatedSummary;
   }
-  // Re-read final written content to get changelog if present
+  // Sync changelog from source article, translating only the latest entry (first line).
+  // Historical entries (lines 2+) are kept in original language.
+  // If no changelog exists, skip.
   try {
-    const finalWritten = await fs.readFile(targetPath, "utf-8");
-    const { frontmatter } = parseFrontmatter(finalWritten);
-    if (frontmatter.changelog) {
-      dbUpdateData.changelog = frontmatter.changelog;
+    const sourceArticleFull = await prisma.article.findUnique({
+      where: { id: articleIdStr },
+      select: { changelog: true },
+    });
+    if (sourceArticleFull?.changelog) {
+      const lines = sourceArticleFull.changelog.split("\n");
+      if (lines.length > 0) {
+        // Translate only the first line (latest entry)
+        const firstLine = lines[0];
+        const match = firstLine.match(/^(\[.+?\])\s*(.*)/);
+        if (match) {
+          const datePrefix = match[1];
+          const entryText = match[2];
+          if (entryText.trim()) {
+            const changelogPrompt =
+              `Translate the following changelog entry from ${sourceLangName} to ${targetLangName}. ` +
+              `Return ONLY the translated text, nothing else.\n\n${entryText}`;
+            const changelogResult = await callDeepSeek({
+              prompt: changelogPrompt,
+              responseFormat: "text",
+              temperature: 0.3,
+            });
+            const translatedEntry = changelogResult.content.trim();
+            // Rebuild: keep date prefix + translated text for first line, rest unchanged
+            const translatedLines = [`${datePrefix} ${translatedEntry}`, ...lines.slice(1)];
+            dbUpdateData.changelog = translatedLines.join("\n");
+            console.log(
+              `[Worker] Translated latest changelog entry: "${entryText}" → "${translatedEntry}"`,
+            );
+          } else {
+            // Entry text is empty — keep as-is
+            dbUpdateData.changelog = sourceArticleFull.changelog;
+          }
+        } else {
+          // No date prefix match — keep as-is
+          dbUpdateData.changelog = sourceArticleFull.changelog;
+        }
+      }
     }
   } catch {
     // Non-fatal

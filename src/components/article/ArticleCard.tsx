@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { Calendar, Eye, User, Tag, FileText, AlignLeft } from "lucide-react";
+import { Calendar, Eye, User, Tag, FileText } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,13 +66,6 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
             </Badge>
           </div>
 
-          {/* Summary - fixed 2-line height so metadata row stays aligned */}
-          {article.summary ? (
-            <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">
-              {article.summary}
-            </p>
-          ) : null}
-
           {/* Metadata row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {article.author && (
@@ -88,7 +81,7 @@ export function ArticleCard({ article, lang }: ArticleCardProps) {
               </span>
             )}
             <span className="inline-flex items-center gap-1">
-              <AlignLeft className="size-3" />
+              <FileText className="size-3" />
               {formatByteSize(article.charCount ?? 0, lang)}
             </span>
             <span className="inline-flex items-center gap-1">

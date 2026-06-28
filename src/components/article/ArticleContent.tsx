@@ -10,7 +10,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { GitCommit, RotateCcw } from "lucide-react";
 
 import { TableOfContents } from "@/components/article/TableOfContents";
 import { WikiPreview } from "@/components/wiki/WikiPreview";
@@ -21,6 +21,7 @@ interface ArticleContentProps {
   lang: string;
   slug: string;
   articleId?: string;
+  changelog?: string | null;
   /**
    * When true, renders ArticleSkeleton instead of fetching.
    * Used by page.tsx during the initial meta-loading phase so the entire
@@ -35,7 +36,7 @@ interface ArticleBodyResponse {
   html: string;
 }
 
-export function ArticleContent({ lang, slug, articleId, loading = false, onBodyError }: ArticleContentProps) {
+export function ArticleContent({ lang, slug, articleId, changelog, loading = false, onBodyError }: ArticleContentProps) {
   const [html, setHtml] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
@@ -116,16 +117,47 @@ export function ArticleContent({ lang, slug, articleId, loading = false, onBodyE
 
       <div className="flex gap-8" data-article-body="true">
         <div className="min-w-0 flex-1">
-          <article className="flex flex-col gap-8">
+          <article className="flex flex-col gap-6">
             {/* Rendered content — client-rendered HTML */}
             <div
               className="markdown-body"
               dangerouslySetInnerHTML={{ __html: html }}
             />
 
-            <hr className="border-border" />
+            <footer className="flex flex-col gap-6 text-sm">
+              {changelog && (() => {
+                // Split into lines, extract [date] prefix from each line
+                const lines = changelog.split("\n");
+                const renderedLines = lines.map((line, i) => {
+                  const match = line.match(/^\[(.+?)\]\s*/);
+                  if (match) {
+                    const date = match[1];
+                    const rest = line.slice(match[0].length);
+                    return (
+                      <span key={i}>
+                        {i > 0 && "\n"}
+                        <span className="text-xs text-muted-foreground/60">{date}</span>
+                        {" "}{rest}
+                      </span>
+                    );
+                  }
+                  return <span key={i}>{i > 0 && "\n"}{line}</span>;
+                });
+                return (
+                  <>
+                    <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+                      <GitCommit className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="font-medium">{lang === "zh" ? "更新记录" : "Changelog"}</p>
+                        <p className="text-muted-foreground mt-1 whitespace-pre-wrap break-words">
+                          {renderedLines}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
-            <footer className="flex flex-col gap-8 text-sm">
               <div className="flex items-start gap-2 text-xs text-muted-foreground/60">
                 <svg
                   className="size-3 mt-0.5 shrink-0"
