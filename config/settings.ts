@@ -61,7 +61,11 @@ export interface AppSettings {
     markdownBgColorDark: string;
   };
   features: Record<string, boolean>;
-  notifications: Record<string, unknown>;
+  notifications: {
+    email: boolean;
+    adminEmail: string;
+    typeSettings: Record<string, { enabled: boolean; email: boolean }>;
+  };
   compilers: Record<string, unknown>;
   prompts: Record<string, string>;
 }

@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { notifyAndMail } from "@/lib/notifications";
 
 export async function PUT(
   request: Request,
@@ -31,6 +32,18 @@ export async function PUT(
       where: { id },
       data: { isHidden: hidden },
     });
+
+    // Notify admin when comment is hidden (fire-and-forget)
+    if (hidden) {
+      notifyAndMail({
+        type: "comment_deleted",
+        title: "评论已隐藏",
+        content: `来自 ${comment.authorName} 的评论已被隐藏`,
+        articleId: comment.articleId || undefined,
+      }).catch((err) => {
+        console.error("[Admin Comments] Failed to send notification:", err);
+      });
+    }
 
     return NextResponse.json({
       id: updated.id,

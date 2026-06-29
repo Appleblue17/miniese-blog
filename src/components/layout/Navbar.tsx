@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FileText, BookOpen, Info, Settings, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Home, FileText, BookOpen, Info, Settings, Menu, X, Bell } from "lucide-react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -90,14 +90,23 @@ export function Navbar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Bottom area: admin link */}
-        <div className="border-t border-border pt-3">
+        {/* Bottom area: admin links */}
+        <div className="border-t border-border pt-3 space-y-1">
           <Link
             href="/admin"
             className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings className="size-4" />
             {lang === "zh" ? "仪表盘" : "Dashboard"}
+          </Link>
+
+          <Link
+            href="/admin/notifications"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Bell className="size-4" />
+            {lang === "zh" ? "通知中心" : "Notifications"}
+            <UnreadBadge />
           </Link>
         </div>
       </nav>
@@ -110,5 +119,42 @@ export function Navbar() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * Client-side component that fetches unread notification count.
+ * Shown as a red badge next to the "通知中心" link in the sidebar.
+ */
+function UnreadBadge() {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/admin/notifications?page=1&limit=1");
+        if (!res.ok) return;
+        const json = (await res.json()) as { unreadCount: number };
+        if (!cancelled) setCount(json.unreadCount);
+      } catch {
+        // ignore
+      }
+    };
+    fetchCount();
+    // Poll every 60 seconds for new notifications
+    const interval = setInterval(fetchCount, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  if (count === null || count === 0) return null;
+
+  return (
+    <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

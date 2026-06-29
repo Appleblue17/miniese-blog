@@ -4,7 +4,14 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-28 (v0.10.0)
+**最后更新**：2026-06-29 (v0.11.0)
+
+### v0.11.0 2026-06-29
+- 新增第 12 章：通知系统设计文档
+  - §12.1：通知类型与三级分类（🔴重要/🟡一般/🔵通知）
+  - §12.2：当前 notifyAndMail 实现分析——硬编码列表、未对接设置、邮件从未实际发送
+  - §12.3：邮箱配置项说明与待重构项
+  - §12.4：待改进清单（邮件开关等级对应、task_failed 通知、article_published 通知、对接设置）
 
 ### v0.10.0 2026-06-28
 - §6.4：统一增量架构扩展——词条发现（discovery）接入增量管道，与 review/translate 共用 `detectChanges` + `splitRange` + `buildContext`
@@ -1750,7 +1757,145 @@ export const config = {
 
 ---
 
-## 12. 后续扩展预留
+---
+
+## 12. 通知系统
+
+### 12.1 通知类型与分类
+
+通知系统覆盖站内通知和邮箱通知。所有通知按类型分为三个等级，控制是否发送邮件。
+
+#### 12.1.1 当前通知类型一览
+
+| 通知类型 | 触发场景 | 发送位置 | 当前是否发邮件 | 当前状态 |
+|---------|---------|---------|---------------|---------|
+| `comment` | 读者发表新评论 | `api/comments/route.ts` | ✅（`notifyAndMail` 中已配置，但实际调用未传 `adminEmail`） | 已实现 |
+| `comment_deleted` | 评论被删除 | （`NotificationType` 已定义但未看到实际调用） | ❌ | 已定义未使用 |
+| `translation_complete` | AI 翻译完成 | `worker.ts` → `processTranslate` | ❌（调用了 `notifyAndMail` 但未传 `adminEmail`） | 已调用但邮件无效 |
+| `task_failed` | AI 任务执行失败 | `NotificationType` 已定义，worker 中尚未显式调用 | — | 已定义未使用 |
+| `discovery` | 词条发现/生成完成 | `worker.ts` → `processDiscover` / `processGenerate` | ❌ | 已调用但未发邮件 |
+
+#### 12.1.2 缺失的通知类型（建议新增）
+
+| 建议新增类型 | 触发场景 | 建议等级 |
+|------------|---------|---------|
+| `article_published` | 文章发布或更新 | 🔴 重要 |
+| `article_scheduled` | 定时发布即将执行 | 🟡 一般 |
+| `system_error` | 系统级错误（API key 失效、磁盘空间不足等） | 🔴 重要 |
+| `backup_complete` | 数据库备份完成 | 🟡 一般 |
+
+#### 12.1.3 三级分类（建议）
+
+| 分类 | 包含类型 | 邮箱行为 |
+|-----|---------|---------|
+| 🔴 **重要** | `task_failed`、`system_error`、`article_published` | ✅ 强制发送邮箱 |
+| 🟡 **一般** | `comment`、`comment_deleted`、`backup_complete` | ⚙️ 可配置 |
+| 🔵 **通知** | `translation_complete`、`discovery` | ❌ 仅站内通知 |
+
+#### 12.1.4 等级定义
+
+| 等级 | 含义 | 邮箱行为 | 包含类型 |
+|-----|------|---------|---------|
+| 🔴 **重要** | 需要管理员关注的操作（发布、出错） | ✅ 强制发送邮件 | `task_failed`、`system_error`、`article_published` |
+| 🟡 **一般** | 用户交互产生的事件（评论、评论删除） | ⚙️ 可在设置页开关 | `comment`、`comment_deleted`、`backup_complete` |
+| 🔵 **通知** | 助手任务的执行结果（翻译完成、词条发现） | ❌ 仅站内通知，不发邮件 | `translation_complete`、`discovery` |
+
+#### 12.1.5 类型字段说明
+
+Prisma schema 中 `Notification.type` 字段当前为 `String`，值对应上述类型名称。后续可改为枚举约束（`enum NotificationType`）增强类型安全。
+
+### 12.2 当前实现
+
+#### 12.2.1 核心函数
+
+`src/lib/notifications.ts` 提供三个函数：
+
+| 函数 | 功能 | 说明 |
+|------|------|------|
+| `createNotification()` | 创建站内通知记录 | 写入 `Notification` 表，不区分级别 |
+| `sendNotificationEmail()` | 发送通知邮件 | 通过 Resend API 发送 HTML 邮件 |
+| `notifyAndMail()` | 创建通知 + 条件发邮件 | 组合前两者，当前硬编码 `["comment", "task_failed"]` 类型才发邮件 |
+
+#### 12.2.2 当前邮件发送逻辑（待改进）
+
+`notifyAndMail()` 中硬编码了邮件发送列表：
+
+```typescript
+if (params.adminEmail && ["comment", "task_failed"].includes(params.type)) {
+  await sendNotificationEmail({ ... });
+}
+```
+
+**两个问题**：
+1. **硬编码列表**：`["comment", "task_failed"]` 写死在代码中，未对接站点设置的邮箱开关。应该改为从 `settings.notifications` 读取每个类型的开关，并按照三级分类（🔴强制/🟡可配置/🔵关闭）来决定是否发邮件
+2. **实际调用从未传入 `adminEmail`**：当前所有 `notifyAndMail` 调用均未从设置中读取管理员邮箱地址，第二个参数传的是 `undefined`，导致 `params.adminEmail` 始终为 falsy，邮件从未实际发出
+
+#### 12.2.3 调用分布
+
+| 类型 | 调用位置 | 是否传入 `adminEmail` |
+|------|---------|----------------------|
+| `comment` | `api/comments/route.ts`（通过 `createNotification`，不经过 `notifyAndMail`） | ❌ |
+| `translation_complete` | `worker.ts` → `processTranslate` | ❌ |
+| `discovery` | `worker.ts` → `processDiscover` / `processGenerate` | ❌ |
+
+当前 `notifyAndMail` 未从设置中读取管理员邮箱，所有调用均未传入 `adminEmail`，实际邮件从未发出。
+
+### 12.3 邮箱配置（站点设置）
+
+对应 `config/default-settings.json` 中的 `notifications` 字段：
+
+```json
+{
+  "notifications": {
+    "email": true,
+    "adminEmail": "",
+    "onComment": true,
+    "onDiscovery": true,
+    "onTranslate": true
+  }
+}
+```
+
+| 设置项 | 类型 | 说明 |
+|--------|------|------|
+| `email` | boolean | 全局邮件通知开关（关闭后不发任何邮件） |
+| `adminEmail` | string | 管理员邮箱地址 |
+| `onComment` | boolean | 🟡 有新评论时发邮件（覆盖 `onTranslate`、`onDiscovery` 等开关，对应"一般"等级） |
+| `onDiscovery` | boolean | 词条发现完成时发邮件（已移至 🔵 通知等级，后续可移除） |
+| `onTranslate` | boolean | 翻译完成时发邮件（已移至 🔵 通知等级，后续可移除） |
+
+**待改进**：设置项需与通知等级对应重构——从当前 `onComment`/`onDiscovery`/`onTranslate` 三个布尔开关，改为按类型列举的配置结构：
+
+```json
+{
+  "notifications": {
+    "email": true,
+    "adminEmail": "admin@example.com",
+    "typeSettings": {
+      "comment": { "enabled": true, "email": true },       // 🟡 一般，邮箱可配置
+      "comment_deleted": { "enabled": true, "email": false },
+      "translation_complete": { "enabled": true, "email": false },  // 🔵 通知，仅站内
+      "task_failed": { "enabled": true, "email": true },   // 🔴 重要，强制邮箱
+      "discovery": { "enabled": true, "email": false },
+      "article_published": { "enabled": true, "email": true },
+      "system_error": { "enabled": true, "email": true }
+    }
+  }
+}
+```
+
+这样每类通知独立控制是否启用（`enabled`）和是否发邮件（`email`），替代当前硬编码行为。
+
+### 12.4 待改进项
+
+| # | 项 | 说明 | 工作量 |
+|---|----|------|--------|
+| 1 | **设置项重构** | `notifications` 从 `onComment`/`onDiscovery`/`onTranslate` 三个布尔开关，改为 `typeSettings` 按类型独立配置，每项含 `enabled` + `email` 开关 | 中 |
+| 2 | **`notifyAndMail` 对接设置** | 读取 `settings.notifications.adminEmail` 和 `typeSettings`，替代硬编码列表 `["comment", "task_failed"]` | 中 |
+| 3 | **`task_failed` 通知** | worker 中在任务失败时创建 `task_failed` 类型的通知记录（当前仅定义了类型但未调用） | 小 |
+| 4 | **`article_published` 通知** | 文章发布 API 中创建发布通知（当前完全缺失） | 小 |
+| 5 | **`comment_deleted` 通知** | 评论被删除时创建通知（当前仅定义了类型但未调用） | 小 |
+| 6 | **`system_error` 通知** | DeepSeek API 调用失败、磁盘空间不足等场景创建通知（需确定检测机制） | 大 |
 
 - **向量数据库**：将 `AiTask` 中的输出改为可存储 embedding
 - **Git 集成**：在发布流程中增加 `git commit` 调用

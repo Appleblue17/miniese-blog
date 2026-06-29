@@ -1,5 +1,7 @@
 /**
- * @file PUT /api/admin/notifications/read-all — Mark all notifications as read.
+ * @file PUT /api/admin/notifications/read-all — Mark all 🔴🟡 notifications as read.
+ *
+ * 🔵 (notice) level notifications are auto-read on page visit and not included here.
  */
 
 import { NextResponse } from "next/server";
@@ -15,7 +17,10 @@ export async function PUT() {
 
   try {
     await prisma.notification.updateMany({
-      where: { isRead: false },
+      where: {
+        isRead: false,
+        type: { notIn: ["translation_complete", "discovery"] },
+      },
       data: { isRead: true },
     });
 

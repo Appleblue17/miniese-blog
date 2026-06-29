@@ -32,6 +32,9 @@ export async function GET(request: Request) {
     prisma.notification.count({ where: { isRead: false } }),
   ]);
 
+  // Notifications of 🔵 (notice) level should auto-read on page visit
+  const AUTO_READ_TYPES = ["translation_complete", "discovery"];
+
   return NextResponse.json({
     notifications: notifications.map((n) => ({
       id: n.id,
@@ -42,6 +45,7 @@ export async function GET(request: Request) {
       articleTitle: n.articleTitle,
       taskId: n.taskId,
       isRead: n.isRead,
+      autoRead: AUTO_READ_TYPES.includes(n.type),
       createdAt: n.createdAt.toISOString(),
     })),
     unreadCount,

@@ -27,6 +27,7 @@ import { detectWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter, buildFrontmatter, generateSlug } from "@/lib/articles/frontmatter";
 import { addJob } from "@/lib/queue/producer";
 import { validateImageReferences, extractImageReferences } from "@/lib/articles/images";
+import { notifyAndMail } from "@/lib/notifications";
 import type { ArticleMeta, ArticleFrontmatter } from "@/lib/articles/frontmatter";
 import type { ContentType } from "@/lib/markdown/renderer";
 
@@ -400,6 +401,18 @@ export async function POST(request: NextRequest) {
     // --- Trigger auto term generation ---
     triggerAutoGenerate(article.id, slug, language).catch((err) => {
       console.error("Auto-generate trigger failed (non-fatal):", err);
+    });
+
+    // --- Notify admin about publish (fire-and-forget) ---
+    const isUpdate = !!draftOfId;
+    notifyAndMail({
+      type: "article_published",
+      title: isUpdate ? "文章已更新" : "文章已发布",
+      content: `文章《${frontmatter.title}》${isUpdate ? "已更新" : "已发布"}`,
+      articleId: article.id,
+      articleTitle: frontmatter.title,
+    }).catch((err) => {
+      console.error("Publish notification failed (non-fatal):", err);
     });
 
     return NextResponse.json({

@@ -1181,6 +1181,18 @@ workerQueue.process("*", 1, async (job) => {
     }
 
     console.error(`[Worker] Job ${job.id} (task ${taskId}) failed: ${errorMessage}`);
+
+    // Notify admin about task failure (fire-and-forget)
+    const failedType = (job.data as Record<string, unknown>).type || "unknown";
+    notifyAndMail({
+      type: "task_failed",
+      title: "AI 任务执行失败",
+      content: `任务 ${failedType} (${taskId}) 执行失败：${errorMessage}`,
+      taskId,
+    }).catch((e) => {
+      console.warn(`[Worker] Failed to send task_failed notification: ${e instanceof Error ? e.message : String(e)}`);
+    });
+
     throw err; // Let Bull handle retry logic
   }
 });

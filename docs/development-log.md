@@ -641,3 +641,64 @@
   - `src/app/api/articles/publish/route.ts`
   - `src/worker.ts`
 - **测试结果**：`npx tsc --noEmit` 编译通过
+
+### 任务 通知系统完善：设置项重构 + 调用补齐 + 等级逻辑 + 设置页 UI
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **架构文档补充**：`docs/architecture.md` 新增 §12 通知系统设计文档
+    - §12.1：通知类型与三级分类（🔴重要/🟡一般/🔵通知）
+    - §12.2：当前 `notifyAndMail` 实现分析——硬编码列表、未对接设置、邮件从未实际发送
+    - §12.3：邮箱配置项说明与重构建议（`onComment`/`onDiscovery`/`onTranslate` → `typeSettings` 结构）
+    - §12.4：6 项待改进清单
+  - **阶段一：设置项重构**
+    - `config/default-settings.json`：`notifications` 从 `onComment`/`onDiscovery`/`onTranslate` 三个布尔值改为 `typeSettings` 结构，6 种类型独立配置 `{ enabled, email }`
+    - `config/settings.ts`：`AppSettings.notifications` 类型加固为 `{ email, adminEmail, typeSettings: Record<string, { enabled, email }> }`
+  - **阶段二：补齐缺失通知调用**
+    - `src/worker.ts`：catch 块中任务失败时创建 `task_failed` 通知（fire-and-forget）
+    - `src/app/api/articles/publish/route.ts`：发布成功后创建 `article_published` 通知，区分首次发布和更新
+    - `src/app/api/admin/comments/[id]/hide/route.ts`：隐藏评论时创建 `comment_deleted` 通知
+  - **阶段三：`notifyAndMail` 内部化 adminEmail**
+    - `src/lib/notifications.ts`：移除 `adminEmail` 参数，改为内部从 `settings.notifications.adminEmail` 读取
+    - 新增 `shouldSendEmail()` 函数：🔴 重要（`task_failed`、`article_published`）强制发送 / 🟡 一般（`comment`、`comment_deleted`）读 `typeSettings.email` / 🔵 通知（`translation_complete`、`discovery`）不发邮件
+    - 所有调用端不再传 `adminEmail`，签名更简洁
+  - **阶段四：清理旧设置项 + 设置页 UI 更新**
+    - `src/app/(dashboard)/admin/settings/page.tsx`：通知 Tab 从旧 3 个开关 → 6 个卡片，每项含 `enabled` + `email` 双开关 + 等级 Badge（🟡一般/🔵通知/🔴重要）
+- **修改文件**（8 个）：
+  - `docs/architecture.md` — 新增 §12 通知系统设计文档
+  - `config/default-settings.json` — 通知设置结构重构
+  - `config/settings.ts` — `AppSettings.notifications` 类型加固
+  - `src/lib/notifications.ts` — `notifyAndMail` 重构，`shouldSendEmail` 等级逻辑
+  - `src/worker.ts` — 新增 `task_failed` 通知
+  - `src/app/api/articles/publish/route.ts` — 新增 `article_published` 通知
+  - `src/app/api/admin/comments/[id]/hide/route.ts` — 新增 `comment_deleted` 通知
+  - `src/app/(dashboard)/admin/settings/page.tsx` — 通知设置 UI 升级
+- **测试结果**：`npx tsc --noEmit` 编译通过（仅遗留与本次改动无关的已有错误）
+
+### 任务 通知中心前端页面优化：筛选 Tab + 分级已读 + Badge + 样式
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **已读策略按等级分化**：
+    - 🔵 通知（`translation_complete`、`discovery`）：打开页面自动已读（新增 `PUT /api/admin/notifications/read-all-auto` 路由）
+    - 🔴🟡 通知（其余类型）：手动标记已读（单条或全部）
+    - `PUT /api/admin/notifications/read-all` 改为只标记非 🔵 类型
+  - **GET API 新增 `autoRead` 字段**：前端据此判断是否显示手动标记按钮
+  - **通知中心页面全面重写**（`/admin/notifications`）：
+    - 筛选 Tab：「全部 / 未读」
+    - 单条标记已读：hover 卡片右上角出现 ✅ 按钮
+    - 全部标记已读：页面顶部右侧按钮，仅当存在未读🔴🟡通知时显示
+    - 已读卡片降低透明度（`opacity-50`），未读保持高亮（`border-primary/20 bg-primary/5`）
+    - 补充 `article_published` 类型图标（FileText）和标签
+  - **侧边栏 Badge**（`Navbar.tsx`）：
+    - 底部新增「通知中心」链接
+    - `UnreadBadge` 客户端组件：进入页面时获取未读数 + 每 60 秒轮询
+  - **新增文件**：
+    - `src/app/api/admin/notifications/read-all-auto/route.ts`
+- **修改文件**（5 个）：
+  - `src/app/api/admin/notifications/route.ts` — 新增 `autoRead` 字段
+  - `src/app/api/admin/notifications/read-all/route.ts` — 改为只标记 🔴🟡
+  - `src/app/(dashboard)/admin/notifications/page.tsx` — 全面重写
+  - `src/app/api/admin/notifications/read-all-auto/route.ts` — **新增**
+  - `src/components/layout/Navbar.tsx` — 新增通知中心链接 + UnreadBadge
+- **测试结果**：`npx tsc --noEmit` 编译通过（仅遗留与本次改动无关的已有错误）

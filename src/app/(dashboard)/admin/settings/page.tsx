@@ -49,7 +49,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
   features: { aiReview: true, autoTranslate: true, wikiDiscovery: true, wikiGenerate: true, comments: true, rss: true },
-  notifications: { email: true, adminEmail: "", onComment: true, onDiscovery: true, onTranslate: true },
+  notifications: { email: true, adminEmail: "", typeSettings: { comment: { enabled: true, email: true }, comment_deleted: { enabled: true, email: false }, translation_complete: { enabled: true, email: false }, task_failed: { enabled: true, email: true }, discovery: { enabled: true, email: false }, article_published: { enabled: true, email: true } } },
   compilers: {
     markdown: { name: "Markdown", extensions: [".md"], enabled: true },
     notesaw: { name: "Notesaw", extensions: [".md"], enabled: true },
@@ -1652,41 +1652,84 @@ export default function SettingsPage() {
             </div>
 
             {[
-              { key: "onComment", label: "新评论通知" },
-              { key: "onDiscovery", label: "新词条发现通知" },
-              { key: "onTranslate", label: "翻译完成通知" },
-            ].map((item) => (
-              <div
-                key={item.key}
-                className="flex items-center justify-between rounded-lg border border-border p-4"
-              >
-                <p className="text-sm font-medium">{item.label}</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!(local.notifications as Record<string, unknown>)[item.key]}
-                    onClick={() =>
-                      updateLocal("notifications", item.key, !(local.notifications as Record<string, unknown>)[item.key])
-                    }
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                      (local.notifications as Record<string, unknown>)[item.key]
-                        ? ""
-                        : "bg-primary/20"
-                    }`}
-                    style={(local.notifications as Record<string, unknown>)[item.key] ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
-                        (local.notifications as Record<string, unknown>)[item.key]
-                          ? "translate-x-4"
-                          : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+              { key: "comment", label: "评论通知", badge: "🟡 一般", desc: "读者发表新评论时通知" },
+              { key: "comment_deleted", label: "评论隐藏通知", badge: "🟡 一般", desc: "评论被隐藏时通知" },
+              { key: "translation_complete", label: "翻译完成通知", badge: "🔵 通知", desc: "AI 翻译完成时通知" },
+              { key: "task_failed", label: "任务失败通知", badge: "🔴 重要", desc: "AI 任务执行失败时通知" },
+              { key: "discovery", label: "词条发现通知", badge: "🔵 通知", desc: "词条发现/生成完成时通知" },
+              { key: "article_published", label: "文章发布通知", badge: "🔴 重要", desc: "文章发布或更新时通知" },
+            ].map((item) => {
+              const ts = (local.notifications as Record<string, unknown>).typeSettings as Record<string, { enabled: boolean; email: boolean }> | undefined;
+              const setting = ts?.[item.key];
+              if (!setting) return null;
+              return (
+                <div
+                  key={item.key}
+                  className="rounded-lg border border-border p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px]"
+                    >
+                      {item.badge}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={setting.enabled}
+                        onClick={() => {
+                          const ts2 = { ...(local.notifications as Record<string, unknown>).typeSettings as Record<string, { enabled: boolean; email: boolean }> };
+                          ts2[item.key] = { ...ts2[item.key], enabled: !setting.enabled };
+                          updateLocal("notifications", "typeSettings", ts2);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                          setting.enabled ? "" : "bg-primary/20"
+                        }`}
+                        style={setting.enabled ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                            setting.enabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                      启用
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={setting.email}
+                        onClick={() => {
+                          const ts2 = { ...(local.notifications as Record<string, unknown>).typeSettings as Record<string, { enabled: boolean; email: boolean }> };
+                          ts2[item.key] = { ...ts2[item.key], email: !setting.email };
+                          updateLocal("notifications", "typeSettings", ts2);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                          setting.email ? "" : "bg-primary/20"
+                        }`}
+                        style={setting.email ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
+                            setting.email ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                      邮件通知
+                    </label>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

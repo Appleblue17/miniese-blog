@@ -4,17 +4,20 @@
  * Provides:
  * - createNotification: Create a notification record in the database
  * - sendNotificationEmail: Send email notification for important events
+ * - notifyAndMail: Create notification + conditionally send email based on settings
  */
 
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
+import { getSettings } from "../../config/settings";
 
 export type NotificationType =
   | "comment"
   | "comment_deleted"
   | "translation_complete"
   | "task_failed"
-  | "discovery";
+  | "discovery"
+  | "article_published";
 
 interface CreateNotificationParams {
   type: NotificationType;
@@ -81,19 +84,57 @@ export async function sendNotificationEmail(params: {
 }
 
 /**
- * Create notification and optionally send email for important events.
+ * Determine whether email should be sent for a given notification type,
+ * based on site settings and severity level.
+ *
+ * 🔴 Important (强制): task_failed, article_published — always sends email
+ * 🟡 Normal   (可配置): comment, comment_deleted — checks typeSettings.email
+ * 🔵 Notice   (仅站内): translation_complete, discovery — never sends email
  */
-export async function notifyAndMail(params: CreateNotificationParams & { adminEmail?: string }): Promise<void> {
+async function shouldSendEmail(type: NotificationType): Promise<boolean> {
+  const settings = await getSettings();
+
+  // Global email toggle
+  if (!settings.notifications.email) return false;
+
+  // Admin email must be configured
+  if (!settings.notifications.adminEmail?.trim()) return false;
+
+  // 🔴 Important — force send email regardless of typeSettings
+  if (type === "task_failed" || type === "article_published") {
+    return true;
+  }
+
+  // 🟡 Normal — check the per-type email toggle
+  const typeSetting = settings.notifications.typeSettings?.[type];
+  if (typeSetting && typeSetting.email) {
+    return true;
+  }
+
+  // 🔵 Notice — never send email
+  return false;
+}
+
+/**
+ * Create notification and optionally send email.
+ * Email decision is based on site settings (typeSettings + severity level).
+ * Callers do NOT need to pass adminEmail — it's read from settings internally.
+ */
+export async function notifyAndMail(params: CreateNotificationParams): Promise<void> {
   await createNotification(params);
 
-  // Send email for important notifications if admin email is provided
-  if (params.adminEmail && ["comment", "task_failed"].includes(params.type)) {
-    await sendNotificationEmail({
-      to: params.adminEmail,
-      title: params.title,
-      content: params.content,
-      articleTitle: params.articleTitle,
-      type: params.type,
-    });
+  try {
+    if (await shouldSendEmail(params.type)) {
+      const settings = await getSettings();
+      await sendNotificationEmail({
+        to: settings.notifications.adminEmail!,
+        title: params.title,
+        content: params.content,
+        articleTitle: params.articleTitle,
+        type: params.type,
+      });
+    }
+  } catch (err) {
+    console.error("[Notifications] Failed to send email:", err);
   }
 }

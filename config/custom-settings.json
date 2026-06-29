@@ -42,7 +42,9 @@
       "maxHeight": 600,
       "defaultWidthRatio": 60,
       "lightboxEnabled": true,
-      "captionIgnoreList": ["alt text"]
+      "captionIgnoreList": [
+        "alt text"
+      ]
     },
     "primary": {
       "lightHue": 200,
@@ -81,31 +83,30 @@
     "wikiGenerate": true,
     "comments": true,
     "rss": true,
-    "devMode": false,
+    "devMode": true,
     "realEmail": false,
     "skipEmailVerification": false
   },
   "notifications": {
     "email": true,
     "adminEmail": "",
-    "typeSettings": {
-      "comment": { "enabled": true, "email": true },
-      "comment_deleted": { "enabled": true, "email": false },
-      "translation_complete": { "enabled": true, "email": false },
-      "task_failed": { "enabled": true, "email": true },
-      "discovery": { "enabled": true, "email": false },
-      "article_published": { "enabled": true, "email": true }
-    }
+    "onComment": true,
+    "onDiscovery": true,
+    "onTranslate": true
   },
   "compilers": {
     "markdown": {
       "name": "Markdown",
-      "extensions": [".md"],
+      "extensions": [
+        ".md"
+      ],
       "enabled": true
     },
     "notesaw": {
       "name": "Notesaw",
-      "extensions": [".md"],
+      "extensions": [
+        ".md"
+      ],
       "enabled": true
     }
   },
