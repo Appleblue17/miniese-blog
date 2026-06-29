@@ -27,7 +27,6 @@ export async function LatestArticles({ lang, count = 5 }: LatestArticlesProps) {
       updatedAt: true,
       summary: true,
       viewCount: true,
-      likes: true,
     },
   });
 
@@ -48,7 +47,6 @@ export async function LatestArticles({ lang, count = 5 }: LatestArticlesProps) {
             tags={article.tags}
             date={article.updatedAt}
             viewCount={article.viewCount}
-            likes={article.likes}
             lang={lang}
             compact
           />

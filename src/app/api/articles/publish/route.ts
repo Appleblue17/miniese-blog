@@ -536,7 +536,7 @@ async function triggerAutoTranslate(params: {
     if (sourceOverrides.length > 0) {
       await prisma.articleImageOverride.createMany({
         data: sourceOverrides.map((ov) => ({
-          articleId: translationArticle.id,
+          articleId: translationArticle!.id,
           filename: ov.filename,
           accessGroup: ov.accessGroup,
         })),
@@ -548,13 +548,18 @@ async function triggerAutoTranslate(params: {
 
     console.log(
       `[Publish] Created translation "${slug}" (${targetLanguage}) ` +
-        `with id ${translationArticle.id}, linked to original ${sourceArticleId}`,
+        `with id ${translationArticle!.id}, linked to original ${sourceArticleId}`,
     );
+  }
+
+  if (!translationArticle) {
+    console.error(`[Publish] Translation article is null for ${slug} — aborting auto-translate`);
+    return;
   }
 
   await addJob("translate", {
     articleId: sourceArticleId,
-    targetArticleId: translationArticle.id,
+    targetArticleId: translationArticle!.id,
     sourceLanguage,
     targetLanguage,
   });

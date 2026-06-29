@@ -6,11 +6,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default function ResetPage() {
+function ResetForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -158,5 +158,19 @@ export default function ResetPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    }>
+      <ResetForm />
+    </Suspense>
   );
 }

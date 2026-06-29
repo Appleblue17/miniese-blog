@@ -67,7 +67,7 @@ export async function Footer() {
             <>
               {" "}
               <span className="text-muted-foreground/40 mx-2">|</span>{" "}
-              <span className="text-muted-foreground/80">{icp}</span>
+              <Link href="https://beian.miit.gov.cn/" className="text-muted-foreground/80 hover:text-foreground transition-colors">{icp}</Link>
             </>
           )}
         </p>

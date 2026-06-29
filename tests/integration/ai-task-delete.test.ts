@@ -66,10 +66,10 @@ describeDb("AI Task Deletion & Worker Resilience", () => {
   ): Promise<string> {
     const task = await prisma.aiTask.create({
       data: {
-        type: overrides.type ?? "review",
-        status: overrides.status ?? "pending",
-        input: overrides.input ?? { source: "test" },
-        output: overrides.output ?? null,
+        type: (overrides.type ?? "review") as any,
+        status: (overrides.status ?? "pending") as any,
+        input: (overrides.input ?? { source: "test" }) as any,
+        output: overrides.output as any ?? null,
         articleId: overrides.articleId ?? null,
         error: overrides.error ?? null,
       },

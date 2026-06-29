@@ -7,11 +7,14 @@
  * The queue is created lazily to allow safe module imports in test
  * environments without Redis, and to prevent eager connections during
  * Next.js SSR / API route loading.
+ *
+ * Bull is imported dynamically to prevent Turbopack build errors in
+ * Next.js. The queue module is only used at runtime (API routes or worker).
  */
 
-import Queue from "bull";
+type BullQueue = import("bull").Queue;
 
-let _queue: Queue.Queue | null = null;
+let _queue: BullQueue | null = null;
 
 function getRedisUrl(): string {
   const url = process.env.REDIS_URL;
@@ -31,16 +34,17 @@ function getRedisUrl(): string {
  * Usage:
  * ```ts
  * import { getQueue } from "@/lib/queue/client";
- * const queue = getQueue();
+ * const queue = await getQueue();
  * await queue.add("review", { ... });
  * ```
  *
  * Used by producers to add jobs and by workers to process them.
  */
-export function getQueue(): Queue.Queue {
+export async function getQueue(): Promise<BullQueue> {
   if (!_queue) {
     const redisUrl = getRedisUrl();
-    _queue = new Queue("ai-tasks", redisUrl, {
+    const Bull = await import("bull");
+    _queue = new Bull.default("ai-tasks", redisUrl, {
       defaultJobOptions: {
         attempts: 3,
         backoff: {

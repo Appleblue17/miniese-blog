@@ -60,7 +60,7 @@ export async function addJob(
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const queue = getQueue();
+      const queue = await getQueue();
       await queue.add(
         type,
         { taskId: task.id, type, payload },

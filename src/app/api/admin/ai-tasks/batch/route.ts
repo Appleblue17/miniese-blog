@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (action === "delete") {
       for (const id of taskIds) {
         try {
-          const queue = getQueue();
+          const queue = await getQueue();
           const job = await queue.getJob(id);
           if (job) {
             // Discard active jobs to prevent Worker from continuing processing

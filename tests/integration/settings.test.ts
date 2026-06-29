@@ -99,7 +99,6 @@ describe("Settings API", () => {
         primary: { lightHue: 210, darkHue: 250, lightSaturation: 65, darkSaturation: 65, lightLightness: 55, darkLightness: 65 },
         accent: { lightHue: 300, darkHue: 290, lightSaturation: 60, darkSaturation: 60, lightLightness: 55, darkLightness: 65 },
         backgroundImages: [],
-        backgroundCarouselEnabled: false,
         backgroundOpacityLight: 20,
         backgroundOpacityDark: 10,
         markdownBgOpacityLight: 30,
@@ -108,6 +107,8 @@ describe("Settings API", () => {
         markdownTextColorDark: "#f0f6fc",
         markdownBgColorLight: "#ffffff",
         markdownBgColorDark: "#0d1117",
+        backgroundColorLight: "#ffffff",
+        backgroundColorDark: "#0d1117",
       },
     });
 

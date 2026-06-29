@@ -34,12 +34,13 @@ export async function POST(request: NextRequest) {
     const resolvedMeta: ArticleMeta | null = meta || null;
 
     // Validate language — must be a valid ArticleLanguage value
-    let resolvedLang = (resolvedMeta?.language || language) as string;
+    let resolvedLang: string = (resolvedMeta?.language || language) as string;
     if (resolvedLang !== "zh" && resolvedLang !== "en") {
       // Default to "zh" when language cannot be determined (e.g. file upload
       // without frontmatter or language suffix). User can change it in editor.
       resolvedLang = "zh";
     }
+    const dbLang = resolvedLang as "zh" | "en";
 
     // Build file content with frontmatter from metadata
     const finalContent = resolvedMeta ? buildFrontmatter(fileContent, resolvedMeta) : fileContent;
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
           summary,
           tags,
           author,
-          language: resolvedLang,
+          language: dbLang,
           status: "draft",
         },
       });
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
             summary,
             tags,
             author,
-            language: resolvedLang,
+            language: dbLang,
             status: "draft",
           },
         });
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
           data: {
             slug: `draft-${Date.now()}`,
             title,
-            language: resolvedLang,
+            language: dbLang,
             contentPath: `content/articles/drafts/${dirName}/article.md`,
             summary,
             tags,
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
         data: {
           slug: `draft-${Date.now()}`,
           title,
-          language: resolvedLang,
+          language: dbLang,
           contentPath: `content/articles/drafts/${dirName}/article.md`,
           summary,
           tags,

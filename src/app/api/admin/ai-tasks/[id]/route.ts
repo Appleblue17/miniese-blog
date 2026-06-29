@@ -25,7 +25,7 @@ export async function DELETE(
 
     // Remove the Bull queue job if it still exists (e.g. waiting for retry)
     try {
-      const queue = getQueue();
+      const queue = await getQueue();
       const job = await queue.getJob(id);
       if (job) {
         // Discard first to stop active processing, then remove

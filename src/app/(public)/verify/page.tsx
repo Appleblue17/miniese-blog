@@ -6,13 +6,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 type VerifyState = "loading" | "success" | "error";
 
-export default function VerifyPage() {
+function VerifyForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -89,5 +89,19 @@ export default function VerifyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    }>
+      <VerifyForm />
+    </Suspense>
   );
 }

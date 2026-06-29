@@ -68,7 +68,7 @@ function ConfirmModal({
   confirmLabel = "确认删除",
 }: {
   title: string;
-  message: string;
+  message: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
