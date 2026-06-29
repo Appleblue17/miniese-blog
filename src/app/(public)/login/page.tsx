@@ -25,6 +25,11 @@ function LoginForm() {
   const [message, setMessage] = useState("");
   const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
 
+  // Extract language from path
+  const lang = typeof window !== "undefined"
+    ? window.location.pathname.match(/^\/(zh|en)/)?.[1] || "zh"
+    : "zh";
+
   // Check if already logged in
   useEffect(() => {
     fetch("/api/auth/me")
@@ -141,7 +146,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer"
+            className="w-full rounded-lg bg-primary-hsl opacity-90 text-white px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer"
           >
             {loading ? "登录中..." : "登录"}
           </button>
@@ -153,7 +158,7 @@ function LoginForm() {
             <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-xs text-muted-foreground">
-            <span className="bg-background px-2">或</span>
+            <span className="px-2">{lang === "zh" ? "或" : "or"}</span>
           </div>
         </div>
 

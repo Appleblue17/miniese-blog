@@ -79,7 +79,7 @@ export function ActionBar() {
   const showLangToggle = !isWikiEntry && !isAdmin;
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center gap-1 rounded-full border border-border bg-background/80 backdrop-blur-sm px-1.5 py-1 shadow-sm">
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-1.5 rounded-full border border-border bg-background/80 backdrop-blur-sm px-3 py-1.5 shadow-sm">
       {/* Language toggle */}
       {showLangToggle && (
         <>
@@ -122,7 +122,7 @@ export function ActionBar() {
             </Button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-background shadow-lg py-1.5">
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-background shadow-lg py-1.5">
                 <div className="px-3 py-2 border-b border-border">
                   <p className="text-sm font-medium truncate">{user.name || "用户"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>

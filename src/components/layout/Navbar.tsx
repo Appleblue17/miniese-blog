@@ -60,7 +60,7 @@ export function Navbar() {
         <div className="flex flex-col gap-1">
           <Link
             href={localize("")}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base transition-colors hover:bg-muted ${
               pathname === localize("") ? "bg-muted font-medium text-primary-hsl" : ""
             }`}
           >
@@ -76,7 +76,7 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={fullHref}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-muted ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base transition-colors hover:bg-muted ${
                   isActive ? "bg-muted font-medium text-primary-hsl" : ""
                 }`}
               >
@@ -94,7 +94,7 @@ export function Navbar() {
         <div className="border-t border-border pt-3 space-y-1">
           <Link
             href="/admin"
-            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Settings className="size-4" />
             {lang === "zh" ? "仪表盘" : "Dashboard"}
@@ -102,7 +102,7 @@ export function Navbar() {
 
           <Link
             href="/admin/notifications"
-            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Bell className="size-4" />
             {lang === "zh" ? "通知中心" : "Notifications"}
