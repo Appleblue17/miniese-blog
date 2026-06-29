@@ -319,7 +319,7 @@ function CreateForm() {
 
       {/* Inline AI Preview (Issue 3: simplified, non-editable) */}
       {preview && !refining && (
-        <div className="rounded-xl border border-border bg-card p-5">
+        <div className="card-base rounded-xl border border-border bg-card p-5">
           <h3 className="text-sm font-semibold flex items-center gap-2 mb-4 text-foreground">
             <Sparkles className="size-4 text-amber-500" />
             AI 分析结果

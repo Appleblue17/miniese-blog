@@ -251,7 +251,7 @@ function ChunkCard({ chunk, maxOrder }: { chunk: ReviewChunk; maxOrder: number }
   if (allItems.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="card-base rounded-lg border border-border bg-card">
       {/* Clickable header */}
       <button
         type="button"

@@ -50,7 +50,7 @@ function langLabel(code: string): string {
 export function ArticleCard({ article, lang }: ArticleCardProps) {
   return (
     <Link href={`/${lang}/articles/${article.slug}`} className="block group h-full">
-      <Card className="h-full transition-shadow hover:shadow-md">
+      <Card className="card-article h-full hover:shadow-md">
         <CardContent className="flex flex-col gap-3 pt-4">
           {/* Title row */}
           <div className="flex items-start gap-2.5">

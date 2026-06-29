@@ -60,7 +60,7 @@ export interface WikiCardProps {
 export function WikiCard({ entry, lang }: WikiCardProps) {
   return (
     <Link href={`/${lang}/wiki/${encodeURIComponent(entry.name)}`} className="block group">
-      <Card className="transition-shadow hover:shadow-md h-full">
+      <Card className="card-article hover:shadow-md h-full">
         <CardContent className="flex flex-col gap-2.5 pt-4">
           {/* Title row: icon + name + type + status + language — all in one line */}
           <div className="flex items-start gap-2">

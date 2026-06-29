@@ -37,7 +37,7 @@ export function ArticleCard({
     return (
       <Link
         href={href}
-        className="group flex items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+        className="card-article group flex items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-sm hover:shadow-md hover:border-primary/30"
       >
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
@@ -75,7 +75,7 @@ export function ArticleCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+      className="card-article group flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30"
     >
       <h3 className="font-semibold text-base sm:text-lg line-clamp-2 group-hover:text-primary transition-colors">
         {title}

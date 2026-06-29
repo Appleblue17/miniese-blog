@@ -307,7 +307,7 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
       <Link
         href={`/${entry.language}/wiki/${encodeURIComponent(entry.name)}`}
         target="_blank"
-        className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted ${
+        className={`card-base flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted ${
           entry.status === "deleted"
             ? "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/20"
             : "border-border bg-card"
@@ -659,7 +659,7 @@ function DiscoveryCard({
   processing: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 hover:border-muted-foreground/30 hover:bg-accent/30 transition-all duration-200">
+    <div className="card-base rounded-lg border border-border bg-card px-4 py-3 hover:border-muted-foreground/30 hover:bg-accent/30 transition-colors duration-200">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Term name + badges */}

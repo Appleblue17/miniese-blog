@@ -76,7 +76,7 @@ function ChunkCard({
   const hasContext = !!(chunk.aboveContext || chunk.belowContext);
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="card-base rounded-lg border border-border bg-card">
       {/* Clickable header */}
       <button
         type="button"

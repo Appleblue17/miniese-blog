@@ -695,10 +695,70 @@
     - `UnreadBadge` 客户端组件：进入页面时获取未读数 + 每 60 秒轮询
   - **新增文件**：
     - `src/app/api/admin/notifications/read-all-auto/route.ts`
-- **修改文件**（5 个）：
-  - `src/app/api/admin/notifications/route.ts` — 新增 `autoRead` 字段
-  - `src/app/api/admin/notifications/read-all/route.ts` — 改为只标记 🔴🟡
-  - `src/app/(dashboard)/admin/notifications/page.tsx` — 全面重写
-  - `src/app/api/admin/notifications/read-all-auto/route.ts` — **新增**
-  - `src/components/layout/Navbar.tsx` — 新增通知中心链接 + UnreadBadge
+  - **修改文件**（5 个）：
+    - `src/app/api/admin/notifications/route.ts` — 新增 `autoRead` 字段
+    - `src/app/api/admin/notifications/read-all/route.ts` — 改为只标记 🔴🟡
+    - `src/app/(dashboard)/admin/notifications/page.tsx` — 全面重写
+    - `src/app/api/admin/notifications/read-all-auto/route.ts` — **新增**
+    - `src/components/layout/Navbar.tsx` — 新增通知中心链接 + UnreadBadge
 - **测试结果**：`npx tsc --noEmit` 编译通过（仅遗留与本次改动无关的已有错误）
+
+### 任务 全站卡片样式统一：opacity-80 hover:opacity-100
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 为全站所有内容卡片统一添加 `opacity-80 hover:opacity-100 transition-all` 悬停效果
+  - **已改文件清单**：
+    - `src/app/(dashboard)/admin/page.tsx` — 仪表盘 8 个入口卡片
+    - `src/components/admin/AdminWikiList.tsx` — EntryRow + DiscoveryCard
+    - `src/components/admin/ArticleRowActions.tsx` — 文章行
+    - `src/components/admin/ArticleCard.tsx` — 2 个卡片（compact + 普通）
+    - `src/components/article/CommentSection.tsx` — 评论输入框卡片
+    - `src/components/admin/TranslateChunkList.tsx` — ChunkCard
+    - `src/components/admin/ReviewChunkList.tsx` — ChunkCard
+    - `src/components/admin/WikiEntryForm.tsx` — AI 预览卡片
+    - `src/app/(dashboard)/admin/media/page.tsx` — 文件夹卡片 + 文件卡片
+    - `src/components/admin/AiTaskList.tsx` — TaskRow（同时移除 Link 上的冗余 `hover:opacity-80`）
+  - **跳过文件**：`src/app/(dashboard)/admin/notifications/page.tsx` — 通知中心维持已读/未读 opacity 逻辑
+- **修改文件**：10 个（后改为 card-base class 方案，见下一条）
+
+### 任务 全站卡片样式统一：提取 card-base class
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 在 `src/app/globals.css` `@layer utilities` 中新增 `.card-base` class（`opacity: 0.8; transition: opacity 0.15s ease-in-out; &:hover { opacity: 1; }`）
+  - 将所有 10 个文件中硬编码的 `opacity-80 hover:opacity-100 transition-all/transition-opacity` 替换为 `card-base`
+  - 保留每个卡片原有的其他 hover 效果（如 `hover:bg-muted`、`hover:shadow-md` 等），移除重复的 transition 声明
+  - 具体替换：
+    - `src/app/(dashboard)/admin/page.tsx` — 7 个入口卡片（通知中心除外）
+    - `src/components/home/ArticleCard.tsx` — compact + 普通 2 个卡片
+    - `src/components/article/CommentSection.tsx` — 评论输入框
+    - `src/components/admin/AiTaskList.tsx` — TaskRow
+    - `src/components/admin/ArticleRowActions.tsx` — 文章行
+    - `src/components/admin/AdminWikiList.tsx` — EntryRow + DiscoveryCard
+    - `src/components/admin/TranslateChunkList.tsx` — ChunkCard
+    - `src/components/admin/ReviewChunkList.tsx` — ChunkCard
+    - `src/components/admin/WikiEntryForm.tsx` — AI 预览卡片
+    - `src/app/(dashboard)/admin/media/page.tsx` — 文件夹卡片 + 文件卡片
+  - **修改文件**：11 个（globals.css + 10 个组件）
+
+### 任务 全站卡片样式统一：文章列表 + 词条列表卡片补充
+
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 补充两个使用 shadcn `<Card>` 组件的卡片：
+    - `src/components/article/ArticleCard.tsx` — 文章列表页（`/zh/articles`），`Card` 加 `card-base`，移除 `transition-shadow`
+    - `src/components/wiki/WikiCard.tsx` — 词条列表页（`/zh/wiki`），`Card` 加 `card-base`，移除 `transition-shadow`
+- **修改文件**：2 个
+- **测试结果**：`npx tsc --noEmit` 编译通过（无新增编译错误）
+
+### 任务 全站卡片样式统一：文章/词条列表改为 card-article
+- **时间**：2026-06-29
+- **状态**：✅ 完成
+- **变更摘要**：
+  - 文章列表和词条列表的卡片使用不同的交互方式：默认不透明，hover 时淡出（`opacity: 1 → 0.7`）
+  - 新增 `card-article` class 到 globals.css `@layer utilities`
+  - 将 `ArticleCard.tsx` 和 `WikiCard.tsx` 的 `card-base` 替换为 `card-article`
+- **修改文件**：3 个（globals.css + 2 个组件）
+- **测试结果**：`npx tsc --noEmit` 编译通过（无新增编译错误）

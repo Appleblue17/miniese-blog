@@ -379,7 +379,7 @@ function PublishedArticleRow({
     <>
       <Link
         href={`/${article.language}/articles/${article.slug}`}
-        className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted"
+        className="card-base flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 hover:bg-muted"
         target="_blank"
       >
         <div className="flex flex-col gap-1 min-w-0 flex-1">

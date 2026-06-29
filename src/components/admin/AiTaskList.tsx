@@ -235,7 +235,7 @@ function TaskRow({
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ${
+      className={`card-base flex items-center gap-3 rounded-lg border px-3 py-3 ${
         skipped
           ? "border-amber-200 bg-amber-50/30 dark:border-amber-900 dark:bg-amber-950/20"
           : task.status === "failed"
@@ -254,7 +254,7 @@ function TaskRow({
       {/* Content (clickable — links to detail page) */}
       <Link
         href={`/admin/ai-tasks/${task.id}`}
-        className="flex flex-col gap-1 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+        className="flex flex-col gap-1 min-w-0 flex-1"
       >
         <div className="flex items-center gap-2">
           <TaskTypeIcon type={task.type} />

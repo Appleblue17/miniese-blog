@@ -30,7 +30,7 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
           href="/admin/articles/new"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <PlusCircle className="size-10 text-primary" />
           <div>
@@ -41,7 +41,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/articles"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <FileText className="size-10 text-primary" />
           <div>
@@ -52,7 +52,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/ai-tasks"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <Bot className="size-10 text-primary" />
           <div>
@@ -65,7 +65,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/wiki"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <BookOpen className="size-10 text-primary" />
           <div>
@@ -76,7 +76,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/interactions"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <MessageSquare className="size-10 text-primary" />
           <div>
@@ -87,7 +87,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/notifications"
-          className="relative flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="relative card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
         >
           <div className="relative">
             <Bell className="size-10 text-primary" />
@@ -109,7 +109,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/media"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <Images className="size-10 text-primary" />
           <div>
@@ -120,7 +120,7 @@ export default async function AdminDashboardPage() {
 
         <Link
           href="/admin/settings"
-          className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-colors hover:bg-muted"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
         >
           <Settings className="size-10 text-primary" />
           <div>

@@ -208,7 +208,7 @@ export function CommentSection({ articleId, lang }: CommentSectionProps) {
           {t("写评论...", "Write a comment...")}
         </button>
       ) : (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="card-base flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
           <textarea
             ref={textareaRef}
             value={text}

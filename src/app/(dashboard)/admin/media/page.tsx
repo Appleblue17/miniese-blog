@@ -584,7 +584,7 @@ export default function MediaPage() {
                 return (
                   <div
                     key={dir}
-                    className="group relative rounded-xl border border-border bg-card overflow-hidden"
+                    className="card-base group relative rounded-xl border border-border bg-card overflow-hidden"
                   >
                     <button
                       type="button"
@@ -666,7 +666,7 @@ export default function MediaPage() {
               {files.map((file) => (
                 <div
                   key={file.path}
-                  className="group relative rounded-xl border border-border bg-card overflow-hidden"
+                  className="card-base group relative rounded-xl border border-border bg-card overflow-hidden"
                 >
                   {/* Thumbnail / Icon */}
                   <div className="aspect-[4/3] flex items-center justify-center bg-muted/30 overflow-hidden">
