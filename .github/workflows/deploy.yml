@@ -1,0 +1,65 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            cd /var/www/miniese-blog
+
+            # 记录当前 HEAD，用于后面判断依赖是否变化
+            OLD_HEAD=$(git rev-parse HEAD)
+
+            # 拉取最新代码
+            echo ">>> Pulling latest code..."
+            git pull
+
+            NEW_HEAD=$(git rev-parse HEAD)
+
+            # 判断 package.json 或 package-lock.json 是否有变化
+            if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
+              CHANGED=$(git diff --name-only "$OLD_HEAD".."$NEW_HEAD" -- package.json package-lock.json)
+            fi
+
+            # 如果没有 node_modules，或者依赖文件有变化，才重新安装
+            if [ ! -d node_modules ] || [ -n "$CHANGED" ]; then
+              if [ -d node_modules ]; then
+                echo ">>> Dependency files changed, reinstalling..."
+              else
+                echo ">>> node_modules not found, installing..."
+              fi
+              NODE_OPTIONS="--max-old-space-size=1024" npm ci
+            else
+              echo ">>> Dependencies not changed, skipping npm install"
+            fi
+
+            # 停掉旧应用释放内存（构建时只需要 worker）
+            echo ">>> Stopping old app..."
+            pm2 stop miniese-blog 2>/dev/null || true
+
+            # 数据库迁移
+            echo ">>> Running database migrations..."
+            npx prisma migrate deploy
+
+            # 构建
+            echo ">>> Building..."
+            NODE_OPTIONS="--max-old-space-size=1536" npm run build
+
+            # 启动/重启
+            echo ">>> Restarting services..."
+            pm2 restart miniese-blog 2>/dev/null || pm2 start npm --name "miniese-blog" -- start
+            pm2 restart miniese-worker 2>/dev/null || pm2 start npm --name "miniese-worker" -- run worker
+            pm2 save
+
+            echo ">>> Deploy complete!"
