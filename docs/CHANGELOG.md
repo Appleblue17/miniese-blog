@@ -1,127 +1,100 @@
 # Changelog
 
-> 记录项目的重要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/)。
+> 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
+>
+> 项目当前为初版（v0.1.0），所有功能均在第一个版本中实现。
 
-## [Unreleased]
+## [0.1.0] — 2026-06-29
 
-### Added
+### 基础架构
 
-#### 搜索与标签筛选系统
-- 新增 `GET /api/tags` API：聚合文章/词条的可用标签列表，支持 `?type=article|wiki|all` 和 `?lang=zh|en`
-- 新增 `SearchFilters` 可复用 UI 组件：搜索框（300ms 防抖）、标签包含/排除下拉选择器、激活筛选条件徽章、移动端折叠面板
-- 文章公开列表页（`ArticleList`）与词条公开列表页（`WikiList`）集成搜索和标签筛选
-- 管理后台文章列表（`admin/articles`）通过 URL search params 持久化搜索/筛选条件，服务端 Prisma 查询
-- 管理后台词条列表（`AdminWikiList`）搜索和标签筛选对 entry tabs 生效
-- 新增 `AdminArticleSearch` 客户端组件：管理后台文章页的搜索/筛选包装器
-- `GET /api/articles` 和 `GET /api/wiki` API 新增 `?q=`（全文搜索 title/summary/tags）、`?tagFilter=`（包含标签，逗号分隔 AND）、`?tagExclude=`（排除标签，逗号分隔）参数
-
-#### 图片灯箱移动端交互（双指缩放 + 拖动平移）
-- 新增触摸事件处理：双指 pinch-to-zoom（0.2x–5x 无级缩放）
-- 缩放后单指 drag-to-pan 平移图片，边界约束防止图片移出视口
-- 拖动时使用 `window.innerWidth/Height` 计算最大偏移量 `(scale-1)*vw/2`
-- 移除右上角关闭按钮（点击 overlay 背景即可关闭 + Escape 键盘）
-- 移除过渡动画（`transition-transform duration-100` → `transition-none`），手势响应更即时
-- caption 和底部信息添加 `pointer-events-none`，防止点击干扰关闭操作
-- 添加 `touch-none select-none` 防止触摸时页面滚动或选中文字
-
-#### AI 对话窗口响应式优化
-- ChatButton 移动端缩小（`size-14`→`size-12`），适配 `safe-area-inset-bottom`
-- ChatDrawer 移动端全屏覆盖（`max-md:inset-0 w-full`），桌面端保持侧滑抽屉
-- 快速操作按钮由 `overflow-x-auto` 改为 `flex flex-wrap`，空间不足时自动换行成两行
-- 拖拽手柄同时支持鼠标（`onMouseDown`）和触摸（`onTouchStart`）事件，平板端可拖拽调整宽度
-- 消息气泡移动端宽度放宽（`max-w-[85%]`）
-- 输入框移动端最小高度 44px，发送按钮 48px
-- 底部适配 `safe-area-inset-bottom` 防止系统导航栏遮挡
-- TextSelectionToolbar 移动端按钮触控热区提升至 `min-h-[44px]`
-
-#### 重名草稿检测和返回按钮统一
-- 新增 `GET /api/articles/draft/check-duplicate` API：上传前检测草稿 slug 是否已存在
-- PublishForm 上传流程新增重名草稿确认对话框（黄色警告卡片），支持覆盖已有草稿
-- 三个步骤标题左侧统一返回按钮（`size-9` ArrowLeft 图标）：
-  - 上传页 → `/admin/articles`，草稿页 → `/admin/articles`，确认页 → 返回步骤二
-- 移除 `/admin/articles/new` 和 `/admin/articles/[id]/edit` 页面级冗余返回按钮
-
-#### AI 聊天对话窗口
-- 新增 `/api/chat` 端点：SSE 流式响应，直接调用 DeepSeek API，支持文章上下文注入
-- 新增 `ChatButton` 组件：右下角浮动聊天入口
-- 新增 `ChatDrawer` 组件：右侧滑入抽屉，流式显示 AI 响应，支持选中内容上下文
-- 新增 `TextSelectionToolbar` 组件：选择文本后浮动工具栏，"向 Miniese 提问"和"申请添加词条"
-- 新增 `SelectionInfo` 类型，包含选中文本、周围段落、标题路径等上下文信息
-- Settings 新增 `prompts.chat` 配置，博主可自定义 Miniese 角色 prompt
-
-#### 阅读页 AI 功能
-- 选中文本时自动计算所属标题层级（headingPath）和周围上下文（surroundingContext）
-- ChatDrawer 选中内容卡片（sticky 固定在顶部）和 4 个快捷操作按钮（解释/翻译/举例/总结）
-- 快捷按钮始终可见，不限于首次交互
-
-#### 发布流程优化
-- Settings 新增 `publish.defaultAuthor` 配置，PublishForm 从设置读取默认作者
-- 语言选择改为必选，保存/提交/确认前进行校验
-- 上传文件时从 frontmatter 提取标题、作者、标签、摘要；无 frontmatter 时从文件名推断标题
-- 删除草稿页面内联 AI 审查卡片，点击审查后直接跳转到详情页
-
-### Fixed
-
-- KaTeX 公式选中后获取渲染字符而非 LaTeX 源码的问题
-  - 选择包含公式的文本时（如 "$E = mc^2$"），`selection.toString()` 返回渲染后的 "E = mc²"
-  - 修复：使用 `range.cloneContents()` 获取选中 DOM 片段，将 `.katex` 元素替换为 `<annotation>` 中的 LaTeX 源码
-  - 支持跨区域选择（普通文本和公式混合），每个公式独立替换
-- skipped 任务（feature disabled）在各处正确显示"已跳过"而非"已完成"
-  - reviews 列表页：映射 status 为 "skipped"，黄色标签
-  - reviews 详情页：跳过状态检测 + 显示 reason 提示卡片
-  - ai-tasks 列表页：API 映射 + AiTaskList 兼容
-  - ai-tasks 详情页：StatusBadge 跳过检测
-- Notesaw block 容器移除 `border-radius: 8px`，恢复直角左侧竖线样式
-- "编辑→"按钮文案改为"点击编辑草稿"，语义更清晰
-
-### Changed
-
-- 发布确认页不再硬编码 "博主"，使用 settings 中的 `publish.defaultAuthor`
-
-#### 基础架构
 - Next.js 16 + TypeScript 5 + Tailwind CSS 4 项目初始化
-- Prisma 7.8 + PostgreSQL 16 + Redis 7 配置
-- Docker Compose 开发环境编排
-- 目录结构和配置文件
+- Prisma 7 + PostgreSQL 16 ORM，`@prisma/adapter-pg` 驱动适配
+- Bull + Redis 7 队列基础设施，支持异步 AI 任务处理
+- Docker Compose 开发环境编排（PostgreSQL 16 + Redis 7）
+- 完整的调试/优化/测试工具链（ESLint flat config、Prettier、Vitest v4）
 
-#### 文章系统
-- Markdown/Notesaw 双渲染管线（统一渲染器，支持 KaTeX）
-- 文章发布流程（上传、预览、元信息编辑、确认发布）
-- 文章列表页（分页、标签筛选）
-- 文章阅读页（正文、右侧 TOC 目录、阅读量、点赞数）
-- 文章管理页（已发布文章 + 草稿绑定显示）
+### 文章系统
 
-#### 知识库
-- 词条 CRUD API 和文件管理
-- 词条列表页和阅读页
-- 词条链接检测（发布时自动替换为链接）
-- 词条 hover 预览（悬停显示定义）
+- Markdown / Notesaw 双渲染管线，支持 KaTeX 数学公式
+- 文章发布流程：上传 Markdown → 预览 → 元信息编辑 → changelog → 发布
+- 文章状态管理：草稿 / 已发布，草稿可编辑和版本管理
+- 文章列表页：分页、标签筛选、搜索
+- 文章阅读页：正文渲染 + 右侧 TOC 目录 + 阅读量统计 + 点赞
+- 图片灯箱：点击放大、键盘/点击关闭、移动端双指缩放与拖动平移
+- 公式溢出自适应修复
 
-#### AI 功能
-- DeepSeek API 封装（重试、超时、Token 记录）
-- 队列基础设施（Bull + Redis + Worker）
-- AI 文章审查（分块处理、结构化报告、历史存档）
-- AI 增量翻译（双向、自动触发、译文标注）
-- AI 词条发现（发布时扫描、候选审批）
-- AI 词条生成（审批后自动生成完整词条）
+### 知识库（Wiki）
 
-#### 仪表盘
-- 文章管理（列表、发布、编辑、删除）
-- 词条管理（列表、创建、编辑、删除）
-- 词条发现审批（批量操作、状态管理）
-- 审查历史（列表页、详情页）
-- 设置页面（常规、外观、功能开关、通知、编译器、Prompt 查看）
-- 全局色彩系统（主题色/强调色可调、实时预览）
+- 词条完整 CRUD（API + 文件管理 + 前端页面）
+- 词条列表页和阅读页（支持中文/英文）
+- 发布时自动词条链接检测：扫描文章内容，匹配已有词条并注入 `<a data-wiki>` 链接
+- 词条 hover 预览：悬停 300ms 后弹出词条摘要卡片，5 分钟全局缓存
+- 词条 ↔ 文章反向链接：词条页展示引用该词条的文章列表
 
-#### 前端
-- 左侧导航栏 + 右上角 ActionBar（语言切换、暗色模式）
-- 响应式布局（移动端基本可用）
-- AI 生成内容背景色标注
+### AI 功能（Miniese 助手）
 
-### Planned
+- DeepSeek API 封装：支持重试、超时、Token 记录
+- **AI 审查**：分块处理长文章，输出结构化报告（事实错误/拼写/语法/结构），chunk 串行处理 + 进度更新
+- **AI 增量翻译**：双向（中↔英），行级 diff 引擎，仅翻译变更行并复用已有翻译，上下文窗口对齐标题边界，frontmatter 翻译 + 译文文件写入 + DB 更新 + 重新渲染
+- **AI 词条发现**：发布时自动扫描候选词条，去重合并，生成提案供审批
+- **AI 词条生成**：审批后调用 AI 自动撰写完整词条（中英文）
+- **AI changelog 自动生成**：发布时自动记录变更日志，累积追加，翻译仅翻最新条目
+- **AI 对话窗口**：右下角浮动聊天入口，右侧滑入抽屉，SSE 流式响应，支持文章上下文注入
+- **选中文本工具栏**：选中文本后弹出浮动工具栏，支持向 Miniese 提问、解释/翻译/举例/总结快捷键
 
-- 账号系统（注册、登录、OAuth、邮箱验证、密码找回）
-- AI 对话窗口（读者与 Miniese 交互）
-- 评论功能（登录后可评论）
-- 词条申请（登录后可提交）
-- 移动端体验优化
+### 仪表盘
+
+- 文章管理：列表、发布、编辑、删除、草稿管理
+- 词条管理：列表、创建、编辑、删除
+- 词条发现审批：候选列表，支持同意/驳回/批量操作
+- 审查历史：列表页 + 详情页（chunk 导航 + 问题分类筛选）
+- AI 任务管理：任务列表、状态追踪、批量删除
+- 通知中心：分类型展示通知，分级已读策略（自动/手动），侧边栏未读 Badge
+- 设置页面：
+  - 常规：站点标题、作者、语言、ICP 备案号
+  - 外观：主题色/强调色自定义 + 实时预览、Hero 配置、背景图轮播
+  - 功能开关：AI 审查/翻译/词条发现/自动翻译 开关
+  - 通知：6 种通知类型，每项含启用 + 邮件双开关 + 等级 Badge
+  - 编译器：正文宽度、图片尺寸、Markdown 背景色
+  - Prompt 自定义：审查/翻译/发现/生成/对话 5 种 prompt 编辑，支持恢复默认
+- 图片管理：文件夹浏览、上传（单张/批量/压缩包）、缩略图预览、删除
+- 关于页面配置、GitHub 链接、许可证信息
+
+### 前端交互
+
+- 响应式布局：桌面端侧边导航栏，移动端折叠
+- 暗色模式支持（`next-themes`），主题色/强调色 CSS 变量系统
+- 全站卡片统一交互：内容卡片 `card-base`（悬停高亮），文章列表卡片 `card-article`（悬停淡出）
+- 多语言支持（中文/英文），URL 路径 `/[lang]/` 前缀
+- 首页 Hero 全屏背景图（Light/Dark 双图），副标题轮播，入口卡片
+- 首页第二屏：最新文章 / 热门文章 / 博客动态时间线，三列网格布局
+- 关于页面：右图左文布局，Miniese 立绘展示，技术栈标签，AIGC 声明
+- 加载动画：Miniese 插画 + CSS 旋转圆环
+- 页脚：GitHub 链接、MIT License、关于页面、ICP 备案号
+
+### 认证与账户
+
+- NextAuth.js v5 认证框架（Credentials + 可选 Google/GitHub OAuth）
+- 注册 / 登录 / 邮箱验证 / 密码找回流程
+- 博主管理员 CLI 创建脚本
+- 中间件路由保护：`/admin/*` 需 admin 角色
+- 评论系统：发表、列表、60s 频率限制，跨翻译版本互通
+
+### 测试
+
+- 363 个测试全部通过（29 个测试文件）
+- 单元测试覆盖：Markdown/Notesaw 渲染、词条链接检测、Wiki 解析、frontmatter、diff/翻译引擎、AI 审查
+- 集成测试覆盖：文章上传/发布/预览/列表/详情/渲染、词条 CRUD、队列 E2E、设置
+- 覆盖率目标：Lines ≥ 80%，Branches ≥ 80%，Functions ≥ 80%
+
+### 文档
+
+- PRD（产品需求文档）
+- 技术架构文档（architecture.md）
+- MVP 范围划定（MVP.md）
+- 开发顺序与依赖关系（development-order.md）
+- 开发活动日志（development-log.md）
+- 测试记录（testing-log.md）
+- 用户指南（user-guide.md）
+- Agent 工作流规范（agent-workflow.md）
