@@ -61,7 +61,10 @@ describe("Settings API", () => {
         heroSubtitleIntervalMs: 5000,
         heroImageLight: "/images/miniese/hero/hero-light.png",
         heroImageDark: "/images/miniese/hero/hero-dark.png",
+        heroImageLightPortrait: "",
+        heroImageDarkPortrait: "",
         homepage: { layout: "columns", latestCount: 5, popularCount: 5, timelineCount: 8 },
+        footer: { githubUrl: "", licenseUrl: "", licenseLabel: "MIT License", licenseLabelEn: "MIT License", aboutLabel: "关于", aboutLabelEn: "About" },
       },
     });
 

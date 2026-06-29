@@ -25,6 +25,14 @@
       "latestCount": 5,
       "popularCount": 5,
       "timelineCount": 8
+    },
+    "footer": {
+      "githubUrl": "https://github.com/Appleblue17/miniese-blog",
+      "licenseUrl": "https://opensource.org/licenses/MIT",
+      "licenseLabel": "MIT License",
+      "licenseLabelEn": "MIT License",
+      "aboutLabel": "关于",
+      "aboutLabelEn": "About"
     }
   },
   "pagination": {

@@ -28,6 +28,14 @@ export interface AppSettings {
       popularCount: number;
       timelineCount: number;
     };
+    footer: {
+      githubUrl: string;
+      licenseUrl: string;
+      licenseLabel: string;
+      licenseLabelEn: string;
+      aboutLabel: string;
+      aboutLabelEn: string;
+    };
   };
   pagination: {
     articlesPerPage: number;
