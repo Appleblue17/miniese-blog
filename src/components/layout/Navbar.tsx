@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FileText, BookOpen, Info, Settings, Menu, X, Bell } from "lucide-react";
+import { Home, FileText, Library, Info, Settings, Menu, X, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 
 const navItems: Array<{ href: string; labelZh: string; labelEn: string; icon: React.ComponentType<{ className?: string }> }> = [
   { href: "/articles", labelZh: "文章", labelEn: "Articles", icon: FileText },
-  { href: "/wiki", labelZh: "知识库", labelEn: "Wiki", icon: BookOpen },
+  { href: "/wiki", labelZh: "知识库", labelEn: "Wiki", icon: Library },
   { href: "/about", labelZh: "关于", labelEn: "About", icon: Info },
 ];
 

@@ -90,9 +90,14 @@
   "notifications": {
     "email": true,
     "adminEmail": "",
-    "onComment": true,
-    "onDiscovery": true,
-    "onTranslate": true
+    "typeSettings": {
+      "comment": { "enabled": true, "email": true },
+      "comment_deleted": { "enabled": true, "email": false },
+      "translation_complete": { "enabled": true, "email": false },
+      "task_failed": { "enabled": true, "email": true },
+      "discovery": { "enabled": true, "email": false },
+      "article_published": { "enabled": true, "email": true }
+    }
   },
   "compilers": {
     "markdown": {

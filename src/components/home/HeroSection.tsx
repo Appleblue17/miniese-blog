@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { FileText, BookOpen, Info } from "lucide-react";
+import { FileText, Library, Info } from "lucide-react";
 import { getSettings } from "../../../config/settings";
 import { HeroCarousel } from "./HeroCarousel";
 import { ScrollIndicator } from "./ScrollIndicator";
@@ -93,7 +93,7 @@ export async function HeroSection({ lang }: HeroSectionProps) {
             />
             <HeroCard
               href={`/${lang}/wiki`}
-              icon={<BookOpen className="size-6" />}
+              icon={<Library className="size-6" />}
               label={lang === "zh" ? "知识库" : "Wiki"}
               description={
                 lang === "zh" ? "查阅术语和概念" : "Browse terms and concepts"

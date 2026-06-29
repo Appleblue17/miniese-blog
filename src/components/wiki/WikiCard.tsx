@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { BookOpen, Sparkles, ShieldCheck, Clock, Tag } from "lucide-react";
+import { Library, Sparkles, ShieldCheck, Clock, Tag } from "lucide-react";
 
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,7 @@ export function WikiCard({ entry, lang }: WikiCardProps) {
         <CardContent className="flex flex-col gap-2.5 pt-4">
           {/* Title row: icon + name + type + status + language — all in one line */}
           <div className="flex items-start gap-2">
-            <BookOpen className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <Library className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
             <CardTitle className="flex-1 text-base group-hover:text-primary-hsl transition-colors leading-snug">
               {entry.name}
             </CardTitle>

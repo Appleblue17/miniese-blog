@@ -16,7 +16,7 @@ import {
   Globe,
   Sparkles,
   Search,
-  BookOpen,
+  Library,
   CheckCircle2,
   Edit,
 } from "lucide-react";
@@ -607,7 +607,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
                 href={`/admin/wiki?status=unreviewed`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
               >
-                <BookOpen className="size-4" />
+                <Library className="size-4" />
                 查看待审查词条
               </Link>
             </div>
@@ -685,7 +685,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
                       <div className="flex-1 min-w-0">
                         {/* Term name + type badge + lang (matching wiki management style) */}
                         <div className="flex items-center gap-2 mb-2">
-                          <BookOpen className="size-4 text-muted-foreground shrink-0" />
+                          <Library className="size-4 text-muted-foreground shrink-0" />
                           <span className="font-semibold text-sm">{candidate.term}</span>
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(candidate.type)}`}

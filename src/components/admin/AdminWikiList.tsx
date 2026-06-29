@@ -20,7 +20,7 @@ import {
   Loader2,
   AlertTriangle,
   X,
-  BookOpen,
+  Library,
   CheckCircle2,
   Hourglass,
   Sparkles,
@@ -63,7 +63,7 @@ type StatusTabDef = {
 };
 
 const STATUS_TABS: StatusTabDef[] = [
-  { key: "all", label: "全部", icon: <BookOpen className="size-3.5" /> },
+  { key: "all", label: "全部", icon: <Library className="size-3.5" /> },
   { key: "|", label: "", icon: null },
   { key: "pending", label: "申请中", icon: <Hourglass className="size-3.5" /> },
   { key: "creating", label: "生成中", icon: <Sparkles className="size-3.5" /> },
@@ -315,7 +315,7 @@ function EntryRow({ entry, onRefresh }: { entry: WikiEntryMeta; onRefresh: () =>
       >
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <BookOpen className="size-4 text-muted-foreground shrink-0" />
+            <Library className="size-4 text-muted-foreground shrink-0" />
             <span className="font-medium truncate">{entry.name}</span>
             {entry.type && <TypeBadge type={entry.type} />}
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider px-1.5 py-0.5">

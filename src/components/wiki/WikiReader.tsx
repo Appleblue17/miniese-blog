@@ -14,7 +14,7 @@
 
 import {
   Calendar,
-  BookOpen,
+  Library,
   Bot,
   User,
   Quote,
@@ -162,7 +162,7 @@ export async function WikiReader({ entry, lang }: WikiReaderProps) {
       {/* 1. Title area */}
       <header className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          <BookOpen className="size-6 shrink-0 text-primary mt-1" />
+          <Library className="size-6 shrink-0 text-primary mt-1" />
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">{entry.name}</h1>
           </div>
