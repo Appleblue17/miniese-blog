@@ -35,6 +35,8 @@ export interface GenerateResult {
   success: boolean;
   entry?: GeneratedWiki;
   reason?: string;
+  /** Total tokens used in the AI call */
+  totalTokensUsed?: number;
 }
 
 /**
@@ -76,12 +78,12 @@ export async function generateWikiEntry(
 
     if (!parsed) {
       console.warn(`[Generator] Failed to parse AI response for term: "${term}"`);
-      return { success: false, reason: "parse_error" };
+      return { success: false, reason: "parse_error", totalTokensUsed: response.usage.total_tokens };
     }
 
     if (parsed.unable) {
       console.log(`[Generator] AI unable to generate content for term: "${term}"`);
-      return { success: false, reason: "unable" };
+      return { success: false, reason: "unable", totalTokensUsed: response.usage.total_tokens };
     }
 
     console.log(`[Generator] Successfully generated wiki entry for term: "${term}"`);
@@ -95,6 +97,7 @@ export async function generateWikiEntry(
         tags: parsed.tags,
         type: parsed.type,
       },
+      totalTokensUsed: response.usage.total_tokens,
     };
   } catch (err) {
     console.warn(

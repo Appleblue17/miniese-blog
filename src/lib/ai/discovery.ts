@@ -89,12 +89,13 @@ export async function incrementalDiscover(
   candidates: DiscoveryCandidate[];
   contentSnapshot: string;
   existingCandidatesMap: Record<string, DiscoveryCandidate[]>;
+  totalTokensUsed: number;
 }> {
   const newBody = stripFrontmatter(newSourceContent);
   const oldBody = stripFrontmatter(oldSourceContent);
 
   if (!newBody.trim()) {
-    return { candidates: [], contentSnapshot: newBody, existingCandidatesMap: {} };
+    return { candidates: [], contentSnapshot: newBody, existingCandidatesMap: {}, totalTokensUsed: 0 };
   }
 
   const newLines = newBody.split("\n");
@@ -113,7 +114,7 @@ export async function incrementalDiscover(
     const deduped = deduplicateByTerm(allReused);
     const filtered = await deduplicateWithExisting(deduped, articleLang, articleId);
 
-    return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap };
+    return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap, totalTokensUsed: 0 };
   }
 
   // ---- Step 3: Build line-level lookup for candidate reuse ----
@@ -145,6 +146,7 @@ export async function incrementalDiscover(
   const newCandidates: DiscoveryCandidate[] = [];
   const newExistingMap: Record<string, DiscoveryCandidate[]> = {};
   const reusedKeys = new Set<string>();
+  let totalTokensUsed = 0;
 
   for (const subChunk of allSubChunks) {
     const existing = existingCandidatesMap[subChunk.content];
@@ -195,6 +197,7 @@ export async function incrementalDiscover(
         maxTokens: 4096,
       });
 
+      totalTokensUsed += response.usage.total_tokens;
       const candidates = parseDiscoveryResponse(response.content);
       newCandidates.push(...candidates);
       newExistingMap[subChunk.content] = candidates;
@@ -249,7 +252,7 @@ export async function incrementalDiscover(
   const uniqueCandidates = deduplicateByTerm(newCandidates);
   const filtered = await deduplicateWithExisting(uniqueCandidates, articleLang, articleId);
 
-  return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap: newExistingMap };
+  return { candidates: filtered, contentSnapshot: newBody, existingCandidatesMap: newExistingMap, totalTokensUsed };
 }
 
 /**

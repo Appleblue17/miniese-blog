@@ -26,6 +26,9 @@ import {
   Globe,
   EyeOff,
   Pin,
+  Link2,
+  ChevronDown,
+  Circle,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +54,7 @@ interface ArticleItem {
   lineCount: number;
   isHidden?: boolean;
   isPinned?: boolean;
+  linkSyncStale?: boolean | null;
 }
 
 interface DraftItem {
@@ -114,6 +118,25 @@ function formatDateTime(dateStr: string): string {
     minute: "2-digit",
     hourCycle: "h23",
   });
+}
+
+/**
+ * Format a timestamp as a human-readable "time ago" string.
+ */
+function formatTimeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "刚刚";
+  if (diffMins < 60) return `${diffMins} 分钟前`;
+  if (diffHours < 24) return `${diffHours} 小时前`;
+  if (diffDays < 7) return `${diffDays} 天前`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} 周前`;
+  return formatDate(dateStr);
 }
 
 function ArticleMetaRow({
@@ -230,6 +253,13 @@ function PublishedArticleRow({
   const [togglingHidden, setTogglingHidden] = useState(false);
   const [togglingPinned, setTogglingPinned] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLinkMenu, setShowLinkMenu] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<{
+    linkCount: number;
+    lastDetectedAt: string | null;
+    isStale: boolean;
+  } | null>(null);
+  const [loadingLinkStatus, setLoadingLinkStatus] = useState(false);
 
   const hasPendingTranslate = activeTaskTypes.includes("translate");
   const hasPendingDiscover = activeTaskTypes.includes("discover");
@@ -433,6 +463,36 @@ function PublishedArticleRow({
     [article.slug, article.language, router],
   );
 
+  // Fetch link status when hover/dropdown is opened
+  const handleFetchLinkStatus = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setLoadingLinkStatus(true);
+      try {
+        const res = await fetch(
+          `/api/admin/articles/link-status?articleIds=${article.id}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const status = data.articles?.[0];
+          if (status) {
+            setLinkStatus({
+              linkCount: status.linkCount,
+              lastDetectedAt: status.lastDetectedAt,
+              isStale: status.isStale,
+            });
+          }
+        }
+      } catch {
+        // Ignore errors in link status fetch
+      } finally {
+        setLoadingLinkStatus(false);
+      }
+    },
+    [article.id],
+  );
+
   return (
     <>
       <Link
@@ -444,6 +504,13 @@ function PublishedArticleRow({
           <div className="flex items-center gap-2">
             <span className="font-medium truncate">{article.title}</span>
             <StatusBadge status={article.status} />
+            {/* Link sync status indicator */}
+            {article.linkSyncStale === true && (
+              <Circle className="size-2 fill-amber-500 text-amber-500 shrink-0" aria-label="链接需要更新" />
+            )}
+            {article.linkSyncStale === false && (
+              <Circle className="size-2 fill-green-500 text-green-500 shrink-0" aria-label="链接已同步" />
+            )}
             {article.isHidden && (
               <EyeOff className="size-3.5 text-muted-foreground/60" aria-label="已隐藏" />
             )}
@@ -480,17 +547,92 @@ function PublishedArticleRow({
             </button>
           ) : null}
 
-          {/* Refresh wiki links button */}
-          <button
-            type="button"
-            onClick={handleRefreshLinks}
-            disabled={refreshingLinks}
-            className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
-            title="刷新词条链接"
-          >
-            <RefreshCw className={`size-3.5 ${refreshingLinks ? "animate-spin" : ""}`} />
-            <span>链接</span>
-          </button>
+          {/* Link dropdown — shows wiki link status and actions */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                handleFetchLinkStatus(e);
+                setShowLinkMenu(!showLinkMenu);
+              }}
+              onMouseEnter={handleFetchLinkStatus}
+              disabled={refreshingLinks}
+              className="inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
+              title="词条链接管理"
+            >
+              {refreshingLinks ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Link2 className="size-3.5" />
+              )}
+              <span className="flex items-center gap-0.5">
+                链接
+                <ChevronDown className={`size-2.5 transition-transform ${showLinkMenu ? "rotate-180" : ""}`} />
+              </span>
+            </button>
+
+            {showLinkMenu && (
+              <>
+                {/* Backdrop to close dropdown */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setShowLinkMenu(false);
+                  }}
+                />
+                {/* Dropdown */}
+                <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg">
+                  <div className="space-y-2">
+                    {/* Link status info */}
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span>词条链接</span>
+                        <span className="font-medium text-foreground">
+                          {loadingLinkStatus ? (
+                            <Loader2 className="size-3 animate-spin inline" />
+                          ) : (
+                            linkStatus?.linkCount ?? "-"
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>最后检测</span>
+                        <span className="font-medium text-foreground">
+                          {loadingLinkStatus ? (
+                            <Loader2 className="size-3 animate-spin inline" />
+                          ) : linkStatus?.lastDetectedAt ? (
+                            formatTimeAgo(linkStatus.lastDetectedAt)
+                          ) : (
+                            "从未"
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    <hr className="border-border" />
+
+                    {/* Actions */}
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          handleRefreshLinks(e);
+                          setShowLinkMenu(false);
+                        }}
+                        disabled={refreshingLinks}
+                        className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        <RefreshCw className={`size-3.5 ${refreshingLinks ? "animate-spin" : ""}`} />
+                        刷新本文链接
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Translate button */}
           <button

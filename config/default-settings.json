@@ -87,11 +87,17 @@
     "autoTranslate": true,
     "wikiDiscovery": true,
     "wikiGenerate": true,
+    "autoLink": { "enabled": false, "intervalDays": 7 },
     "comments": true,
     "rss": true,
     "devMode": false,
     "realEmail": false,
     "skipEmailVerification": false
+  },
+  "ai": {
+    "monthlyTokenLimit": 10000000,
+    "warningThreshold": 0.7,
+    "criticalThreshold": 0.9
   },
   "notifications": {
     "email": true,

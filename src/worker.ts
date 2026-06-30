@@ -38,6 +38,36 @@ if (!REDIS_URL) {
 }
 
 // ---------------------------------------------------------------------------
+// AiUsageLog helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Records token usage to the AiUsageLog table.
+ * Fire-and-forget: failures are logged but not thrown.
+ */
+async function recordAiUsage(
+  type: "review" | "translate" | "generate" | "discover" | "chat",
+  promptTokens: number,
+  completionTokens: number,
+  totalTokens: number,
+): Promise<void> {
+  try {
+    await prisma.aiUsageLog.create({
+      data: {
+        type,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+      },
+    });
+  } catch (err) {
+    console.warn(
+      `[Worker] Failed to record AiUsageLog: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Review handler
 // ---------------------------------------------------------------------------
 
@@ -170,6 +200,14 @@ async function processReview(job: Job): Promise<Record<string, unknown>> {
       `(${result.summary.errors} errors, ${result.summary.warnings} warnings, ` +
       `${result.summary.suggestions} suggestions), ` +
       `${result.reviewedCount} reviewed, ${result.reusedCount} reused`,
+  );
+
+  // Record token usage
+  recordAiUsage(
+    "review",
+    result.totalTokensUsed, // approximate: we don't have prompt vs completion from incrementalReview
+    0,
+    result.totalTokensUsed,
   );
 
   // 5. Return the full result (stored as AiTask.output)
@@ -565,6 +603,18 @@ async function processTranslate(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
+  // Record token usage for incremental translation
+  recordAiUsage(
+    "translate",
+    result.totalTokensUsed,
+    0,
+    result.totalTokensUsed,
+  );
+
+  // Also record usage from metadata translation calls (title, summary, changelog)
+  // These are tracked separately since we don't store their individual usage.
+  // For now, only the main incremental translation usage is recorded.
+
   // 13. Return result including the full translation map for future incremental runs
   //     and translatedGroups for the detail page display, plus contentSnapshot
   //     for the next incremental diff.
@@ -864,6 +914,11 @@ async function processGenerate(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
+  // Record token usage
+  if (result.totalTokensUsed) {
+    recordAiUsage("generate", 0, 0, result.totalTokensUsed);
+  }
+
   // 7. Return success
   return {
     discoveryId: discoveryIdStr,
@@ -1020,8 +1075,13 @@ async function processDiscover(job: Job): Promise<Record<string, unknown>> {
     );
   });
 
+  // Record token usage
+  if (result.totalTokensUsed) {
+    recordAiUsage("discover", 0, 0, result.totalTokensUsed);
+  }
+
   // 7. Return summary including contentSnapshot + existingCandidatesMap
-  //    for the next incremental run. incrementalDiscover builds the map
+  //    for the next incremental run. incrementalBuilds the map
   //    keyed by sub-chunk content → candidates found.
   return {
     articleId: articleIdStr,
@@ -1044,6 +1104,129 @@ async function processScan(job: Job): Promise<Record<string, unknown>> {
   return { message: "扫描完成（模拟）", proposals: [] };
 }
 
+/**
+ * Processes an auto-link job — re-renders articles whose wiki links are stale.
+ *
+ * This job type does NOT call DeepSeek; it purely re-renders Markdown/Notesaw
+ * content to update wiki link references. It exists as a queue task so that:
+ * 1. External cron triggers can enqueue it without blocking
+ * 2. The result is tracked in the AiTask table for observability
+ * 3. Feature flag (`features.autoLink`) enforcement is centralized
+ *
+ * Logic:
+ * 1. Fetch all published original articles
+ * 2. Check each article's link staleness via ArticleWikiLink table
+ * 3. Re-render only stale articles (never detected or > 7 days old)
+ * 4. Update renderedContent in DB
+ *
+ * Payload: none (operates on all published articles)
+ */
+async function processAutoLink(_job: Job): Promise<Record<string, unknown>> {
+  console.log(`[Worker] Processing auto-link`);
+
+  // 1. Fetch all published original articles (not translations)
+  const articles = await prisma.article.findMany({
+    where: { status: "published", originalId: null },
+    select: {
+      id: true,
+      slug: true,
+      language: true,
+      contentPath: true,
+      contentType: true,
+    },
+  });
+
+  // 2. Batch query link detection timestamps from ArticleWikiLink
+  const linkRecords = await prisma.articleWikiLink.groupBy({
+    by: ["articleId"],
+    _max: { detectedAt: true },
+    where: { articleId: { in: articles.map((a) => a.id) } },
+  });
+  const lastDetectedMap = new Map(
+    linkRecords.map((r) => [r.articleId, r._max.detectedAt]),
+  );
+
+  // 3. Count wiki entries per language
+  const wikiEntryCounts = await prisma.wikiEntry.groupBy({
+    by: ["language"],
+    where: { status: { not: "deleted" } },
+    _count: { id: true },
+  });
+  const wikiCountByLang: Record<string, number> = {};
+  for (const w of wikiEntryCounts) {
+    wikiCountByLang[w.language] = w._count.id;
+  }
+
+  const now = new Date();
+  const staleThresholdMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  const toRender: Array<{
+    id: string;
+    slug: string;
+    language: string;
+    contentPath: string;
+    contentType: string;
+  }> = [];
+
+  for (const article of articles) {
+    const langWikiCount = wikiCountByLang[article.language] || 0;
+    if (langWikiCount === 0) continue;
+
+    const lastDetected = lastDetectedMap.get(article.id) ?? null;
+    if (!lastDetected) {
+      toRender.push(article);
+    } else {
+      const age = now.getTime() - new Date(lastDetected).getTime();
+      if (age > staleThresholdMs) {
+        toRender.push(article);
+      }
+    }
+  }
+
+  // 4. Re-render stale articles
+  const errors: string[] = [];
+  let reRendered = 0;
+
+  for (const article of toRender) {
+    try {
+      const filePath = path.join(process.cwd(), article.contentPath);
+      const rawContent = await fs.readFile(filePath, "utf-8");
+
+      const { content: mdBody } = parseFrontmatter(rawContent);
+      const pipeline: "markdown" | "notesaw" =
+        (article.contentType as "markdown" | "notesaw") || "markdown";
+
+      const linkedContent = await detectWikiLinks({
+        lang: article.language,
+        content: mdBody,
+      });
+      const html = await renderMarkdown(linkedContent, pipeline);
+
+      await prisma.article.update({
+        where: { id: article.id },
+        data: { renderedContent: html },
+      });
+
+      reRendered++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Article "${article.slug}" (${article.id}): ${msg}`);
+    }
+  }
+
+  console.log(
+    `[Worker] Auto-link complete: ${reRendered}/${toRender.length} articles re-rendered` +
+      (errors.length > 0 ? `, ${errors.length} errors` : ""),
+  );
+
+  return {
+    total: articles.length,
+    needsUpdate: toRender.length,
+    reRendered,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
@@ -1053,6 +1236,7 @@ const HANDLERS: Record<string, (job: Job) => Promise<Record<string, unknown>>> =
   translate: processTranslate,
   discover: processDiscover,
   generate: processGenerate,
+  auto_link: processAutoLink,
   // scan: disabled for now
 };
 
@@ -1205,11 +1389,64 @@ workerQueue.on("failed", (job, err) => {
   console.error(`[Worker] Job ${job.id} failed after attempts: ${err.message}`);
 });
 
+// ---------------------------------------------------------------------------
+// Auto-link scheduler
+// ---------------------------------------------------------------------------
+
+/**
+ * Checks settings and optionally starts a setInterval for auto-link scanning.
+ * Cancelled on graceful shutdown.
+ */
+let autoLinkTimer: ReturnType<typeof setInterval> | null = null;
+
+async function startAutoLinkScheduler(): Promise<void> {
+  try {
+    const settings = await getSettings();
+    const autoLinkCfg = settings.features?.autoLink;
+    const enabled = typeof autoLinkCfg === "object" ? autoLinkCfg.enabled : Boolean(autoLinkCfg);
+    const intervalDays =
+      typeof autoLinkCfg === "object" && typeof autoLinkCfg.intervalDays === "number"
+        ? autoLinkCfg.intervalDays
+        : 7;
+
+    if (!enabled) {
+      console.log("[Worker] Auto-link scheduler: disabled (feature flag off)");
+      return;
+    }
+
+    const intervalMs = Math.max(intervalDays, 1) * 24 * 60 * 60 * 1000;
+
+    console.log(
+      `[Worker] Auto-link scheduler: enabled, scanning every ${intervalDays} day(s) (${intervalMs} ms)`,
+    );
+
+    // Run once immediately on startup
+    processAutoLink({} as Job).catch((err) =>
+      console.warn(`[Worker] Initial auto-link scan failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
+
+    // Then schedule
+    autoLinkTimer = setInterval(() => {
+      processAutoLink({} as Job).catch((err) =>
+        console.warn(`[Worker] Scheduled auto-link scan failed: ${err instanceof Error ? err.message : String(err)}`),
+      );
+    }, intervalMs);
+  } catch (err) {
+    console.warn(
+      `[Worker] Failed to start auto-link scheduler: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+// Start the scheduler after worker is ready
+startAutoLinkScheduler();
+
 console.log("[Worker] ai-tasks worker started. Waiting for jobs...");
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("[Worker] Shutting down gracefully...");
+  if (autoLinkTimer) clearInterval(autoLinkTimer);
   await workerQueue.close();
   await prisma.$disconnect();
   process.exit(0);
@@ -1217,6 +1454,7 @@ process.on("SIGINT", async () => {
 
 process.on("SIGTERM", async () => {
   console.log("[Worker] Shutting down gracefully...");
+  if (autoLinkTimer) clearInterval(autoLinkTimer);
   await workerQueue.close();
   await prisma.$disconnect();
   process.exit(0);

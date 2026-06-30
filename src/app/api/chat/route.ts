@@ -28,6 +28,7 @@
 
 import { NextResponse } from "next/server";
 import { getSettings } from "../../../../config/settings";
+import { prisma } from "@/lib/db";
 import type { SelectionInfo } from "@/types/ai";
 
 interface ChatMessage {
@@ -171,6 +172,9 @@ export async function POST(request: Request) {
         const decoder = new TextDecoder();
         let buffer = "";
         let previousContent = "";
+        let totalPromptTokens = 0;
+        let totalCompletionTokens = 0;
+        let totalTokens = 0;
 
         try {
           while (true) {
@@ -189,6 +193,14 @@ export async function POST(request: Request) {
                 try {
                   const parsed = JSON.parse(data);
                   const choice = parsed.choices?.[0];
+
+                  // Capture usage from the final chunk (choices is empty, usage present)
+                  if (!choice && parsed.usage) {
+                    totalPromptTokens = parsed.usage.prompt_tokens || 0;
+                    totalCompletionTokens = parsed.usage.completion_tokens || 0;
+                    totalTokens = parsed.usage.total_tokens || 0;
+                  }
+
                   const delta = choice?.delta?.content || "";
                   if (delta) {
                     // Some DeepSeek implementations send cumulative content
@@ -215,6 +227,21 @@ export async function POST(request: Request) {
         } catch (err) {
           console.error("[Chat API] Stream error:", err);
         } finally {
+          // Record token usage (fire-and-forget)
+          if (totalTokens > 0) {
+            prisma.aiUsageLog
+              .create({
+                data: {
+                  type: "chat",
+                  promptTokens: totalPromptTokens,
+                  completionTokens: totalCompletionTokens,
+                  totalTokens,
+                },
+              })
+              .catch((e) =>
+                console.error("[Chat API] Failed to record usage:", e),
+              );
+          }
           reader.releaseLock();
           controller.close();
         }

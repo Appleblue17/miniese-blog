@@ -32,6 +32,8 @@ enum AiTaskType {
   generate
   scan
   discover
+  chat
+  auto_link
 }
 
 enum WikiStatus {

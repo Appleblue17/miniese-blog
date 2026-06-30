@@ -48,7 +48,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     markdownTextColorLight: "#1f2328", markdownTextColorDark: "#f0f6fc",
     markdownBgColorLight: "#ffffff", markdownBgColorDark: "#0d1117",
   },
-  features: { aiReview: true, autoTranslate: true, wikiDiscovery: true, wikiGenerate: true, comments: true, rss: true },
+  features: { aiReview: true, autoTranslate: true, wikiDiscovery: true, wikiGenerate: true, autoLink: false, comments: true, rss: true },
+  ai: { monthlyTokenLimit: 10000000, warningThreshold: 0.7, criticalThreshold: 0.9 },
   notifications: { email: true, adminEmail: "", typeSettings: { comment: { enabled: true, email: true }, comment_deleted: { enabled: true, email: false }, translation_complete: { enabled: true, email: false }, task_failed: { enabled: true, email: true }, discovery: { enabled: true, email: false }, article_published: { enabled: true, email: true } } },
   compilers: {
     markdown: { name: "Markdown", extensions: [".md"], enabled: true },

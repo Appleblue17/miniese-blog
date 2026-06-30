@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FileText, Library, Info, Settings, Menu, X, Bell } from "lucide-react";
+import { Home, FileText, Library, Info, Settings, Menu, X, Bell, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,14 @@ export function Navbar() {
             <Bell className="size-4" />
             {lang === "zh" ? "通知中心" : "Notifications"}
             <UnreadBadge />
+          </Link>
+
+          <Link
+            href="/admin/ai/tokens"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <BarChart3 className="size-4" />
+            {lang === "zh" ? "Token 用量" : "AI Tokens"}
           </Link>
         </div>
       </nav>

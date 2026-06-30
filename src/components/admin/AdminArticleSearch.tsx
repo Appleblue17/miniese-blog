@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useCallback, useTransition } from "react";
+import { useCallback, useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SearchFilters } from "@/components/ui/SearchFilters";
 
@@ -26,6 +26,9 @@ export function AdminArticleSearch({
 }: AdminArticleSearchProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const tagFilterArray = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
   const tagExcludeArray = tagExclude ? tagExclude.split(",").filter(Boolean) : [];

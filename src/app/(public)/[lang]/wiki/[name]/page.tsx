@@ -18,6 +18,8 @@ import path from "path";
 import type { Metadata } from "next";
 import { WikiReader } from "@/components/wiki/WikiReader";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
+import { checkAccess } from "@/lib/auth";
 import { parseWikiFileWithMeta, slugifyName } from "@/lib/wiki/parser";
 import type { WikiStatus, WikiEntryDetail } from "@/types/wiki";
 
@@ -110,6 +112,15 @@ export default async function WikiEntryPage({ params }: Props) {
   const entry = await fetchEntry(lang, name);
   if (!entry) {
     notFound();
+  }
+
+  // Check access group permissions
+  if (entry.accessGroup && entry.accessGroup.length > 0) {
+    const session = await auth();
+    const userRoles = session?.user?.roles as string[] | undefined;
+    if (!checkAccess(userRoles ?? [], entry.accessGroup)) {
+      notFound();
+    }
   }
 
   return (

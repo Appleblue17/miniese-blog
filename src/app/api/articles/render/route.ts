@@ -21,7 +21,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown/renderer";
-import { detectWikiLinks } from "@/lib/markdown/linkDetector";
+import { detectWikiLinks, syncArticleWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter } from "@/lib/articles/frontmatter";
 import type { ContentType } from "@/lib/markdown/renderer";
 
@@ -92,6 +92,14 @@ export async function POST(request: NextRequest) {
       where: { id: articleId },
       data: updateData,
     });
+
+    // --- Sync ArticleWikiLink records ---
+    //
+    // Extract wiki entry names from the rendered HTML (data-wiki-name attributes),
+    // look up their IDs, and create/delete ArticleWikiLink records so the
+    // link-status API can report accurate link counts and detection timestamps.
+
+    await syncArticleWikiLinks(articleId, lang, html);
 
     return NextResponse.json({
       success: true,

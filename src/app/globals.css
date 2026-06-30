@@ -292,6 +292,24 @@
   overflow-y: hidden;
 }
 
+/* ── Recharts tick color — respects CSS variable for light/dark mode ─ */
+
+.recharts-cartesian-axis-tick-value {
+  fill: oklch(0.35 0 0) !important;
+}
+.dark .recharts-cartesian-axis-tick-value {
+  fill: oklch(0.72 0 0) !important;
+}
+
+.recharts-cartesian-axis-tick line,
+.recharts-cartesian-axis-line {
+  stroke: oklch(0.85 0 0) !important;
+}
+.dark .recharts-cartesian-axis-tick line,
+.dark .recharts-cartesian-axis-line {
+  stroke: oklch(0.3 0 0) !important;
+}
+
 /* ── Card base style — opacity hover effect ────────────────────────── */
 
 @layer utilities {

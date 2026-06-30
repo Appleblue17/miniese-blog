@@ -381,3 +381,86 @@ function isWordChar(char: string): boolean {
 
   return false;
 }
+
+/**
+ * Syncs ArticleWikiLink records for a given article by extracting wiki entry
+ * names from its rendered HTML content (data-wiki-name attributes).
+ *
+ * Creates new links, removes links for entries no longer in the content,
+ * and updates detectedAt for remaining links.
+ *
+ * @param articleId - The article ID
+ * @param lang - The article language ('zh' | 'en')
+ * @param html - The rendered HTML content containing data-wiki-name attributes
+ */
+export async function syncArticleWikiLinks(
+  articleId: string,
+  lang: string,
+  html: string,
+): Promise<void> {
+  // Extract wiki entry names from rendered HTML
+  const wikiNameRegex = /data-wiki-name="([^"]+)"/g;
+  const wikiNames: string[] = [];
+  let nameMatch: RegExpExecArray | null;
+  while ((nameMatch = wikiNameRegex.exec(html)) !== null) {
+    const name = nameMatch[1];
+    if (!wikiNames.includes(name)) {
+      wikiNames.push(name);
+    }
+  }
+
+  // Look up wiki entry IDs by name and language
+  const wikiEntries = await prisma.wikiEntry.findMany({
+    where: {
+      name: { in: wikiNames.length > 0 ? wikiNames : [""] },
+      language: lang as "zh" | "en",
+    },
+    select: { id: true, name: true },
+  });
+  const currentEntryIds = new Set(wikiEntries.map((e) => e.id));
+  const wikiEntryIdByName = new Map(wikiEntries.map((e) => [e.name, e.id]));
+
+  // Create ArticleWikiLink records for newly detected links
+  const newLinkData = wikiNames
+    .map((name) => {
+      const wikiEntryId = wikiEntryIdByName.get(name);
+      if (!wikiEntryId) return null;
+      return { articleId, wikiEntryId };
+    })
+    .filter((x): x is { articleId: string; wikiEntryId: string } => x !== null);
+
+  if (newLinkData.length > 0) {
+    await prisma.articleWikiLink.createMany({
+      data: newLinkData,
+      skipDuplicates: true,
+    });
+  }
+
+  // Fetch existing links for this article to determine what to delete/update
+  const existingLinks = await prisma.articleWikiLink.findMany({
+    where: { articleId },
+  });
+
+  // Delete links to wiki entries no longer in the rendered content
+  const linksToDelete = existingLinks
+    .filter((link) => !currentEntryIds.has(link.wikiEntryId))
+    .map((link) => link.id);
+
+  if (linksToDelete.length > 0) {
+    await prisma.articleWikiLink.deleteMany({
+      where: { id: { in: linksToDelete } },
+    });
+  }
+
+  // Update detectedAt for remaining (still-linked) entries
+  const remainingIds = existingLinks
+    .filter((link) => currentEntryIds.has(link.wikiEntryId))
+    .map((link) => link.id);
+
+  if (remainingIds.length > 0) {
+    await prisma.articleWikiLink.updateMany({
+      where: { id: { in: remainingIds } },
+      data: { detectedAt: new Date() },
+    });
+  }
+}

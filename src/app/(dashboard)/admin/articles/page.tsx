@@ -15,6 +15,7 @@ import { PlusCircle, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import { ArticleRowActions } from "@/components/admin/ArticleRowActions";
 import { AdminArticleSearch } from "@/components/admin/AdminArticleSearch";
+import { BatchRenderButton } from "@/components/admin/BatchRenderButton";
 import { prisma } from "@/lib/db";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -44,6 +45,7 @@ interface ArticleItem {
   isPinned: boolean;
   charCount: number;
   lineCount: number;
+  linkSyncStale: boolean | null; // null = no wiki entries for this lang, true = stale, false = synced
 }
 
 interface DraftItem {
@@ -279,8 +281,39 @@ async function fetchData(
     }
     const allTags = Array.from(tagSet).sort();
 
+    // Fetch link sync status for all articles on this page
+    const linkRecords = await prisma.articleWikiLink.groupBy({
+      by: ["articleId"],
+      _max: { detectedAt: true },
+      where: { articleId: { in: linkedArticleIds } },
+    });
+    const linkDetectedMap = new Map(
+      linkRecords.map((r) => [r.articleId, r._max.detectedAt]),
+    );
+
+    // Check if wiki entries exist for each article's language
+    const wikiEntryLangs = await prisma.wikiEntry.groupBy({
+      by: ["language"],
+      where: { status: { not: "deleted" } },
+      _count: { id: true },
+    });
+    const hasWikiEntries = new Map(wikiEntryLangs.map((r) => [r.language, r._count.id > 0]));
+
+    const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const articlesWithLinkStatus = articlesWithStats.map((a) => ({
+      ...a,
+      linkSyncStale: ((): boolean | null => {
+        if (!hasWikiEntries.get(a.language)) return null; // no wiki entries for this lang
+        const lastDetected = linkDetectedMap.get(a.id);
+        if (!lastDetected) return true; // never detected = stale
+        return (now - lastDetected.getTime()) > STALE_THRESHOLD_MS;
+      })(),
+    }));
+
     return {
-      articles: articlesWithStats,
+      articles: articlesWithLinkStatus,
       translations: translationsWithStats,
       drafts: draftsWithStats,
       newDrafts: newDraftsWithStats,
@@ -356,12 +389,19 @@ export default async function AdminArticlesPage({
         </Link>
       </div>
 
-      <AdminArticleSearch
-        q={q}
-        tagFilter={tagFilterParam}
-        tagExclude={tagExcludeParam}
-        allTags={allTags}
-      />
+      <div className="flex items-start gap-3 mb-6">
+        <div className="flex-1 min-w-0">
+          <AdminArticleSearch
+            q={q}
+            tagFilter={tagFilterParam}
+            tagExclude={tagExcludeParam}
+            allTags={allTags}
+          />
+        </div>
+        <div className="shrink-0 pt-0.5">
+          <BatchRenderButton />
+        </div>
+      </div>
 
       {!hasContent ? (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">

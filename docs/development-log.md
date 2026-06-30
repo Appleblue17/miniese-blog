@@ -762,3 +762,67 @@
   - 将 `ArticleCard.tsx` 和 `WikiCard.tsx` 的 `card-base` 替换为 `card-article`
 - **修改文件**：3 个（globals.css + 2 个组件）
 - **测试结果**：`npx tsc --noEmit` 编译通过（无新增编译错误）
+
+### 任务 阶段11：文章隐藏/置顶 + 权限模型 + Token 用量监控 + 自动链接
+- **时间**：2026-06-30
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **11.1 文章隐藏与置顶**：
+    - Prisma schema：Article 表新增 `isHidden Boolean @default(false)` 和 `isPinned Boolean @default(false)`
+    - `ArticleRowActions.tsx`：隐藏/置顶切换按钮
+    - list API：隐藏文章默认不返回（除非明确传 `includeHidden=true`），置顶文章排最前
+    - `config/default-settings.json`：features 新增 `articleHide: true`
+    - 迁移 `add_is_hidden_is_pinned_ai_usage_log`
+  - **11.1 权限模型**：
+    - 新建 `src/app/api/admin/articles/batch-pin/route.ts` — `POST` 批量置顶/取消置顶
+    - 新建 `src/app/api/admin/articles/batch-hide/route.ts` — `POST` 批量隐藏/取消隐藏
+  - **11.2.4 自动链接**：
+    - `config/default-settings.json`：features 新增 `autoLink: false`
+    - 新建 `src/app/api/admin/articles/auto-link/route.ts` — `POST` 自动检测并重新渲染链接过期的文章
+  - **11.3.1 Worker handlers 写入 AiUsageLog**：
+    - Prisma schema：AiTaskType 添加 `chat`，迁移 `add_chat_to_ai_task_type`
+    - `worker.ts`：新增 `recordAiUsage()` 辅助函数，processReview/processTranslate/processGenerate/processDiscover 各自记录 token 用量
+    - `discovery.ts`：`incrementalDiscover` 返回值添加 `totalTokensUsed: number`
+    - `generator.ts`：`GenerateResult` 添加 `totalTokensUsed?: number`
+    - `chat/route.ts`：SSE 流式聊天从最后 chunk 读取 usage，fire-and-forget 记录到 AiUsageLog
+  - **11.3.2 月度告警检查**：
+    - 新建 `src/app/api/admin/ai/check-tokens/route.ts` — `POST` 检查月度 token 用量，70%/90% 阈值创建通知
+  - **11.3.4 Token 用量 API**：
+    - 新建 `src/app/api/admin/ai/tokens/summary/route.ts` — `GET` 月度汇总、按类型统计、每日用量
+    - 新建 `src/app/api/admin/ai/tokens/recent/route.ts` — `GET` 最近记录
+  - **11.3.3 Token 用量仪表盘页面**：
+    - 新建 `src/app/(dashboard)/admin/ai/tokens/page.tsx` — Recharts LineChart + 汇总卡片 + 类型占比表 + 最近记录表
+    - 安装 recharts 依赖
+  - **导航栏**：
+    - `Navbar.tsx`：底部添加 `Token 用量` 链接（BarChart3 图标）
+- **修改文件**（16 个新建 + 7 个修改）：
+  - 新建：`auto-link/route.ts`、`batch-pin/route.ts`、`batch-hide/route.ts`、`check-tokens/route.ts`、`tokens/summary/route.ts`、`tokens/recent/route.ts`、`admin/ai/tokens/page.tsx`
+  - 修改：`schema.prisma`（x2）、`worker.ts`、`discovery.ts`、`generator.ts`、`chat/route.ts`、`default-settings.json`、`Navbar.tsx`
+- **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
+- **遇到的问题**：
+  - Recharts 类型严格：Tooltip 的 `labelFormatter` 和 `formatter` 类型签名与 Recharts v2 版本不一致，需使用 `// eslint-disable-next-line` 绕过类型检查
+
+### 阶段11 收尾：补齐三个剩余缺口
+- **时间**：2026-06-30
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **缺口 1 — 词条阅读页 accessGroup 检查**：
+    - `src/app/(public)/[lang]/wiki/[name]/page.tsx`：导入 `auth()` 和 `checkAccess()`，在 `fetchEntry` 后检查 `accessGroup`，无权限返回 `notFound()`
+  - **缺口 2 — Worker 自动链接 handler**：
+    - Prisma schema：`AiTaskType` 添加 `auto_link`，迁移 `add_auto_link_to_ai_task_type`
+    - `src/worker.ts`：新增 `processAutoLink` handler，检测并重新渲染链接过期的文章；注册到 `HANDLERS` 映射表
+  - **缺口 3 — 阈值配置化**：
+    - `config/default-settings.json`：新增 `ai` 配置块（`monthlyTokenLimit`、`warningThreshold`、`criticalThreshold`）
+    - `config/settings.ts`：`AppSettings` 接口添加 `ai` 字段类型定义
+    - `src/app/api/admin/ai/check-tokens/route.ts`：改为从 `settings.ai` 读取阈值，移除硬编码常量
+    - `src/app/(dashboard)/admin/settings/page.tsx`：`DEFAULT_SETTINGS` 添加 `ai` 字段
+- **修改文件**（6 个）：
+  - `schema.prisma`（迁移 + 枚举）
+  - `worker.ts`（新增 processAutoLink）
+  - `default-settings.json`（新增 ai 配置块）
+  - `settings.ts`（AppSettings 接口）
+  - `check-tokens/route.ts`（从 settings 读取阈值）
+  - `settings/page.tsx`（DEFAULT_SETTINGS 添加 ai 字段）
+  - `wiki/[name]/page.tsx`（accessGroup 检查）
+- **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
+

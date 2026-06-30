@@ -68,7 +68,12 @@ export interface AppSettings {
     markdownBgColorLight: string;
     markdownBgColorDark: string;
   };
-  features: Record<string, boolean>;
+  features: Record<string, boolean | { enabled: boolean; intervalDays: number }>;
+  ai: {
+    monthlyTokenLimit: number;
+    warningThreshold: number;
+    criticalThreshold: number;
+  };
   notifications: {
     email: boolean;
     adminEmail: string;
