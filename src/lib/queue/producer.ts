@@ -28,6 +28,37 @@ export interface JobData {
 }
 
 /**
+ * Delete old AiTask records beyond the configured retain count.
+ * Runs best-effort (catches errors silently).
+ */
+async function pruneOldTasks(): Promise<void> {
+  try {
+    const { getSettings } = await import("../../../config/settings");
+    const settings = await getSettings();
+    const maxCount = settings.ai.taskRetainCount;
+
+    const total = await prisma.aiTask.count();
+
+    if (total > maxCount) {
+      const keep = await prisma.aiTask.findMany({
+        orderBy: { createdAt: "desc" },
+        take: maxCount,
+        select: { id: true },
+      });
+
+      if (keep.length > 0) {
+        const keepIds = new Set(keep.map((t) => t.id));
+        await prisma.aiTask.deleteMany({
+          where: { id: { notIn: [...keepIds] } },
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[Task Producer] Failed to prune old tasks:", err);
+  }
+}
+
+/**
  * Creates a new AI task and enqueues it for processing.
  *
  * @param type - The type of AI task (review, translate, generate, scan).
@@ -55,6 +86,9 @@ export async function addJob(
       ...(articleId ? { articleId } : {}),
     },
   });
+
+  // Prune old task records in the background
+  await pruneOldTasks();
 
   // 2. Enqueue the job (with retries)
   let lastError: Error | null = null;

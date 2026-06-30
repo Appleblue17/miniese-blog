@@ -39,6 +39,7 @@ export async function GET(request: Request) {
     notifications: notifications.map((n) => ({
       id: n.id,
       type: n.type,
+      severity: n.severity,
       title: n.title,
       content: n.content,
       articleId: n.articleId,

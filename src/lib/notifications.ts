@@ -30,10 +30,63 @@ interface CreateNotificationParams {
 }
 
 /**
+ * Notification severity levels (matching the existing comment-based severity).
+ * 🔴 important  — task_failed, article_published (force email)
+ * 🟡 normal    — comment, comment_deleted (configurable email)
+ * 🔵 notice    — translation_complete, discovery (never email)
+ */
+export type NotificationSeverity = "important" | "normal" | "notice";
+
+function getSeverity(type: NotificationType): NotificationSeverity {
+  if (type === "task_failed" || type === "article_published") {
+    return "important";
+  }
+  if (type === "translation_complete" || type === "discovery") {
+    return "notice";
+  }
+  return "normal";
+}
+
+/**
+ * Delete old notifications beyond the configured retain count.
+ * Runs best-effort (catches errors silently).
+ */
+async function pruneOldNotifications(): Promise<void> {
+  try {
+    const { getSettings } = await import("../../config/settings");
+    const settings = await getSettings();
+    const maxCount = settings.notifications.maxRetainCount;
+
+    // Get total count
+    const total = await prisma.notification.count();
+
+    if (total > maxCount) {
+      // Find the cutoff ID — oldest notification that stays
+      const keep = await prisma.notification.findMany({
+        orderBy: { createdAt: "desc" },
+        take: maxCount,
+        select: { id: true },
+      });
+
+      if (keep.length > 0) {
+        const keepIds = new Set(keep.map((n) => n.id));
+        await prisma.notification.deleteMany({
+          where: { id: { notIn: [...keepIds] } },
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[Notifications] Failed to prune old notifications:", err);
+  }
+}
+
+/**
  * Create a notification record in the database.
+ * Automatically prunes old notifications if count exceeds configured max.
  */
 export async function createNotification(params: CreateNotificationParams): Promise<void> {
   try {
+    const severity = getSeverity(params.type);
     await prisma.notification.create({
       data: {
         type: params.type,
@@ -43,8 +96,12 @@ export async function createNotification(params: CreateNotificationParams): Prom
         articleTitle: params.articleTitle || null,
         taskId: params.taskId || null,
         userId: params.userId || null,
+        severity,
       },
     });
+
+    // Prune old notifications in the background
+    await pruneOldNotifications();
   } catch (err) {
     console.error("[Notifications] Failed to create notification:", err);
   }

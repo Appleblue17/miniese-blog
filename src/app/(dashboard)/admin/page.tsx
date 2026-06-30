@@ -6,7 +6,7 @@
  */
 
 import Link from "next/link";
-import { FileText, PlusCircle, Library, Settings, Bot, MessageSquare, Bell, Images } from "lucide-react";
+import { FileText, PlusCircle, Library, Settings, Bot, MessageSquare, Bell, Images, BarChart3 } from "lucide-react";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 
@@ -71,6 +71,17 @@ export default async function AdminDashboardPage() {
           <div>
             <h2 className="font-medium text-lg">知识库管理</h2>
             <p className="text-sm text-muted-foreground mt-1">管理 Wiki 词条和术语</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/ai/tokens"
+          className="card-base flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center hover:bg-muted"
+        >
+          <BarChart3 className="size-10 text-primary" />
+          <div>
+            <h2 className="font-medium text-lg">Token 用量</h2>
+            <p className="text-sm text-muted-foreground mt-1">查看 AI Token 消耗统计和趋势</p>
           </div>
         </Link>
 

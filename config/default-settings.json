@@ -97,11 +97,13 @@
   "ai": {
     "monthlyTokenLimit": 10000000,
     "warningThreshold": 0.7,
-    "criticalThreshold": 0.9
+    "criticalThreshold": 0.9,
+    "taskRetainCount": 200
   },
   "notifications": {
     "email": true,
     "adminEmail": "",
+    "maxRetainCount": 200,
     "typeSettings": {
       "comment": { "enabled": true, "email": true },
       "comment_deleted": { "enabled": true, "email": false },

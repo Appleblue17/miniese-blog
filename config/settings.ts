@@ -73,10 +73,12 @@ export interface AppSettings {
     monthlyTokenLimit: number;
     warningThreshold: number;
     criticalThreshold: number;
+    taskRetainCount: number;
   };
   notifications: {
     email: boolean;
     adminEmail: string;
+    maxRetainCount: number;
     typeSettings: Record<string, { enabled: boolean; email: boolean }>;
   };
   compilers: Record<string, unknown>;

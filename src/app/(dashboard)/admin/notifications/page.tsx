@@ -40,6 +40,7 @@ interface Notification {
   taskId: string | null;
   isRead: boolean;
   autoRead: boolean;
+  severity: string;
   createdAt: string;
 }
 
@@ -86,6 +87,20 @@ function NotificationIcon({ type }: { type: string }) {
   const Icon = TYPE_ICONS[type] || Bell;
   return <Icon className={`size-5 ${TYPE_COLORS[type] || "text-muted-foreground"}`} />;
 }
+
+// ─── Severity Dot ────────────────────────────────────────────────────────────
+
+const SEVERITY_DOT: Record<string, string> = {
+  important: "bg-red-500",
+  normal: "bg-amber-400",
+  notice: "bg-blue-400",
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  important: "重要",
+  normal: "普通",
+  notice: "提示",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -275,12 +290,13 @@ export default function AdminNotificationsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-block size-2 rounded-full shrink-0 ${SEVERITY_DOT[notification.severity] || "bg-primary"} ${isUnread ? "" : "opacity-30"}`}
+                        title={SEVERITY_LABEL[notification.severity] || notification.severity}
+                      />
                       <span className="text-xs font-medium text-muted-foreground">
                         {TYPE_LABELS[notification.type] || notification.type}
                       </span>
-                      {isUnread && (
-                        <span className="size-2 rounded-full bg-primary" />
-                      )}
                       <span className="ml-auto text-xs text-muted-foreground">
                         {timeAgo(notification.createdAt)}
                       </span>
