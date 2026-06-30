@@ -40,9 +40,30 @@ export async function proxy(request: NextRequest) {
       if (isAdminApi) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(loginUrl);
+      // Return a simple forbidden page instead of redirecting to login,
+      // avoiding redirect loops when non-admin users visit /admin.
+      return new NextResponse(
+        `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>无权限访问</title>
+<style>
+body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fafafa;color:#333;text-align:center;padding:1rem}
+h1{font-size:2rem;margin-bottom:.5rem}
+p{color:#666;margin-bottom:2rem}
+a{color:#2563eb;text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>403 — 无权限访问</h1>
+<p>你需要管理员权限才能访问此页面。</p>
+<a href="/">返回首页</a>
+</body>
+</html>`,
+        {
+          status: 403,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        },
+      );
     }
 
     // Authenticated admin — pass through without language redirect

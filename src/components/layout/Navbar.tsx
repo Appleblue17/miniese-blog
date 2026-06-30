@@ -16,6 +16,21 @@ const navItems: Array<{ href: string; labelZh: string; labelEn: string; icon: Re
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data: { user?: { roles?: string[] } }) => {
+        const roles = data?.user?.roles ?? [];
+        setIsAdmin(roles.includes("admin"));
+      })
+      .catch(() => {
+        // Not logged in
+      })
+      .finally(() => setSessionLoaded(true));
+  }, []);
 
   // Extract language prefix from path (/zh/articles → zh)
   const lang = pathname.match(/^\/(zh|en)/)?.[1] || "zh";
@@ -90,8 +105,9 @@ export function Navbar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Bottom area: admin links */}
-        <div className="border-t border-border pt-3 space-y-1">
+        {/* Bottom area: admin links — only shown to logged-in admin users */}
+        {sessionLoaded && isAdmin && (
+          <div className="border-t border-border pt-3 space-y-1">
           <Link
             href="/admin"
             className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -117,6 +133,7 @@ export function Navbar() {
             {lang === "zh" ? "Token 用量" : "AI Tokens"}
           </Link>
         </div>
+        )}
       </nav>
 
       {/* Overlay for mobile */}

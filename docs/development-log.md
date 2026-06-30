@@ -826,3 +826,14 @@
   - `wiki/[name]/page.tsx`（accessGroup 检查）
 - **测试结果**：363/363 全部通过（29 个测试文件），`npx tsc --noEmit` 编译通过
 
+### 任务 非管理员访问 /admin 返回 403 + 导航栏按权限显示
+- **时间**：2026-06-30
+- **状态**：✅ 完成（已暂存待提交）
+- **变更摘要**：
+  - **proxy.ts**：非管理员访问 /admin 或 /api/admin 时不再重定向到 `/login?callbackUrl=...`，改为直接返回 403 静态 HTML 页面（"无权限访问"），从根本上消除重定向循环
+  - **Navbar.tsx**：底部"仪表盘"、"通知中心"、"Token 用量"三个链接改为通过 `/api/auth/session` 获取 session 判断当前用户角色，仅在 `roles.includes("admin")` 时显示
+- **修改文件**（2 个）：
+  - `src/proxy.ts`
+  - `src/components/layout/Navbar.tsx`
+- **测试结果**：`npx tsc --noEmit` 编译通过
+
