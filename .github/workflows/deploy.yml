@@ -22,14 +22,16 @@ jobs:
             OLD_HEAD=$(git rev-parse HEAD)
 
             # 拉取最新代码
-            echo ">>> Pulling latest code..."
-            git pull
+            echo ">>> Fetching and resetting to latest..."
+            git fetch origin
+            git reset --hard origin/main
 
             NEW_HEAD=$(git rev-parse HEAD)
 
             # 判断 package.json 或 package-lock.json 是否有变化
+            CHANGED=""
             if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
-              CHANGED=$(git diff --name-only "$OLD_HEAD".."$NEW_HEAD" -- package.json package-lock.json)
+              CHANGED=$(git diff --name-only "$OLD_HEAD".."$NEW_HEAD" -- package.json package-lock.json || true)
             fi
 
             # 如果没有 node_modules，或者依赖文件有变化，才重新安装
@@ -43,6 +45,7 @@ jobs:
             else
               echo ">>> Dependencies not changed, skipping npm install"
             fi
+
 
             # 停掉旧应用释放内存（构建时只需要 worker）
             echo ">>> Stopping old app..."
