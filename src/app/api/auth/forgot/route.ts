@@ -1,6 +1,9 @@
 /**
  * @file POST /api/auth/forgot — Send password reset email.
  *
+ * Only works for users who have bound an OAuth account (and thus have an email).
+ * Pure password-only users must contact an admin to reset their password.
+ *
  * Generates a reset token, stores it as a VerificationToken,
  * and sends a reset link to the user's email.
  */
@@ -13,18 +16,29 @@ import { sendEmail, resetPasswordEmailHtml } from "@/lib/mail";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { username, email } = body;
 
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "请输入邮箱地址" }, { status: 400 });
+    const login = username || email;
+    if (!login || typeof login !== "string") {
+      return NextResponse.json({ error: "请输入用户名或邮箱" }, { status: 400 });
     }
 
-    // Check if user exists (don't reveal existence for security)
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Try to find user by username first, then by email
+    let user = await prisma.user.findUnique({
+      where: { username: login },
+    });
+
     if (!user) {
-      // Return success even if user doesn't exist (security best practice)
+      user = await prisma.user.findUnique({
+        where: { email: login },
+      });
+    }
+
+    // If user not found or has no email, tell them to contact admin
+    if (!user || !user.email) {
       return NextResponse.json({
-        message: "如果该邮箱已注册，您将收到重置密码邮件",
+        message: "未找到已绑定邮箱的用户，请联系管理员重置密码",
+        noEmail: true,
       });
     }
 
@@ -32,27 +46,29 @@ export async function POST(request: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 60 * 60 * 1000);
 
+    const userEmail = user.email as string; // guaranteed non-null here
+
     // Clean up old tokens for this email
     await prisma.verificationToken.deleteMany({
-      where: { identifier: email },
+      where: { identifier: userEmail },
     });
 
     await prisma.verificationToken.create({
       data: {
-        identifier: email,
+        identifier: userEmail,
         token,
         expires,
       },
     });
 
     await sendEmail({
-      to: email,
+      to: userEmail,
       subject: "重置密码 - Miniese's Blog",
       html: resetPasswordEmailHtml(token),
     });
 
     return NextResponse.json({
-      message: "如果该邮箱已注册，您将收到重置密码邮件",
+      message: "如果该用户已绑定邮箱，您将收到重置密码邮件",
     });
   } catch (err) {
     console.error("[Forgot API] Error:", err);

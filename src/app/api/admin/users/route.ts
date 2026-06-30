@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       take: limit,
       select: {
         id: true,
+        username: true,
         email: true,
         name: true,
         roles: true,
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     users: users.map((u) => ({
       id: u.id,
+      username: u.username,
       email: u.email,
       name: u.name,
       roles: u.roles,

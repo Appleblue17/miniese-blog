@@ -1,7 +1,7 @@
 /**
  * @file Register page — /register
  *
- * Registration form with email, password, and name.
+ * Registration form with username and password (no email required).
  * Shows success message after submission.
  */
 
@@ -14,12 +14,12 @@ import Link from "next/link";
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -35,13 +35,12 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccess("");
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name: name || undefined }),
+        body: JSON.stringify({ username, password, name: name || undefined }),
       });
 
       const data = await res.json();
@@ -52,7 +51,7 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccess(data.message);
+      setSuccess(true);
     } catch {
       setError("网络错误，请稍后重试");
     } finally {
@@ -78,7 +77,7 @@ export default function RegisterPage() {
 
         {success ? (
           <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 p-4 text-sm text-green-600 dark:text-green-400 space-y-3">
-            <p>{success}</p>
+            <p>注册成功！</p>
             <Link
               href="/login"
               className="block text-center rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
@@ -89,6 +88,22 @@ export default function RegisterPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
+              <label htmlFor="username" className="block text-sm font-medium mb-1">
+                用户名
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="字母、数字、下划线，2-32 个字符"
+                required
+                pattern="[a-zA-Z0-9_-]{2,32}"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+              />
+            </div>
+
+            <div>
               <label htmlFor="name" className="block text-sm font-medium mb-1">
                 昵称（可选）
               </label>
@@ -97,22 +112,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="你的昵称"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">
-                邮箱
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                required
+                placeholder="显示名称"
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               />
             </div>

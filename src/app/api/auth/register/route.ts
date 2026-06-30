@@ -1,41 +1,35 @@
 /**
  * @file POST /api/auth/register — User registration.
  *
- * Validates input, checks for existing email, hashes password,
- * creates user (unverified), and sends verification email.
+ * Validates input, checks for existing username, hashes password,
+ * creates user (no email required). Email is optional and can be
+ * added later via OAuth binding.
  */
 
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
-import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import { sendEmail, verificationEmailHtml } from "@/lib/mail";
-
-/**
- * Dynamically load dev settings to check skipEmailVerification flag.
- */
-async function shouldSkipEmailVerification(): Promise<boolean> {
-  try {
-    const { getSettings } = await import(
-      "../../../../../config/settings"
-    );
-    const settings = await getSettings();
-    const features = settings.features as Record<string, unknown>;
-    return features.devMode === true && features.skipEmailVerification === true;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name } = body;
+    const { username, password, name } = body;
 
     // Validate input
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "请输入邮箱地址" }, { status: 400 });
+    if (!username || typeof username !== "string" || username.trim().length === 0) {
+      return NextResponse.json({ error: "请输入用户名" }, { status: 400 });
     }
+
+    const trimmedUsername = username.trim();
+
+    // Username format: alphanumeric, hyphens, underscores, 2-32 chars
+    if (!/^[a-zA-Z0-9_-]{2,32}$/.test(trimmedUsername)) {
+      return NextResponse.json(
+        { error: "用户名只能包含字母、数字、下划线和连字符，长度 2-32 个字符" },
+        { status: 400 },
+      );
+    }
+
     if (!password || typeof password !== "string" || password.length < 6) {
       return NextResponse.json(
         { error: "密码至少需要 6 个字符" },
@@ -43,16 +37,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: "邮箱格式不正确" }, { status: 400 });
-    }
-
-    // Check if email already exists
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // Check if username already exists
+    const existing = await prisma.user.findUnique({
+      where: { username: trimmedUsername },
+    });
     if (existing) {
       return NextResponse.json(
-        { error: "该邮箱已被注册" },
+        { error: "该用户名已被使用" },
         { status: 409 },
       );
     }
@@ -60,52 +51,20 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Check dev settings for skipEmailVerification
-    const skipVerification = await shouldSkipEmailVerification();
-    const emailVerified = skipVerification ? new Date() : null;
-
-    // Create user
+    // Create user (no email required)
     const user = await prisma.user.create({
       data: {
-        email,
+        username: trimmedUsername,
         password: hashedPassword,
-        name: name || email.split("@")[0],
+        name: name || trimmedUsername,
         roles: ["user"],
-        emailVerified,
       },
     });
 
-    // Send verification email if not auto-verified
-    if (!emailVerified) {
-      const token = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      // Clean up old tokens for this email
-      await prisma.verificationToken.deleteMany({
-        where: { identifier: email },
-      });
-
-      await prisma.verificationToken.create({
-        data: {
-          identifier: email,
-          token,
-          expires,
-        },
-      });
-
-      await sendEmail({
-        to: email,
-        subject: "验证您的邮箱 - Miniese's Blog",
-        html: verificationEmailHtml(token),
-      });
-    }
-
     return NextResponse.json(
       {
-        message: emailVerified
-          ? "注册成功"
-          : "注册成功，请查收验证邮件",
-        email,
+        message: "注册成功",
+        username: user.username,
       },
       { status: 201 },
     );

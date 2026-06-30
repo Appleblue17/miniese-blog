@@ -2,10 +2,13 @@
  * @file auth.ts — NextAuth (Auth.js) v5 configuration.
  *
  * Supports:
- * - Credentials (email + password) login
+ * - Credentials (username/email + password) login
  * - Google OAuth (optional, requires GOOGLE_CLIENT_* env vars)
  * - GitHub OAuth (optional, requires GITHUB_CLIENT_* env vars)
  * - Prisma adapter for database-backed users/sessions/accounts
+ *
+ * Email is optional — users register with username + password.
+ * Email can be added later via OAuth binding.
  */
 
 import NextAuth from "next-auth";
@@ -27,20 +30,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email: { label: "邮箱", type: "email" },
+        username: { label: "用户名/邮箱", type: "text" },
         password: { label: "密码", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.username || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+        const login = credentials.username as string;
+
+        // Try to find user by username first, then by email
+        let user = await prisma.user.findUnique({
+          where: { username: login },
         });
+
+        if (!user) {
+          // Try email lookup (email is optional but some users may have it)
+          user = await prisma.user.findUnique({
+            where: { email: login },
+          });
+        }
 
         if (!user || !user.password) return null;
 
-        // 根据设置决定是否要求邮箱验证
-        // 如果设置中 dev.skipEmailVerification 为 true，跳过验证检查
         const passwordValid = await bcrypt.compare(
           credentials.password as string,
           user.password,
@@ -51,6 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
+          username: user.username,
           roles: user.roles,
         };
       },
@@ -73,10 +85,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       : []),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.roles = (user as { roles?: string[] }).roles || ["user"];
         token.id = user.id;
+        token.username = (user as { username?: string }).username;
       }
       return token;
     },
@@ -84,6 +97,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         (session.user as { roles: string[] }).roles = (token.roles as string[]) || ["user"];
         (session.user as { id: string }).id = token.id as string;
+        (session.user as { username?: string }).username = token.username as string;
       }
       return session;
     },
@@ -92,7 +106,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 });
 
 /**
- * Extend the built-in session types to include roles and id.
+ * Extend the built-in session types to include roles, id and username.
  */
 declare module "next-auth" {
   interface Session {
@@ -101,6 +115,7 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
+      username?: string;
       roles: string[];
     };
   }
@@ -110,5 +125,6 @@ declare module "@auth/core/jwt" {
   interface JWT {
     roles: string[];
     id?: string;
+    username?: string;
   }
 }

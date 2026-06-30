@@ -837,3 +837,35 @@
   - `src/components/layout/Navbar.tsx`
 - **测试结果**：`npx tsc --noEmit` 编译通过
 
+### 账号系统设计变更：邮箱可选，仅通过 OAuth 绑定
+- **时间**：2026-06-30
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **背景**：Resend 要求邮箱失败率低于 4%，直接让用户输入邮箱注册存在退信封号风险
+  - **新设计**：
+    - 注册仅需用户名 + 密码，不再需要邮箱
+    - 登录支持用户名/邮箱两种方式
+    - 邮箱仅通过 OAuth（Google/GitHub）绑定获取，确保邮箱始终有效
+    - 找回密码/邮件通知等邮箱服务仅对已绑定 OAuth 的用户可用
+    - 纯密码用户忘记密码通过管理员重置
+    - Resend 仅用于已绑定 OAuth 用户主动触发密码找回/通知推送，退信风险极低
+  - **OAuth 首次登录流程**（已确认）：
+    - 用户点击「使用 Google 登录」
+    - OAuth 回调，服务端检查邮箱是否匹配已有用户
+      - ✅ 匹配 → 直接登录
+      - ❌ 不匹配 → 重定向到 `/register?oauth=...` 页面，预填用户名、邮箱
+    - 用户确认注册后自动绑定 OAuth 账号
+  - **已实现**：
+    - Prisma schema：User.username 新增（唯一），User.email 改为可选
+    - 注册接口：改为 username + password，移除 email 必填
+    - Credentials provider：支持 username 或 email 登录
+    - OAuth 绑定/解绑/查询接口（`/api/auth/oauth/link`、`unlink`、`accounts`）
+    - 个人设置页 OAuth 绑定管理 UI
+    - 找回密码接口：有邮箱用户正常发邮件，无邮箱用户返回 `noEmail: true` 提示联系管理员
+    - 管理后台交互页用户管理：新增「重置密码」按钮（生成临时密码弹窗）
+    - 管理员重置密码 API：`POST /api/admin/users/[id]/reset-password`
+    - create-admin 脚本：适配 username + 可选 email
+    - 站点设置页「开发」Tab：移除"跳过邮箱验证"，"真实邮件发送"改为"模拟邮件发送"（反义开关）
+    - config/default-settings.json：移除 skipEmailVerification 字段
+    - 集成测试 15/15 全部通过
+

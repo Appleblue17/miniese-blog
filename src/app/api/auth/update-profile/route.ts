@@ -1,7 +1,8 @@
 /**
  * @file PUT /api/auth/update-profile — Update user profile.
  *
- * Requires authentication. Updates the user's name.
+ * Requires authentication. Updates the user's display name.
+ * Username is set at registration and cannot be changed here.
  */
 
 import { NextResponse } from "next/server";

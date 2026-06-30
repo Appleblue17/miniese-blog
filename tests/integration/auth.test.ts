@@ -2,16 +2,15 @@
  * @file Auth API integration tests.
  *
  * Tests for:
- * - POST /api/auth/register — Registration with email/password
- * - GET /api/auth/verify   — Email verification
- * - POST /api/auth/forgot  — Password reset request
- * - POST /api/auth/reset   — Password reset with token
+ * - POST /api/auth/register — Registration with username/password (no email)
+ * - POST /api/auth/forgot   — Password reset request (only for users with email)
+ * - POST /api/auth/reset    — Password reset with token
+ * - GET  /api/auth/verify   — Email verification (backward compat)
  *
  * Note: Routes that depend on `auth()` (NextAuth session) cannot be tested
  * in vitest because Next.js `headers()`/`cookies()` APIs require request
  * scope. Those routes are: GET /api/auth/me, PUT /api/auth/update-profile,
- * PUT /api/auth/update-password. Their auth checks are simple and verified
- * by code review: if auth() returns null, route returns 401.
+ * PUT /api/auth/update-password, OAuth bind/unbind.
  *
  * These tests require a running PostgreSQL database.
  * They will be skipped if the database is not available.
@@ -22,9 +21,8 @@ import { isDatabaseAvailable } from "./setup";
 import bcrypt from "bcrypt";
 
 let isDbAvailable = false;
-const testEmail = `test-auth-${Date.now()}@miniese.blog`;
+const testUsername = `test-auth-${Date.now()}`;
 const testPassword = "TestPass123!";
-let verificationToken = "";
 
 // Shared prisma reference
 let prisma: any = null;
@@ -38,13 +36,10 @@ beforeAll(async () => {
   }
 });
 
-// Note: No beforeEach cleanup of tokens — tests rely on tokens created
-// in earlier tests (e.g., register creates token consumed by verify).
-
 afterAll(async () => {
   if (!isDbAvailable || !prisma) return;
   await prisma.user.deleteMany({
-    where: { email: { contains: "test-auth-" } },
+    where: { username: { contains: "test-auth-" } },
   }).catch(() => {});
   await prisma.verificationToken.deleteMany({
     where: { identifier: { contains: "test-auth-" } },
@@ -54,15 +49,14 @@ afterAll(async () => {
 const describeDb = isDbAvailable ? describe : describe.skip;
 
 describeDb("POST /api/auth/register", () => {
-  it("registers a new user and returns 409 when email already exists", async () => {
+  it("registers a new user with username and password", async () => {
     const { POST } = await import("@/app/api/auth/register/route");
 
-    // First registration
     const req1 = new Request("http://localhost:3000/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: testEmail,
+        username: testUsername,
         password: testPassword,
         name: "Test User",
       }),
@@ -73,43 +67,41 @@ describeDb("POST /api/auth/register", () => {
 
     expect(res1.status).toBe(201);
     expect(data1.message).toContain("注册成功");
+    expect(data1.username).toBe(testUsername);
 
     // Verify user was created
-    const user = await prisma.user.findUnique({ where: { email: testEmail } });
+    const user = await prisma.user.findUnique({ where: { username: testUsername } });
     expect(user).not.toBeNull();
     expect(user!.name).toBe("Test User");
     expect(user!.roles).toContain("user");
+    expect(user!.email).toBeNull(); // No email required
     expect(user!.emailVerified).toBeNull();
 
     // Verify password is hashed
     const isMatch = await bcrypt.compare(testPassword, user!.password);
     expect(isMatch).toBe(true);
+  });
 
-    // Check verification token was created
-    const token = await prisma.verificationToken.findFirst({
-      where: { identifier: testEmail },
-    });
-    expect(token).not.toBeNull();
-    verificationToken = token!.token;
+  it("returns 409 when username already exists", async () => {
+    const { POST } = await import("@/app/api/auth/register/route");
 
-    // Second registration with same email — should fail with 409
-    const req2 = new Request("http://localhost:3000/api/auth/register", {
+    const req = new Request("http://localhost:3000/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: testEmail,
+        username: testUsername,
         password: testPassword,
       }),
     });
 
-    const res2 = await POST(req2);
-    const data2 = await res2.json();
+    const res = await POST(req);
+    const data = await res.json();
 
-    expect(res2.status).toBe(409);
-    expect(data2.error).toContain("已被注册");
+    expect(res.status).toBe(409);
+    expect(data.error).toContain("已被使用");
   });
 
-  it("returns 400 when email is missing", async () => {
+  it("returns 400 when username is missing", async () => {
     const { POST } = await import("@/app/api/auth/register/route");
 
     const request = new Request("http://localhost:3000/api/auth/register", {
@@ -122,7 +114,7 @@ describeDb("POST /api/auth/register", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain("邮箱");
+    expect(data.error).toContain("用户名");
   });
 
   it("returns 400 when password is too short", async () => {
@@ -132,7 +124,7 @@ describeDb("POST /api/auth/register", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: `shortpw-${Date.now()}@test.com`,
+        username: `shortpw-${Date.now()}`,
         password: "12345",
       }),
     });
@@ -144,14 +136,14 @@ describeDb("POST /api/auth/register", () => {
     expect(data.error).toContain("6 个字符");
   });
 
-  it("returns 400 when email format is invalid", async () => {
+  it("returns 400 when username format is invalid", async () => {
     const { POST } = await import("@/app/api/auth/register/route");
 
     const request = new Request("http://localhost:3000/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: "not-an-email",
+        username: "a", // too short (min 2)
         password: testPassword,
       }),
     });
@@ -160,76 +152,76 @@ describeDb("POST /api/auth/register", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain("邮箱格式");
+    expect(data.error).toContain("用户名");
   });
-});
 
-describeDb("GET /api/auth/verify", () => {
-  it("verifies email with valid token", async () => {
-    // Ensure token exists
-    expect(verificationToken).not.toBe("");
-    
-    const { GET } = await import("@/app/api/auth/verify/route");
+  it("returns 400 when username has special characters", async () => {
+    const { POST } = await import("@/app/api/auth/register/route");
 
-    const request = new Request(
-      `http://localhost:3000/api/auth/verify?token=${verificationToken}`,
-    );
-
-    const response = await GET(request);
-    const data = await response.json();
-    
-    console.log("[DEBUG verify] status:", response.status, "body:", JSON.stringify(data));
-
-    expect(response.status).toBe(200);
-    expect(data.message).toContain("验证成功");
-    expect(data.email).toBe(testEmail);
-
-    // Verify user's emailVerified is set
-    const user = await prisma.user.findUnique({ where: { email: testEmail } });
-    expect(user!.emailVerified).not.toBeNull();
-
-    // Verify token was deleted
-    const token = await prisma.verificationToken.findFirst({
-      where: { identifier: testEmail },
+    const request = new Request("http://localhost:3000/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "user@name!",
+        password: testPassword,
+      }),
     });
-    expect(token).toBeNull();
-  });
 
-  it("returns 400 when token is missing", async () => {
-    const { GET } = await import("@/app/api/auth/verify/route");
-
-    const request = new Request("http://localhost:3000/api/auth/verify");
-
-    const response = await GET(request);
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain("令牌");
+    expect(data.error).toContain("用户名");
   });
 
-  it("returns 400 for invalid token", async () => {
-    const { GET } = await import("@/app/api/auth/verify/route");
-
-    const request = new Request(
-      "http://localhost:3000/api/auth/verify?token=invalid-token-123",
-    );
-
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toContain("无效");
+  it("does NOT create a verification token (email is optional)", async () => {
+    // Verify no verification token was created for the user
+    const tokens = await prisma.verificationToken.findMany({
+      where: { identifier: { contains: testUsername } },
+    });
+    expect(tokens).toHaveLength(0);
   });
 });
 
 describeDb("POST /api/auth/forgot", () => {
-  it("sends reset email for existing user (mock)", async () => {
+  it("returns noEmail flag when user has no email (no token created)", async () => {
+    const { POST } = await import("@/app/api/auth/forgot/route");
+
+    // User registered without email
+    const request = new Request("http://localhost:3000/api/auth/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: testUsername }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.noEmail).toBe(true);
+    expect(data.message).toContain("未找到");
+
+    // No verification token should be created since user has no email
+    const tokens = await prisma.verificationToken.findMany({
+      where: { identifier: { contains: testUsername } },
+    });
+    expect(tokens).toHaveLength(0);
+  });
+
+  it("sends reset email for user with email", async () => {
+    // Add email to test user
+    const testEmail = `${testUsername}@test.com`;
+    await prisma.user.update({
+      where: { username: testUsername },
+      data: { email: testEmail },
+    });
+
     const { POST } = await import("@/app/api/auth/forgot/route");
 
     const request = new Request("http://localhost:3000/api/auth/forgot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: testEmail }),
+      body: JSON.stringify({ username: testUsername }),
     });
 
     const response = await POST(request);
@@ -238,34 +230,34 @@ describeDb("POST /api/auth/forgot", () => {
     expect(response.status).toBe(200);
     expect(data.message).toContain("重置密码邮件");
 
-    // Verify new token was created
+    // Verify token was created
     const token = await prisma.verificationToken.findFirst({
       where: { identifier: testEmail },
     });
     expect(token).not.toBeNull();
-    // Token should be valid for 1 hour
     const oneHourMs = 60 * 60 * 1000;
     expect(token!.expires.getTime() - Date.now()).toBeLessThan(oneHourMs + 5000);
     expect(token!.expires.getTime() - Date.now()).toBeGreaterThan(oneHourMs - 5000);
   });
 
-  it("returns success even for non-existent email (security)", async () => {
+  it("returns noEmail for non-existent user (security)", async () => {
     const { POST } = await import("@/app/api/auth/forgot/route");
 
     const request = new Request("http://localhost:3000/api/auth/forgot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "nonexistent@test.com" }),
+      body: JSON.stringify({ username: "nonexistent-user" }),
     });
 
     const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.message).toContain("重置密码邮件");
+    expect(data.noEmail).toBe(true);
+    expect(data.message).toContain("未找到");
   });
 
-  it("returns 400 when email is missing", async () => {
+  it("returns 400 when login is missing", async () => {
     const { POST } = await import("@/app/api/auth/forgot/route");
 
     const request = new Request("http://localhost:3000/api/auth/forgot", {
@@ -278,7 +270,7 @@ describeDb("POST /api/auth/forgot", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toContain("邮箱");
+    expect(data.error).toContain("用户名或邮箱");
   });
 });
 
@@ -287,9 +279,10 @@ describeDb("POST /api/auth/reset", () => {
 
   beforeAll(async () => {
     if (!isDbAvailable || !prisma) return;
-    // Create a fresh reset token (verify consumed the original)
+    // Create a fresh reset token for the test user
     const crypto = await import("crypto");
     const token = crypto.default.randomBytes(32).toString("hex");
+    const testEmail = `${testUsername}@test.com`;
     await prisma.verificationToken.create({
       data: {
         identifier: testEmail,
@@ -302,7 +295,7 @@ describeDb("POST /api/auth/reset", () => {
 
   it("resets password with valid token", async () => {
     expect(resetToken).not.toBe("");
-    
+
     const newPassword = "NewPass456!";
     const { POST } = await import("@/app/api/auth/reset/route");
 
@@ -314,14 +307,12 @@ describeDb("POST /api/auth/reset", () => {
 
     const response = await POST(request);
     const data = await response.json();
-    
-    console.log("[DEBUG reset] status:", response.status, "body:", JSON.stringify(data));
 
     expect(response.status).toBe(200);
     expect(data.message).toContain("密码重置成功");
 
     // Verify password was updated
-    const user = await prisma.user.findUnique({ where: { email: testEmail } });
+    const user = await prisma.user.findUnique({ where: { username: testUsername } });
     const isMatch = await bcrypt.compare(newPassword, user!.password);
     expect(isMatch).toBe(true);
 

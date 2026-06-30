@@ -1773,56 +1773,27 @@ export default function SettingsPage() {
               <div className="space-y-4 pl-4 border-l-2 border-muted">
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="text-sm font-medium">真实邮件发送</p>
+                    <p className="text-sm font-medium">模拟邮件发送</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      关闭时邮件将打印到控制台而非实际发送
+                      开启时邮件将打印到控制台而非实际发送，关闭时使用真实邮件服务
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={!!local.features.realEmail}
+                      aria-checked={!local.features.realEmail}
                       onClick={() =>
-                        updateLocal("features", "realEmail", !local.features.realEmail)
+                        updateLocal("features", "realEmail", !!local.features.realEmail)
                       }
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                        local.features.realEmail ? "" : "bg-primary/20"
+                        !local.features.realEmail ? "" : "bg-primary/20"
                       }`}
-                      style={local.features.realEmail ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
+                      style={!local.features.realEmail ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
                     >
                       <span
                         className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
-                          local.features.realEmail ? "translate-x-4" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                  <div>
-                    <p className="text-sm font-medium">跳过邮箱验证</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      注册时自动标记邮箱已验证，无需验证邮件
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!local.features.skipEmailVerification}
-                      onClick={() =>
-                        updateLocal("features", "skipEmailVerification", !local.features.skipEmailVerification)
-                      }
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                        local.features.skipEmailVerification ? "" : "bg-primary/20"
-                      }`}
-                      style={local.features.skipEmailVerification ? { backgroundColor: "hsl(var(--primary-hue), var(--primary-sat), var(--primary-light))" } : undefined}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform ${
-                          local.features.skipEmailVerification ? "translate-x-4" : "translate-x-0"
+                          !local.features.realEmail ? "translate-x-4" : "translate-x-0"
                         }`}
                       />
                     </button>

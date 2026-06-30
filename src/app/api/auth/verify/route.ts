@@ -1,6 +1,10 @@
 /**
  * @file GET /api/auth/verify — Email verification.
  *
+ * Note: Since email is now optional and only available via OAuth binding,
+ * this endpoint is kept for backward compatibility. New users won't
+ * receive verification emails during registration.
+ *
  * Validates the verification token, updates user's emailVerified field,
  * and deletes the used token.
  */
@@ -38,7 +42,7 @@ export async function GET(request: Request) {
         where: { token },
       });
       return NextResponse.json(
-        { error: "验证令牌已过期，请重新注册" },
+        { error: "验证令牌已过期" },
         { status: 400 },
       );
     }

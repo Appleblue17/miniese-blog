@@ -19,6 +19,7 @@ export async function GET() {
       id: session.user.id,
       name: session.user.name,
       email: session.user.email,
+      username: (session.user as { username?: string }).username,
       roles: (session.user as { roles?: string[] }).roles || ["user"],
     },
   });

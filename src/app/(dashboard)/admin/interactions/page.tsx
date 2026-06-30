@@ -25,6 +25,7 @@ import {
   Loader2,
   Search,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,8 @@ interface CommentItem {
 
 interface UserItem {
   id: string;
-  email: string;
+  username: string | null;
+  email: string | null;
   name: string | null;
   roles: string[];
   createdAt: string;
@@ -306,6 +308,14 @@ function UsersTab() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Reset password modal state
+  const [resetModal, setResetModal] = useState<{
+    user: UserItem;
+    tempPassword: string | null;
+    loading: boolean;
+    error: string;
+  } | null>(null);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -349,6 +359,45 @@ function UsersTab() {
     }
   };
 
+  const handleResetPassword = async (user: UserItem) => {
+    setResetModal({ user, tempPassword: null, loading: false, error: "" });
+
+    // Confirm
+    if (!confirm(`确定重置用户 "${user.username || user.email}" 的密码？`)) {
+      setResetModal(null);
+      return;
+    }
+
+    setResetModal({ user, tempPassword: null, loading: true, error: "" });
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "重置失败");
+      }
+
+      setResetModal({
+        user,
+        tempPassword: data.temporaryPassword,
+        loading: false,
+        error: "",
+      });
+    } catch (err) {
+      setResetModal({
+        user,
+        tempPassword: null,
+        loading: false,
+        error: (err as Error).message,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -367,62 +416,109 @@ function UsersTab() {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">邮箱</th>
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">昵称</th>
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">角色</th>
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">注册时间</th>
-            <th className="text-right py-2 font-medium text-muted-foreground">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => {
-            const isAdmin = u.roles.includes("admin");
-            return (
-              <tr key={u.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors">
-                <td className="py-3 pr-4">{u.email}</td>
-                <td className="py-3 pr-4 text-muted-foreground">{u.name || "-"}</td>
-                <td className="py-3 pr-4">
-                  <div className="flex flex-wrap gap-1">
-                    {u.roles.map((role) => (
-                      <Badge
-                        key={role}
-                        variant={role === "admin" ? "default" : "outline"}
-                        className="text-[11px]"
+    <>
+      {resetModal && !resetModal.loading && resetModal.tempPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg space-y-4">
+            <h3 className="text-lg font-semibold">密码已重置</h3>
+            <p className="text-sm text-muted-foreground">
+              用户 <strong>{resetModal.user.username || resetModal.user.email}</strong> 的密码已重置。
+            </p>
+            <div className="rounded-lg border border-border bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground mb-1">临时密码：</p>
+              <p className="text-lg font-mono font-bold tracking-wider select-all">
+                {resetModal.tempPassword}
+              </p>
+            </div>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+              请将临时密码告知用户，建议用户登录后立即修改密码。
+            </p>
+            <button
+              onClick={() => setResetModal(null)}
+              className="w-full rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">用户名</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">邮箱</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">昵称</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">角色</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">注册时间</th>
+              <th className="text-right py-2 font-medium text-muted-foreground">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => {
+              const isAdmin = u.roles.includes("admin");
+              return (
+                <tr key={u.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors">
+                  <td className="py-3 pr-4 font-medium">{u.username || "—"}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">{u.email || "未绑定"}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">{u.name || "-"}</td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-wrap gap-1">
+                      {u.roles.map((role) => (
+                        <Badge
+                          key={role}
+                          variant={role === "admin" ? "default" : "outline"}
+                          className="text-[11px]"
+                        >
+                          {role === "admin" ? "管理员" : role}
+                        </Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-3 pr-4 text-muted-foreground/60 whitespace-nowrap">
+                    {formatDate(u.createdAt)}
+                  </td>
+                  <td className="py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResetPassword(u)}
+                        disabled={actionLoading === u.id}
+                        className="text-xs"
+                        title="重置密码"
                       >
-                        {role === "admin" ? "管理员" : role}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="py-3 pr-4 text-muted-foreground/60 whitespace-nowrap">
-                  {formatDate(u.createdAt)}
-                </td>
-                <td className="py-3 text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleToggleAdmin(u.id, isAdmin)}
-                    disabled={actionLoading === u.id}
-                    className="text-xs"
-                  >
-                    {actionLoading === u.id ? (
-                      <Loader2 className="size-3 animate-spin mr-1" />
-                    ) : (
-                      <Shield className="size-3 mr-1" />
-                    )}
-                    {isAdmin ? "取消管理" : "设为管理员"}
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                        {actionLoading === u.id ? (
+                          <Loader2 className="size-3 animate-spin mr-1" />
+                        ) : (
+                          <KeyRound className="size-3 mr-1" />
+                        )}
+                        重置密码
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleAdmin(u.id, isAdmin)}
+                        disabled={actionLoading === u.id}
+                        className="text-xs"
+                      >
+                        {actionLoading === u.id ? (
+                          <Loader2 className="size-3 animate-spin mr-1" />
+                        ) : (
+                          <Shield className="size-3 mr-1" />
+                        )}
+                        {isAdmin ? "取消管理" : "设为管理员"}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

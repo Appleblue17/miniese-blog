@@ -19,7 +19,7 @@ function LoginForm() {
   const error = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -52,13 +52,13 @@ function LoginForm() {
     setMessage("");
 
     const result = await signIn("credentials", {
-      email,
+      username,
       password,
       redirect: false,
     });
 
     if (result?.error) {
-      setMessage("邮箱或密码错误");
+      setMessage("用户名/邮箱或密码错误");
       setLoading(false);
       return;
     }
@@ -109,17 +109,17 @@ function LoginForm() {
         <form onSubmit={handleCredentialsLogin} className="space-y-4">
           <div>
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="block text-sm font-medium mb-1"
             >
-              邮箱
+              用户名 / 邮箱
             </label>
             <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="用户名或邮箱"
               required
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
             />

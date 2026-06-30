@@ -2,8 +2,13 @@
  * @file proxy.ts — Next.js 16 proxy middleware.
  *
  * Responsibilities (in order):
- * 1. Auth protection — Protect admin routes using NextAuth
+ * 1. Auth protection — Protect admin routes using NextAuth (email is optional,
+ *    only users with admin role can access /admin routes)
  * 2. Language redirect — Redirect language-less URLs to preferred language
+ *
+ * Note: Email is optional in the user model. Users register with username + password,
+ * and can optionally bind OAuth (Google/GitHub) to add an email. The auth check
+ * below only verifies the session and admin role, not email verification.
  *
  * Next.js 16 deprecated "middleware.ts" in favor of "proxy.ts".
  * See: https://nextjs.org/docs/messages/middleware-to-proxy

@@ -2,11 +2,13 @@
  * @file create-admin.ts — CLI script to create or update an admin user.
  *
  * Usage:
- *   npm run create-admin -- --email admin@example.com --password mypassword
+ *   npm run create-admin -- --username admin --password mypassword
  *
  * Options:
- *   --email     Admin email (required)
- *   --password  Admin password (required, min 6 chars)
+ *   --username   Admin username (required, alphanumeric/hyphen/underscore, 2-32 chars)
+ *   --password   Admin password (required, min 6 chars)
+ *   --email      Admin email (optional, for password recovery via OAuth)
+ *   --name       Display name (optional, defaults to username)
  */
 
 import { PrismaClient } from "../src/generated/prisma/client";
@@ -15,11 +17,17 @@ import bcrypt from "bcrypt";
 
 async function main() {
   const args = process.argv.slice(2);
+  const username = getArg(args, "--username") || getArg(args, "-u");
+  const password = getArg(args, "--password") || getArg(args, "-p");
   const email = getArg(args, "--email");
-  const password = getArg(args, "--password");
+  const name = getArg(args, "--name") || getArg(args, "-n");
 
-  if (!email || !password) {
-    console.error("Usage: npm run create-admin -- --email <email> --password <password>");
+  if (!username || !password) {
+    console.error("Usage: npm run create-admin -- --username <username> --password <password> [--email <email>]");
+    console.error("  --username / -u   Admin username (required)");
+    console.error("  --password / -p   Admin password (required, min 6 chars)");
+    console.error("  --email           Admin email (optional)");
+    console.error("  --name / -n       Display name (optional, defaults to username)");
     process.exit(1);
   }
 
@@ -28,10 +36,17 @@ async function main() {
     process.exit(1);
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    console.error("Error: Invalid email format");
+  if (!/^[a-zA-Z0-9_-]{2,32}$/.test(username)) {
+    console.error("Error: Username must be 2-32 characters, alphanumeric/hyphen/underscore only");
     process.exit(1);
+  }
+
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.error("Error: Invalid email format");
+      process.exit(1);
+    }
   }
 
   const prisma = new PrismaClient({
@@ -42,22 +57,26 @@ async function main() {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.upsert({
-      where: { email },
+      where: { username },
       update: {
         password: hashedPassword,
         roles: ["admin"],
-        emailVerified: new Date(),
+        ...(email ? { email } : {}),
+        name: name || username,
       },
       create: {
-        email,
+        username,
         password: hashedPassword,
-        name: "Admin",
+        name: name || username,
         roles: ["admin"],
-        emailVerified: new Date(),
+        ...(email ? { email, emailVerified: new Date() } : {}),
       },
     });
 
-    console.log(`Admin user "${user.email}" (id: ${user.id}) ${user.roles.includes("admin") ? "created/updated" : "created"} successfully.`);
+    const parts = [`Admin user "${user.username}" (id: ${user.id})`];
+    if (user.email) parts.push(`email: ${user.email}`);
+    parts.push(user.roles.includes("admin") ? "created/updated successfully." : "created.");
+    console.log(parts.join(", "));
   } catch (err) {
     console.error("Error creating admin user:", err);
     process.exit(1);
