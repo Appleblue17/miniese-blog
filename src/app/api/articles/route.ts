@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = { status: "published", language };
+    const where: any = { status: "published", language, isHidden: false };
 
     // Legacy single-tag filter
     if (tag) {
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     const [articles, total] = await Promise.all([
       prisma.article.findMany({
         where,
-        orderBy: { publishedAt: "desc" },
+        orderBy: [{ isPinned: "desc" }, { publishedAt: "desc" }],
         skip: (page - 1) * limit,
         take: limit,
         select: {

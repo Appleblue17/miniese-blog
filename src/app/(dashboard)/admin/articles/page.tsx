@@ -40,6 +40,8 @@ interface ArticleItem {
   changelog: string | null;
   viewCount: number;
   isAITranslated: boolean;
+  isHidden: boolean;
+  isPinned: boolean;
   charCount: number;
   lineCount: number;
 }
@@ -205,6 +207,8 @@ async function fetchData(
           changelog: a.changelog,
           viewCount: a.viewCount,
           isAITranslated: a.isAITranslated,
+          isHidden: a.isHidden,
+          isPinned: a.isPinned,
           ...stats,
         };
       }),

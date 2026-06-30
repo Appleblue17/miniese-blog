@@ -13,11 +13,19 @@ import {
   Info,
   Download,
   Upload,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import matter from "gray-matter";
 import { FileUploader, type UploadResult } from "./FileUploader";
 import { ImageManager } from "./ImageManager";
@@ -40,6 +48,7 @@ interface ArticleMeta {
   tags: string[];
   author: string;
   summary: string;
+  accessGroup?: string[];
 }
 
 interface PublishFormProps {
@@ -78,6 +87,7 @@ export function PublishForm({
     tags: [],
     author: "",
     summary: "",
+    accessGroup: [],
   });
   // Ref to always access the latest meta value (bypass stale closures)
   const metaRef = useRef(meta);
@@ -145,6 +155,7 @@ export function PublishForm({
           fileType: initialMeta?.fileType || prev.fileType,
           tags: initialMeta?.tags || prev.tags,
           summary: initialMeta?.summary || prev.summary,
+          accessGroup: initialMeta?.accessGroup || prev.accessGroup,
         }));
 
         if (initialExtraFrontmatter) {
@@ -794,6 +805,38 @@ export function PublishForm({
         />
       </div>
 
+      {/* Access group */}
+      <div className="space-y-2">
+        <Label htmlFor="meta-access-group">
+          <span className="inline-flex items-center gap-1.5">
+            <Shield className="size-3.5" />
+            阅读权限
+          </span>
+        </Label>
+        <Select
+          value={(!meta.accessGroup || meta.accessGroup.length === 0) ? "public" : meta.accessGroup[0]}
+          onValueChange={(value: string | null) => {
+            setMeta((m) => ({
+              ...m,
+              accessGroup: !value || value === "public" ? [] : [value],
+            }));
+          }}
+        >
+          <SelectTrigger id="meta-access-group" className="w-full">
+            <SelectValue placeholder="选择阅读权限" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="public">公开</SelectItem>
+            <SelectItem value="admin">仅管理员</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {!meta.accessGroup || meta.accessGroup.length === 0
+            ? "所有人可见（公开）"
+            : "仅管理员可见"}
+        </p>
+      </div>
+
       {/* Extra frontmatter fields (read-only display) */}
       {Object.keys(extraFrontmatter).length > 0 && (
         <div className="rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -1179,6 +1222,10 @@ export function PublishForm({
               <span className="text-muted-foreground">{meta.summary}</span>
             </div>
           )}
+          <div className="flex gap-2">
+            <span className="text-muted-foreground shrink-0 w-16">权限：</span>
+            <span>{!meta.accessGroup || meta.accessGroup.length === 0 ? "公开" : "仅管理员"}</span>
+          </div>
           {Object.keys(extraFrontmatter).length > 0 && (
             <div className="flex gap-2">
               <span className="text-muted-foreground shrink-0 w-16">其他：</span>

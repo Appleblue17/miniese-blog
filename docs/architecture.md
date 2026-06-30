@@ -4,7 +4,15 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-29 (v0.11.0)
+**最后更新**：2026-06-30 (v0.12.0)
+
+### v0.12.0 2026-06-30
+- 新增 §13：权限模型——统一 AND 匹配规则，`accessGroup` 字段说明
+- 新增 §14：Token 用量管理——`AiUsageLog` 表、记录、告警、仪表盘设计
+- §4.1：Article 模型新增 `isHidden`、`isPinned` 字段
+- §11.4：仪表盘路由新增 `/admin/ai/tokens`
+- §11.5：API 路由新增文章隐藏/置顶、批量链接、Token 统计、自动链接相关端点
+- §12.1：通知类型新增 `token_warning`、`token_critical`
 
 ### v0.11.0 2026-06-29
 - 新增第 12 章：通知系统设计文档
@@ -406,6 +414,8 @@ miniese-blog/
 | likes | Int | 点赞数，默认 0（v0.2.1 新增） |
 | draftOfId | String? | 草稿关联的已发布文章 ID（v0.3.0 新增） |
 | renderedContent | Text? | 发布时渲染的 HTML 缓存（v0.4.0 新增） |
+| isHidden | Boolean | 隐藏状态，默认 false（v0.12.0 新增）。隐藏等价于 accessGroup: ["admin"]，但独立字段不与原有权限冲突 |
+| isPinned | Boolean | 置顶状态，默认 false（v0.12.0 新增）。置顶文章在列表中优先显示 |
 
 ##### 自关联说明
 
@@ -1548,6 +1558,7 @@ SITE_URL="https://..."
 | `/admin/ai-tasks/[taskId]` | AI 任务详情（审查报告 / 翻译详情） |
 | `/admin/notifications` | 通知中心 |
 | `/admin/settings` | 站点设置（外观 Tab 含主题模式、页面背景色、主题色/强调色 HSL 滑块、Markdown 样式、背景图片、图片设置等配置项） |
+| `/admin/ai/tokens` | Token 用量监控（今日用量、近7天趋势、本月统计、按类型统计、最近调用记录） |
 
 ### 11.5 API 路由
 
@@ -1561,6 +1572,8 @@ SITE_URL="https://..."
 | GET | `/api/articles` | 文章列表 | `?lang=zh` 必填，支持 `?tag=`（单标签）、`?q=`（全文搜索）、`?tagFilter=`（包含标签，逗号分隔）、`?tagExclude=`（排除标签，逗号分隔） |
 | GET | `/api/articles/[slug]` | 文章详情 | `?lang=zh` 必填 |
 | GET | `/api/articles/draft/check-duplicate` | 检测草稿 slug 是否已存在 | `?slug=` 必填 |
+| POST | `/api/articles/[slug]/toggle-hidden` | 切换隐藏状态，返回新的 `isHidden` | `?lang=zh` |
+| POST | `/api/articles/[slug]/toggle-pinned` | 切换置顶状态，返回新的 `isPinned` | `?lang=zh` |
 | PUT | `/api/articles/[slug]` | 更新文章（v2） | `?lang=zh` |
 | DELETE | `/api/articles/[slug]` | 删除文章（v2） | `?lang=zh` |
 
@@ -1631,6 +1644,16 @@ SITE_URL="https://..."
 |------|------|------|
 | GET | `/api/admin/ai-tasks` | 获取 AI 任务列表 |
 | GET | `/api/admin/ai-tasks/[taskId]` | 获取 AI 任务详情 |
+
+#### 管理员链接与 Token 管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/admin/articles/render-all` | 批量触发文章重新渲染（含 wiki 链接检测）。接收 `{ articleIds?: string[], olderThanDays?: number }`。可选指定文章列表或超过 N 天未更新的文章。走队列异步处理。 |
+| GET | `/api/admin/articles/link-status` | 返回每篇文章的距离上次链接天数。返回 `{ articles: [{ id, slug, title, lastLinkedAt, daysSinceLastLink }] }` |
+| GET | `/api/admin/cron/auto-link` | 外部 cron 触发自动链接（扫描超过 `features.autoLink.intervalDays` 天未链接的文章） |
+| GET | `/api/admin/ai/tokens/summary` | 返回今日、近7天、本月汇总统计（按类型分） |
+| GET | `/api/admin/ai/tokens/recent` | 返回最近 N 条调用记录（默认 20） |
 
 ### 11.6 Proxy 实现
 
@@ -1774,6 +1797,8 @@ export const config = {
 | `translation_complete` | AI 翻译完成 | `worker.ts` → `processTranslate` | ❌（调用了 `notifyAndMail` 但未传 `adminEmail`） | 已调用但邮件无效 |
 | `task_failed` | AI 任务执行失败 | `NotificationType` 已定义，worker 中尚未显式调用 | — | 已定义未使用 |
 | `discovery` | 词条发现/生成完成 | `worker.ts` → `processDiscover` / `processGenerate` | ❌ | 已调用但未发邮件 |
+| `token_warning` | 本月 token 用量超过警告阈值 | Token 告警逻辑（§14.3） | — | 待实现 |
+| `token_critical` | 本月 token 用量超过严重阈值 | Token 告警逻辑（§14.3） | — | 待实现 |
 
 #### 12.1.2 缺失的通知类型（建议新增）
 
@@ -1896,6 +1921,220 @@ if (params.adminEmail && ["comment", "task_failed"].includes(params.type)) {
 | 4 | **`article_published` 通知** | 文章发布 API 中创建发布通知（当前完全缺失） | 小 |
 | 5 | **`comment_deleted` 通知** | 评论被删除时创建通知（当前仅定义了类型但未调用） | 小 |
 | 6 | **`system_error` 通知** | DeepSeek API 调用失败、磁盘空间不足等场景创建通知（需确定检测机制） | 大 |
+
+---
+
+## 13. 权限模型
+
+### 13.1 设计原则
+
+系统采用统一的权限模型，适用于文章、词条和图片：
+
+- 用户拥有 **`roles: string[]`**（如 `["admin"]`、`["user"]`、`["admin", "school"]`）
+- 内容拥有 **`accessGroup: string[]`**（如 `["admin"]`、`["school"]`、空数组 = 公开）
+- **AND 匹配**：用户必须有 `accessGroup` 中**所有**要求的角色才能访问
+- 空数组表示公开，无需任何角色即可访问
+
+```
+用户 roles: ["admin", "school"]
+内容 accessGroup: ["admin"]  → ✅ 有 admin
+内容 accessGroup: ["school"] → ✅ 有 school
+内容 accessGroup: ["admin", "school"] → ✅ 两者都有
+内容 accessGroup: ["school", "some_other"] → ❌ 没有 some_other
+内容 accessGroup: [] → ✅ 公开
+```
+
+### 13.2 当前应用
+
+| 实体 | accessGroup 字段 | 当前常见值 | 说明 |
+|------|-----------------|-----------|------|
+| Article | Article.accessGroup | `[]`（公开）、`["admin"]`（仅博主） | 文章阅读页检查 |
+| Article.defaultImageAccessGroup | Article.defaultImageAccessGroup | `[]`（公开）、`["admin"]` | 图片默认权限 |
+| ArticleImageOverride | ArticleImageOverride.accessGroup | `[]`、`["admin"]`、`["school"]` | 单张图片权限覆盖 |
+| WikiEntry | WikiEntry.accessGroup | `[]`（公开） | 词条阅读页检查 |
+
+### 13.3 隐层（isHidden）
+
+`Article.isHidden` 是一个临时隐藏开关，在权限检查之外独立判断：
+- 隐藏文章在公开列表过滤，直接 URL 返回 404
+- 其行为等价于 `accessGroup: ["admin"]`，但不与原有权限设置冲突
+- 管理员在仪表盘可见所有隐藏文章
+
+### 13.4 检查逻辑
+
+```typescript
+function checkAccess(userRoles: string[], requiredGroups: string[]): boolean {
+  // 空数组 = 公开
+  if (requiredGroups.length === 0) return true;
+  // 用户必须有所有要求的角色
+  return requiredGroups.every((group) => userRoles.includes(group));
+}
+```
+
+在 API 层：
+- `GET /api/articles`：过滤 `isHidden: false`（不返回隐藏文章）
+- `GET /api/articles/[slug]`：检查 `isHidden`，隐藏且非管理员返回 404；检查 `accessGroup`，无权限返回 403
+- `GET /api/wiki/[name]`：检查 `accessGroup`，无权限返回 403
+- `GET /api/images/[articleId]/[filename]`：已有权限检查逻辑（§9.4）
+
+---
+
+## 14. Token 用量管理
+
+### 14.1 概述
+
+系统记录每次 AI 调用的 token 用量，支持月度统计和阈值告警，帮助博主监控和优化 API 成本。
+
+### 14.2 数据库模型
+
+```prisma
+model AiUsageLog {
+  id               String     @id @default(uuid())
+  type             AiTaskType // review / translate / discover / generate / chat
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  createdAt        DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+}
+```
+
+### 14.3 记录时机
+
+各 worker handler 和 chat API 在调用 `callDeepSeek()` 后立即写入 `AiUsageLog`：
+
+```typescript
+const result = await callDeepSeek({ ... });
+await prisma.aiUsageLog.create({
+  data: {
+    type: taskType, // "review" | "translate" | "discover" | "generate" | "chat"
+    promptTokens: result.usage.prompt_tokens,
+    completionTokens: result.usage.completion_tokens,
+    totalTokens: result.usage.total_tokens,
+  },
+});
+```
+
+### 14.4 月度告警
+
+每次写入后检查当月汇总：
+
+```typescript
+const now = new Date();
+const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+const aggregate = await prisma.aiUsageLog.aggregate({
+  _sum: { totalTokens: true },
+  where: { createdAt: { gte: monthStart } },
+});
+const monthTotal = aggregate._sum.totalTokens ?? 0;
+
+const settings = await getSettings();
+const warningThreshold = settings.ai?.tokenWarningThreshold ?? 500_000;
+const criticalThreshold = settings.ai?.tokenCriticalThreshold ?? 1_000_000;
+
+// 检查是否已发送过告警（同级别每月一条）
+const existingWarning = await prisma.notification.findFirst({
+  where: {
+    type: { in: ["token_warning", "token_critical"] },
+    createdAt: { gte: monthStart },
+  },
+});
+
+if (monthTotal >= criticalThreshold && !existingWarning) {
+  await createNotification({ type: "token_critical", ... });
+} else if (monthTotal >= warningThreshold && !existingWarning) {
+  await createNotification({ type: "token_warning", ... });
+}
+```
+
+### 14.5 settings 配置
+
+在 `config/default-settings.json` 中：
+
+```json
+{
+  "ai": {
+    "tokenWarningThreshold": 500000,
+    "tokenCriticalThreshold": 1000000
+  }
+}
+```
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `ai.tokenWarningThreshold` | 500000 | 月用量警告阈值（本月 prompt + completion tokens） |
+| `ai.tokenCriticalThreshold` | 1000000 | 月用量严重阈值 |
+
+### 14.6 仪表盘查看页
+
+**路径**：`/admin/ai/tokens`
+
+**布局**：
+
+1. **今日用量卡片**：
+   - 今日总消耗 tokens
+   - 按类型分：review / translate / discover / generate / chat
+
+2. **近 7 天趋势图**：
+   - 简单柱状图（手写 SVG 或 recharts）
+   - 横轴：日期，纵轴：tokens
+   - 堆叠显示各类型
+
+3. **本月统计卡片**：
+   - 进度条：`本月用量 / 警告阈值`，百分比
+   - 环形进度指示器
+   - 两行：警告阈值、严重阈值
+
+4. **按类型本月统计表**：
+   | 类型 | 调用次数 | 输入 Tokens | 输出 Tokens | 总计 |
+   |------|---------|------------|------------|------|
+
+5. **最近调用记录**（最近 20 条）：
+   | 时间 | 类型 | 输入 Tokens | 输出 Tokens | 总计 |
+   |-----|------|------------|------------|------|
+
+### 14.7 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/admin/ai/tokens/summary` | 返回今日、近7天、本月汇总统计 |
+| GET | `/api/admin/ai/tokens/recent` | 返回最近 N 条调用记录（默认 20） |
+
+**summary 返回格式**：
+
+```typescript
+interface TokenSummary {
+  today: {
+    total: number;
+    byType: Record<string, number>;
+  };
+  daily: Array<{ date: string; byType: Record<string, number> }>; // 近7天
+  month: {
+    total: number;
+    byType: { type: string; count: number; totalTokens: number }[];
+    warningThreshold: number;
+    criticalThreshold: number;
+  };
+}
+```
+
+### 14.8 去重规则
+
+- 同一阈值级别（warning / critical）每月只创建一条告警通知
+- 当月已存在 `token_warning` 通知后，即使再度超阈值也不再重复创建（除非升级到 critical）
+- 跨月重置：下月 1 日重新计算，可再次触发告警
+
+### 14.9 图表实现
+
+使用轻量方案——**手写 SVG** 简单柱状图，不引入额外图表依赖。柱状图逻辑封装为可复用组件：
+
+```typescript
+// src/components/admin/TokenBarChart.tsx
+// Props: { daily: { date: string; values: { label: string; value: number }[] }[] }
+// 渲染 SVG 堆叠柱状图
+```
 
 - **向量数据库**：将 `AiTask` 中的输出改为可存储 embedding
 - **Git 集成**：在发布流程中增加 `git commit` 调用

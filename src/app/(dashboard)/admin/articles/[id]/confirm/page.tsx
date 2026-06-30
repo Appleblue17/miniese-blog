@@ -60,6 +60,7 @@ export default async function ConfirmPublishPage({ params }: Props) {
         tags: string[];
         author: string;
         summary: string;
+        accessGroup?: string[];
       }
     | undefined;
 
@@ -90,6 +91,7 @@ export default async function ConfirmPublishPage({ params }: Props) {
         tags: Array.isArray(data.tags) ? (data.tags as string[]) : [],
         author: (data.author as string) || "博主",
         summary: (data.summary as string) || "",
+        accessGroup: Array.isArray(data.accessGroup) ? (data.accessGroup as string[]) : undefined,
       };
 
       const extra: Record<string, unknown> = {};

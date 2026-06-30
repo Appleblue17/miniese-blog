@@ -33,6 +33,8 @@ import { prisma } from "@/lib/db";
 import { renderMarkdown } from "@/lib/markdown/renderer";
 import { detectWikiLinks } from "@/lib/markdown/linkDetector";
 import { parseFrontmatter } from "@/lib/articles/frontmatter";
+import { auth } from "@/auth";
+import { checkAccess } from "@/lib/auth";
 import type { ContentType } from "@/lib/markdown/renderer";
 
 /**
@@ -109,6 +111,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         originalId: true,
         contentPath: true,
         contentType: true,
+        isHidden: true,
+        accessGroup: true,
       },
     });
 
@@ -117,6 +121,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         { error: `Article not found: "${slug}" in language "${language}".` },
         { status: 404 },
       );
+    }
+
+    // Hidden article check: return 404 for non-admin users
+    if (article.isHidden) {
+      const session = await auth();
+      const userRoles = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
+      if (!checkAccess(userRoles, ["admin"])) {
+        return NextResponse.json(
+          { error: `Article not found: "${slug}" in language "${language}".` },
+          { status: 404 },
+        );
+      }
+    }
+
+    // Permission check: accessGroup
+    if (article.accessGroup && article.accessGroup.length > 0) {
+      const session = await auth();
+      const userRoles = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
+      if (!checkAccess(userRoles, article.accessGroup)) {
+        return NextResponse.json(
+          { error: "You do not have permission to access this article." },
+          { status: 403 },
+        );
+      }
     }
 
     // If fields=meta, return article metadata only (skip HTML rendering)

@@ -103,6 +103,8 @@ export async function GET(request: NextRequest) {
           changelog: a.changelog,
           viewCount: a.viewCount,
           isAITranslated: a.isAITranslated,
+          isHidden: a.isHidden,
+          isPinned: a.isPinned,
           ...stats,
         };
       }),

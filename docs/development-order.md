@@ -4,7 +4,7 @@
 
 ## 0、修改记录
 
-**最后更新**：2026-06-13
+**最后更新**：2026-06-30
 
 ### v1.5.0 2026-06-13
 
@@ -18,6 +18,10 @@
   - skipped 任务（feature disabled）在审查列表页和详情页正确显示"已跳过"而非"已完成"
   - Notesaw block 容器移除 `border-radius: 8px`，恢复直角样式
 - "编辑→"按钮文案改为"点击编辑草稿"，语义更清晰
+
+### v2.0.0 2026-06-30
+
+- 新增阶段11：文章隐藏/置顶 + 权限落地 + 一键链接 + Token 用量管理
 
 ### v1.4.0 2026-06-12
 
@@ -783,3 +787,67 @@ public/images/miniese/
 - [ ] AI 任务等待时显示加载状态
 - [x] 加载指示器正常旋转/跳动
 - [x] 插画清晰，透明背景无白边
+
+
+## 阶段11：文章隐藏/置顶 + 权限落地 + 一键链接 + Token 用量管理
+
+**目标**：文章可隐藏/置顶、权限模型统一落地、管理页一键链接与定期自动链接、Token 用量监控与告警。
+
+**依赖**：阶段1-10 已完成。详细技术方案见 `docs/architecture.md` §13（权限模型）、§4.1（Schema）、§14（Token 管理）、§11.5（API 路由）。
+
+**开发顺序**：11.1 → (11.2 ║ 11.3)
+
+---
+
+### 模块 11.1：文章隐藏/显示与置顶 + 权限落地
+
+| 任务 | 说明 | 验收标准 |
+|------|------|----------|
+| 11.1.1 数据库迁移 | Article 模型新增 `isHidden`、`isPinned` 字段 | 迁移成功，字段可读写 |
+| 11.1.2 切换隐藏/置顶 API | `POST /api/articles/[slug]/toggle-hidden`、`POST /api/articles/[slug]/toggle-pinned` | 2 个端点返回正确的 `isHidden`/`isPinned` |
+| 11.1.3 公开列表过滤 | `GET /api/articles` 过滤 `isHidden: false`；排序改为 `[{ isPinned: "desc" }, { publishedAt: "desc" }]` | 隐藏文章不在列表显示，置顶文章优先 |
+| 11.1.4 隐藏文章 404 | `GET /api/articles/[slug]` 检查 `isHidden`，隐藏且非管理员返回 404 | 直接访问隐藏文章返回 404 |
+| 11.1.5 文章管理页按钮 | 每行新增隐藏/显示按钮（Eye/EyeOff 图标）和置顶/取消按钮（Pin/PinOff 图标） | 按钮正常切换，状态即时应答 |
+| 11.1.6 权限落实—文章/词条 `accessGroup` | 文章阅读页、词条阅读页检查 `accessGroup`，无权限返回 403 | 权限不足时返回 403 或占位提示 |
+| 11.1.7 权限落实—草稿编辑页 | PublishForm 新增权限组 Select（公开 / 仅 admin） | 可设置并保存权限组 |
+
+---
+
+### 模块 11.2：文章管理一键链接 + 自动链接
+
+| 任务 | 说明 | 验收标准 |
+|------|------|----------|
+| 11.2.1 显示距上次链接时间 | 文章管理页每行显示"距上次链接：X 天前"或"未链接" | 每行正确显示链接状态 |
+| 11.2.2 批量链接 API | `POST /api/admin/articles/render-all` 接收 `{ articleIds?, olderThanDays? }` 参数，走队列异步处理 | 批量触发 re-render 成功 |
+| 11.2.3 链接状态 API | `GET /api/admin/articles/link-status` 返回每篇文章的 `lastLinkedAt`、`daysSinceLastLink` | 返回正确数据 |
+| 11.2.4 链接此页按钮 | 文章管理页工具栏"链接此页"按钮，对当前页所有文章触发批量链接 | 点击后触发渲染 |
+| 11.2.5 按时间链接下拉 | "链接 ▼"下拉菜单（3天/7天/30天/全部），按天数筛选 | 筛选后触发对应文章的渲染 |
+| 11.2.6 自动链接配置 | settings 新增 `features.autoLink.enabled` + `features.autoLink.intervalDays` | 配置项可读写 |
+| 11.2.7 Worker 自动链接 | Worker 定时扫描超过 `intervalDays` 未链接的文章，触发 re-render | 启用后按时自动链接 |
+| 11.2.8 外部 cron 端点 | `GET /api/admin/cron/auto-link` 可由外部定时任务触发 | 调用后执行自动链接扫描 |
+
+---
+
+### 模块 11.3：Token 用量管理与告警系统
+
+| 任务 | 说明 | 验收标准 |
+|------|------|----------|
+| 11.3.1 数据库迁移 | 新增 `AiUsageLog` 表 | 迁移成功 |
+| 11.3.2 记录 Token 用量 | 各 worker handler（review/translate/discover/generate）及 chat API 在调用 `callDeepSeek` 后写入 `AiUsageLog` | 每次 AI 调用产生一条记录 |
+| 11.3.3 统计 API | `GET /api/admin/ai/tokens/summary` 返回今日/近7天/本月汇总；`GET /api/admin/ai/tokens/recent` 返回最近 N 条记录 | 数据正确 |
+| 11.3.4 仪表盘查看页 | `/admin/ai/tokens` 展示今日用量、近7天趋势（柱状图）、本月统计（进度条）、按类型表、最近记录 | 页面完整可读 |
+| 11.3.5 告警通知 | 每月汇总超 `tokenWarningThreshold`/`tokenCriticalThreshold` 时创建 `token_warning`/`token_critical` 类型 Notification | 超阈值后生成通知 |
+| 11.3.6 告警去重 | 同一阈值级别每月只创建一条告警通知 | 不会重复通知 |
+| 11.3.7 阈值配置 | settings 新增 `ai.tokenWarningThreshold`、`ai.tokenCriticalThreshold` | 配置项可读写 |
+
+---
+
+### 综合验收标准
+
+- [ ] 文章可隐藏/显示、可置顶
+- [ ] 权限模型统一落地（文章/词条/图片）
+- [ ] 文章管理页可查看链接状态、批量链接
+- [ ] 自动链接 Worker 按配置周期运行
+- [ ] Token 用量持久化记录
+- [ ] Token 用量仪表盘可查看（今日/7天/本月/按类型/最近记录）
+- [ ] 超阈值自动告警

@@ -24,6 +24,8 @@ import {
   Languages,
   Sparkles,
   Globe,
+  EyeOff,
+  Pin,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +49,8 @@ interface ArticleItem {
   viewCount: number;
   charCount: number;
   lineCount: number;
+  isHidden?: boolean;
+  isPinned?: boolean;
 }
 
 interface DraftItem {
@@ -223,6 +227,8 @@ function PublishedArticleRow({
   const [refreshingLinks, setRefreshingLinks] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [togglingHidden, setTogglingHidden] = useState(false);
+  const [togglingPinned, setTogglingPinned] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasPendingTranslate = activeTaskTypes.includes("translate");
@@ -375,6 +381,58 @@ function PublishedArticleRow({
     [article.id, router],
   );
 
+  const handleToggleHidden = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTogglingHidden(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/articles/${article.slug}/toggle-hidden?lang=${article.language}`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          setError("切换隐藏状态失败");
+          setTogglingHidden(false);
+          return;
+        }
+        setTogglingHidden(false);
+        router.refresh();
+      } catch {
+        setError("切换隐藏状态请求失败");
+        setTogglingHidden(false);
+      }
+    },
+    [article.slug, article.language, router],
+  );
+
+  const handleTogglePinned = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setTogglingPinned(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/articles/${article.slug}/toggle-pinned?lang=${article.language}`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          setError("切换置顶状态失败");
+          setTogglingPinned(false);
+          return;
+        }
+        setTogglingPinned(false);
+        router.refresh();
+      } catch {
+        setError("切换置顶状态请求失败");
+        setTogglingPinned(false);
+      }
+    },
+    [article.slug, article.language, router],
+  );
+
   return (
     <>
       <Link
@@ -386,6 +444,12 @@ function PublishedArticleRow({
           <div className="flex items-center gap-2">
             <span className="font-medium truncate">{article.title}</span>
             <StatusBadge status={article.status} />
+            {article.isHidden && (
+              <EyeOff className="size-3.5 text-muted-foreground/60" aria-label="已隐藏" />
+            )}
+            {article.isPinned && (
+              <Pin className="size-3.5 text-amber-500" aria-label="已置顶" />
+            )}
           </div>
           <ArticleMetaRow
             language={article.language}
@@ -454,6 +518,46 @@ function PublishedArticleRow({
               className={`size-3.5 ${discovering ? "animate-pulse" : hasPendingDiscover ? "text-yellow-400" : ""}`}
             />
             <span>{hasPendingDiscover ? "发现中" : "发现词条"}</span>
+          </button>
+
+          {/* Toggle hidden button */}
+          <button
+            type="button"
+            onClick={handleToggleHidden}
+            disabled={togglingHidden}
+            className={`inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight transition-colors disabled:opacity-50 cursor-pointer ${
+              article.isHidden
+                ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+            title={article.isHidden ? "取消隐藏" : "隐藏文章"}
+          >
+            {togglingHidden ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <EyeOff className="size-3.5" />
+            )}
+            <span>{article.isHidden ? "隐藏" : "隐藏"}</span>
+          </button>
+
+          {/* Toggle pinned button */}
+          <button
+            type="button"
+            onClick={handleTogglePinned}
+            disabled={togglingPinned}
+            className={`inline-flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-[10px] leading-tight transition-colors disabled:opacity-50 cursor-pointer ${
+              article.isPinned
+                ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+            title={article.isPinned ? "取消置顶" : "置顶文章"}
+          >
+            {togglingPinned ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Pin className="size-3.5" />
+            )}
+            <span>{article.isPinned ? "置顶" : "置顶"}</span>
           </button>
 
           {/* Separator */}

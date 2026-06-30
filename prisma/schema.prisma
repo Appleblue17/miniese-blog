@@ -84,6 +84,8 @@ model Article {
   charCount        Int             @default(0)
 
   isAITranslated  Boolean         @default(false)
+  isHidden        Boolean         @default(false)
+  isPinned        Boolean         @default(false)
 
   // 翻译版本绑定：若此记录是 AI 翻译版本，指向原文章
   originalId      String?
@@ -279,4 +281,16 @@ model WikiDiscovery {
   @@index([articleId, term])
   @@index([status])
   @@index([articleId])
+}
+
+model AiUsageLog {
+  id               String     @id @default(uuid())
+  type             AiTaskType
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  createdAt        DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
 }
