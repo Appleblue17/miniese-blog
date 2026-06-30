@@ -51,6 +51,10 @@ jobs:
             echo ">>> Stopping old app..."
             pm2 stop miniese-blog 2>/dev/null || true
 
+            # 生成 Prisma 客户端（供类型检查使用）
+            echo ">>> Generating Prisma client..."
+            npx prisma generate
+
             # 数据库迁移
             echo ">>> Running database migrations..."
             npx prisma migrate deploy
