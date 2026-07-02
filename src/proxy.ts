@@ -130,9 +130,18 @@ a{color:#2563eb;text-decoration:underline}
     pathname === "/favicon.ico" ||
     pathname === "/rss.xml" ||
     pathname === "/sitemap.xml" ||
-    pathname === "/manifest.json"
+    pathname === "/manifest.json" ||
+    // PWA icons & similar static files (not in public/ but requested by browsers)
+    /^\/icon-\d+x\d+\.(png|jpg|jpeg|webp|svg)$/i.test(pathname) ||
+    /^\/apple-icon-\d+x\d+\.(png|jpg|jpeg|webp|svg)$/i.test(pathname)
   ) {
     return NextResponse.next();
+  }
+
+  // Return 404 for root-level paths that look like static files (not page routes).
+  // Prevents requests like /icon-192x192.png from being caught by [lang] page routes.
+  if (/^\/[^/]+\.[a-z0-9]+$/i.test(pathname) && !pathname.startsWith("/api")) {
+    return new NextResponse(null, { status: 404 });
   }
 
   // Already has language prefix — pass through
@@ -168,5 +177,5 @@ a{color:#2563eb;text-decoration:underline}
 }
 
 export const config = {
-  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
+  matcher: "/((?!_next/static|_next/image|favicon.ico|icon-\\d+x\\d+\\.png|apple-icon-\\d+x\\d+\\.png).*)",
 };

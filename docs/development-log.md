@@ -869,3 +869,20 @@
     - config/default-settings.json：移除 skipEmailVerification 字段
     - 集成测试 15/15 全部通过
 
+### 任务 PWA 图标 404 修复 + proxy 静态文件兜底
+- **时间**：2026-07-01
+- **状态**：✅ 完成
+- **变更摘要**：
+  - **Bug 修复 — `/icon-192x192.png` 导致 Prisma 报错**：
+    - 根因：`public/manifest.json` 中图标路径 `/icon-192x192.png` 与实际文件位置 `/images/miniese/avatar/icon-192x192.png` 不匹配
+    - 浏览器请求 `/icon-192x192.png` 找不到文件 → Next.js 将其当作 `[lang]` 页面路由处理 → `lang` 变成 `"icon-192x192.png"` → 服务端组件用非法 lang 值查 Prisma 报错
+  - **修复**：
+    - `public/manifest.json`：图标路径改为 `/images/miniese/avatar/icon-*.png`
+    - `src/proxy.ts`：
+      - 在静态资源白名单中添加 PWA 图标路径的正则匹配（`/^\/icon-\d+x\d+\.png$/`、`/^\/apple-icon-\d+x\d+\.png$/`）
+      - 在 matcher 中的排除列表中也添加对应的 PWA 图标模式
+      - 新增通用兜底规则：根路径下带文件扩展名的未知请求（`/^\/[^/]+\.[a-z0-9]+$/`）直接返回 404，防止被 `[lang]` 路由捕获
+- **修改文件**（2 个）：
+  - `public/manifest.json` — 修正图标路径
+  - `src/proxy.ts` — 新增静态资源白名单 + 兜底 404 规则
+
