@@ -429,6 +429,13 @@ export async function incrementalReview(
       });
       reusedCount++;
 
+      // Record for detail page even for reused chunks — prevents
+      // groups from being empty when all sub-chunks are reused.
+      groups.push({
+        targetLines: [subChunk.startLine, subChunk.endLine],
+        contextLines: [subChunk.startLine, subChunk.endLine],
+      });
+
       processedSubChunks++;
       onProgress?.(processedSubChunks, totalSubChunks);
       continue;

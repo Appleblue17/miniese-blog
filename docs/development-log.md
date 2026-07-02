@@ -886,3 +886,17 @@
   - `public/manifest.json` — 修正图标路径
   - `src/proxy.ts` — 新增静态资源白名单 + 兜底 404 规则
 
+### 任务 Bug 修复：增量翻译复用子块时 translatedGroups 为空 + reviewer 相同模式修复
+- **时间**：2026-07-02
+- **状态**：✅ 完成（未提交）
+- **变更摘要**：
+  - **Bug 描述**：发布文章 A → 触发翻译完成。改为完全不同内容 B → 触发翻译完成。再改回 A → 触发翻译。第三次翻译所有子块都命中缓存（复用），但 `translatedGroups` 数组为空，导致详情页 fallback 到"全文模式"，用 `translations[body]` 查找失败，最终显示中文原文。
+  - **根因**：`translator2.ts` 第 318-324 行复用子块的 `continue` 跳过了 `translatedGroups.push()`，当所有子块都复用时代码为空。
+  - **修复 1 — translator2.ts**：复用子块时也添加 `translatedGroups` 记录，`contextLines` 设为与 `targetLines` 相同（作为复用标识）。
+  - **修复 2 — 详情页 page.tsx**：通过 `contextLines === targetLines` 推断复用状态，复用 chunk 不渲染上下文区域。
+  - **修复 3 — reviewer.ts**：`incrementalReview` 中复用子块有相同的漏记录问题（`continue` 跳过 `groups.push()`），同步修复。
+  - **修改文件**（2 个）：
+    - `src/lib/ai/translator2.ts` — 复用子块时添加 `translatedGroups` 记录
+    - `src/lib/ai/reviewer.ts` — 复用子块时添加 `groups` 记录
+  - **无关任务确认**：`discovery.ts` 的 `incrementalDiscover` 中复用子块在 `continue` 前已正确记录 `newExistingMap`，不存在此问题。
+

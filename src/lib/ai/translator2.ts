@@ -341,6 +341,16 @@ export async function incrementalTranslate(
       const translated = newTranslations[originalContent];
       outputLines = replaceLines(outputLines, subChunk.startLine, subChunk.endLine, translated);
       reusedCount++;
+
+      // Record for detail page even for reused chunks — without this,
+      // translatedGroups becomes empty when ALL sub-chunks are reused,
+      // causing the detail page to fall back to "full translation mode"
+      // where translations[body] lookup fails (key mismatch).
+      translatedGroups.push({
+        targetLines: [subChunk.startLine, subChunk.endLine],
+        contextLines: [subChunk.startLine, subChunk.endLine],
+      });
+
       continue;
     }
 

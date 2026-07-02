@@ -341,17 +341,26 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
           }
         }
 
+        // Determine if this chunk was reused: the translation exists in the output
+        // and was NOT newly translated in this run. We infer this from the fact
+        // that targetLines === contextLines (no context window was extended for
+        // reused chunks — see translator2.ts fix: reused chunks set contextLines
+        // equal to targetLines).
+        const isReused = translatedContent !== undefined &&
+          group.targetLines[0] === group.contextLines[0] &&
+          group.targetLines[1] === group.contextLines[1];
+
         // Extract above/below context (lines in contextLines but not targetLines)
         let aboveContext: string | undefined;
         let belowContext: string | undefined;
 
-        if (contextStart < targetStart) {
+        if (!isReused && contextStart < targetStart) {
           const above = lines.slice(contextStart - 1, targetStart - 1);
           if (above.length > 0) {
             aboveContext = above.join("\n");
           }
         }
-        if (contextEnd > targetEnd) {
+        if (!isReused && contextEnd > targetEnd) {
           const below = lines.slice(targetEnd, contextEnd);
           if (below.length > 0) {
             belowContext = below.join("\n");
@@ -368,7 +377,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
           title,
           sourceText: targetContent,
           translatedText: translatedContent ?? targetContent,
-          reused: false,
+          reused: isReused,
           context: false,
           startLine: targetStart,
           endLine: targetEnd,

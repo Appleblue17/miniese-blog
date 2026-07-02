@@ -45,6 +45,10 @@
 - 阶段 5.2：孤立草稿问题（审查按钮移除恢复现场）
 - 阶段 3.3：Wiki 阅读页 URL 编码 404（decodeParam 解码）
 
+### Fixed
+- 增量翻译全复用场景下详情页显示中文原文：`translator2.ts` 中复用子块未记录 `translatedGroups`，导致详情页 fallback 到"全文模式"查找失败
+- `reviewer.ts` 相同模式：复用子块 `continue` 跳过 `groups.push()`，详情页分组数据不完整
+
 ## [0.5.0] — 2026-06-12
 
 ### Added
