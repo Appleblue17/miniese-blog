@@ -10,6 +10,7 @@
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
 import { getSettings } from "../../config/settings";
+import { renderTemplate } from "../../config/mail-templates";
 
 export type NotificationType =
   | "comment"
@@ -121,18 +122,24 @@ export async function sendNotificationEmail(params: {
   try {
     const url = process.env.SITE_URL || "http://localhost:3000";
     const subject = `[Miniese's Blog] ${params.title}`;
-    const html = `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #333;">${params.title}</h2>
-        <p style="color: #666; line-height: 1.6;">${params.content}</p>
-        ${params.articleTitle ? `<p style="color: #999; font-size: 14px;">相关文章：${params.articleTitle}</p>` : ""}
-        <p style="margin-top: 24px;">
-          <a href="${url}/admin/notifications" style="display: inline-block; padding: 8px 16px; background: #333; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px;">
-            查看详情
-          </a>
-        </p>
-      </div>
-    `;
+
+    // Load notification template from settings, fall back to default
+    let template: string;
+    try {
+      const settings = await getSettings();
+      template = settings.mailTemplates?.notification?.trim()
+        || (await import("../../config/mail-templates")).DEFAULT_MAIL_TEMPLATES.notification;
+    } catch {
+      const { DEFAULT_MAIL_TEMPLATES } = await import("../../config/mail-templates");
+      template = DEFAULT_MAIL_TEMPLATES.notification;
+    }
+
+    const html = renderTemplate(template, {
+      title: params.title,
+      content: params.content,
+      articleTitle: params.articleTitle || "",
+      url,
+    });
 
     await sendEmail({ to: params.to, subject, html });
   } catch (err) {

@@ -6,6 +6,21 @@
 ## [Unreleased]
 
 ### Added
+- 邮件模板自定义（设置页高级 tab 编辑 resetPassword/notification HTML 模板，支持 `{{variable}}` 占位符和 `{{#key}}...{{/key}}` 条件块）
+
+### Changed
+- `mail.ts` / `notifications.ts`：邮件 HTML 从硬编码迁移为可配置模板，从 `mailTemplates` 配置加载
+- `sendEmail` 使用 `MAIL_FROM` 环境变量替代运行时拼写
+- `updateSettings`：空 mailTemplates 自动剥离（同 prompts 模式）
+- 移除未使用的 `verification` 模板（当前注册不需要邮箱验证）
+
+### Fixed
+- `forgot/route.ts`：`resetPasswordEmailHtml` 缺少 `await`
+- 设置页 `realEmail` 开关逻辑反转（`!!` → `!`）
+
+## [0.6.0] — 2026-07-02
+
+### Added
 - 设置页「页面背景颜色」配置项 & UI（body 背景色可独立于 Markdown 背景色进行控制，支持浅色/深色模式分别设置）
 - 阶段 8：账号系统（注册、登录、密码管理、邮箱验证、个人设置）
 - 阶段 8：评论系统（API + CommentSection 前端组件，跨版本互通，60s 频率限制）
@@ -44,8 +59,6 @@
 - 阶段 5.2：草稿记录未删除（publish API 使用 delete 而非 update）
 - 阶段 5.2：孤立草稿问题（审查按钮移除恢复现场）
 - 阶段 3.3：Wiki 阅读页 URL 编码 404（decodeParam 解码）
-
-### Fixed
 - 增量翻译全复用场景下详情页显示中文原文：`translator2.ts` 中复用子块未记录 `translatedGroups`，导致详情页 fallback 到"全文模式"查找失败
 - `reviewer.ts` 相同模式：复用子块 `continue` 跳过 `groups.push()`，详情页分组数据不完整
 

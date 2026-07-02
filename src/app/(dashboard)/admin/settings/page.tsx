@@ -57,6 +57,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   publish: { defaultAuthor: "博主" },
   prompts: { review: "", translate: "", discovery: "", generate: "", chat: "" },
+  mailTemplates: { resetPassword: "", notification: "" },
 };
 
 type TabId = "general" | "appearance" | "features" | "notifications" | "dev" | "advanced";
@@ -231,17 +232,20 @@ export default function SettingsPage() {
   const [local, setLocal] = useState<AppSettings | null>(null);
   // Default prompts from default-settings.json (used for "恢复默认")
   const [defaultPrompts, setDefaultPrompts] = useState<Record<string, string> | null>(null);
+  // Default mail templates from default-settings.json (used for "恢复默认")
+  const [defaultMailTemplates, setDefaultMailTemplates] = useState<Record<string, string> | null>(null);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((r) => r.json())
-      .then((data: AppSettings & { defaultPrompts?: Record<string, string> }) => {
-        // Strip defaultPrompts from the settings object
-        const { defaultPrompts: dp, ...settingsOnly } = data;
+      .then((data: AppSettings & { defaultPrompts?: Record<string, string>; defaultMailTemplates?: Record<string, string> }) => {
+        // Strip extra fields from the settings object
+        const { defaultPrompts: dp, defaultMailTemplates: dmt, ...settingsOnly } = data;
         setSettings(settingsOnly as AppSettings);
         setLocal(JSON.parse(JSON.stringify(settingsOnly)) as AppSettings);
         if (dp) setDefaultPrompts(dp);
+        if (dmt) setDefaultMailTemplates(dmt);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -1784,7 +1788,7 @@ export default function SettingsPage() {
                       role="switch"
                       aria-checked={!local.features.realEmail}
                       onClick={() =>
-                        updateLocal("features", "realEmail", !!local.features.realEmail)
+                        updateLocal("features", "realEmail", !local.features.realEmail)
                       }
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                         !local.features.realEmail ? "" : "bg-primary/20"
@@ -1873,6 +1877,51 @@ export default function SettingsPage() {
                   value={displayValue}
                   onChange={(e) => updateLocal("prompts", key, e.target.value)}
                   rows={6}
+                  className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y"
+                />
+              </div>
+            );
+            })}
+
+            <SectionHeading>邮件模板</SectionHeading>
+            <p className="text-xs text-muted-foreground">
+              自定义发送的邮件 HTML 模板。支持 <code className="text-[10px]">{`{{variable}}`}</code> 占位符和 <code className="text-[10px]">{`{{#key}}...{{/key}}`}</code> 条件块。清空可恢复默认模板。
+            </p>
+
+            {["resetPassword", "notification"].map((key) => {
+              const val = local.mailTemplates?.[key] ?? "";
+              const defaultVal = defaultMailTemplates?.[key] ?? "";
+              const displayValue = val || defaultVal;
+              const matchesDefault = displayValue === defaultVal;
+              const labelMap: Record<string, string> = {
+                resetPassword: "重置密码邮件",
+                notification: "通知邮件",
+              };
+
+              return (
+              <div key={key}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium">{labelMap[key] ?? key}</label>
+                  <div className="flex items-center gap-2">
+                    {!matchesDefault && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateLocal("mailTemplates", key, defaultVal);
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                        title="恢复默认模板"
+                      >
+                        <Undo2 className="size-3" />
+                        恢复默认
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <textarea
+                  value={displayValue}
+                  onChange={(e) => updateLocal("mailTemplates", key, e.target.value)}
+                  rows={8}
                   className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-y"
                 />
               </div>

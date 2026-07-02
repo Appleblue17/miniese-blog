@@ -83,6 +83,7 @@ export interface AppSettings {
   };
   compilers: Record<string, unknown>;
   prompts: Record<string, string>;
+  mailTemplates: Record<string, string>;
 }
 
 let cachedSettings: AppSettings | null = null;
@@ -147,6 +148,15 @@ export async function updateSettings(
     for (const key of Object.keys(updates.prompts)) {
       if (!updates.prompts[key]?.trim()) {
         delete updates.prompts[key];
+      }
+    }
+  }
+
+  // Strip empty-string mail templates so defaults remain in effect
+  if (updates.mailTemplates) {
+    for (const key of Object.keys(updates.mailTemplates)) {
+      if (!updates.mailTemplates[key]?.trim()) {
+        delete updates.mailTemplates[key];
       }
     }
   }

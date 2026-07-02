@@ -18,8 +18,9 @@ export async function GET() {
     ]);
     const defaultSettings = JSON.parse(defaultContent) as Record<string, unknown>;
     const defaultPrompts = (defaultSettings.prompts as Record<string, string>) || {};
+    const defaultMailTemplates = (defaultSettings.mailTemplates as Record<string, string>) || {};
 
-    return NextResponse.json({ ...settings, defaultPrompts });
+    return NextResponse.json({ ...settings, defaultPrompts, defaultMailTemplates });
   } catch (err) {
     console.error("[Settings API] GET error:", err);
     return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });

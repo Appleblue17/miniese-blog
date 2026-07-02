@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     await sendEmail({
       to: userEmail,
       subject: "重置密码 - Miniese's Blog",
-      html: resetPasswordEmailHtml(token),
+      html: await resetPasswordEmailHtml(token),
     });
 
     return NextResponse.json({
