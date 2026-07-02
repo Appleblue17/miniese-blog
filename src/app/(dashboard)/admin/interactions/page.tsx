@@ -26,6 +26,9 @@ import {
   Search,
   AlertCircle,
   KeyRound,
+  Key,
+  Copy,
+  CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +55,7 @@ interface UserItem {
   email: string | null;
   name: string | null;
   roles: string[];
+  hasApiToken: boolean;
   createdAt: string;
 }
 
@@ -316,6 +320,14 @@ function UsersTab() {
     error: string;
   } | null>(null);
 
+  // API Token modal state
+  const [tokenModal, setTokenModal] = useState<{
+    user: UserItem;
+    token: string | null;
+    loading: boolean;
+    error: string;
+  } | null>(null);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -398,6 +410,57 @@ function UsersTab() {
     }
   };
 
+  const handleGenerateToken = async (user: UserItem) => {
+    setTokenModal({ user, token: null, loading: true, error: "" });
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/api-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "生成失败");
+      }
+
+      setTokenModal({
+        user,
+        token: data.token,
+        loading: false,
+        error: "",
+      });
+
+      // Update hasApiToken in list
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, hasApiToken: true } : u)),
+      );
+    } catch (err) {
+      setTokenModal({
+        user,
+        token: null,
+        loading: false,
+        error: (err as Error).message,
+      });
+    }
+  };
+
+  const handleCopyToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token);
+    } catch {
+      // Fallback: select the text
+      const el = document.querySelector("#api-token-text") as HTMLElement;
+      if (el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -443,6 +506,70 @@ function UsersTab() {
         </div>
       )}
 
+      {/* API Token Modal */}
+      {tokenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg space-y-4">
+            <h3 className="text-lg font-semibold">
+              {tokenModal.loading ? "正在生成…" : tokenModal.error ? "生成失败" : "API Token 已生成"}
+            </h3>
+
+            {tokenModal.loading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="size-6 animate-spin text-muted-foreground/40" />
+              </div>
+            )}
+
+            {!tokenModal.loading && tokenModal.error && (
+              <>
+                <p className="text-sm text-destructive">{tokenModal.error}</p>
+                <button
+                  onClick={() => setTokenModal(null)}
+                  className="w-full rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  关闭
+                </button>
+              </>
+            )}
+
+            {!tokenModal.loading && tokenModal.token && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  用户 <strong>{tokenModal.user.username || tokenModal.user.email}</strong> 的 API Token。
+                  <span className="block text-yellow-600 dark:text-yellow-400 mt-1 text-xs">
+                    此令牌仅显示一次，请立即复制并妥善保存！
+                  </span>
+                </p>
+                <div className="relative rounded-lg border border-border bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">API Token：</p>
+                  <p
+                    id="api-token-text"
+                    className="text-sm font-mono font-bold tracking-wider break-all select-all"
+                  >
+                    {tokenModal.token}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopyToken(tokenModal.token!)}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Copy className="size-4" />
+                    复制 Token
+                  </button>
+                  <button
+                    onClick={() => setTokenModal(null)}
+                    className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -474,6 +601,12 @@ function UsersTab() {
                           {role === "admin" ? "管理员" : role}
                         </Badge>
                       ))}
+                      {u.hasApiToken && (
+                        <Badge variant="secondary" className="text-[11px]">
+                          <Key className="size-3 mr-0.5" />
+                          Token
+                        </Badge>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 pr-4 text-muted-foreground/60 whitespace-nowrap">
@@ -481,6 +614,17 @@ function UsersTab() {
                   </td>
                   <td className="py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGenerateToken(u)}
+                        disabled={actionLoading === u.id}
+                        className="text-xs"
+                        title={u.hasApiToken ? "重新生成 API Token" : "生成 API Token"}
+                      >
+                        <Key className="size-3 mr-1" />
+                        {u.hasApiToken ? "重新生成 Token" : "生成 Token"}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

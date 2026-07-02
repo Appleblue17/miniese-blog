@@ -1,14 +1,19 @@
 /**
  * @file POST /api/articles/[slug]/toggle-pinned
  *
- * Toggle the isPinned status of an article.
+ * Toggle the isPinned status of an article AND all its related translations.
  * Pinned articles are displayed first in public listings.
  * This is an admin-only operation (checked by the caller/middleware).
  *
- * Query params:
- *   lang - Language code "zh" or "en" (required)
+ * Query params (optional):
+ *   lang - Language code "zh" or "en" (default: "zh")
  *
  * Response: { isPinned: boolean }
+ *
+ * Note: Pinning/unpinning applies to all language versions of the article
+ * (original + translations) to keep them consistent.
+ * The `lang` parameter is only used to look up one version of the article;
+ * all associated versions are toggled together.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,18 +26,19 @@ export async function POST(
   try {
     const { slug } = await params;
     const { searchParams } = new URL(request.url);
-    const language = searchParams.get("lang");
+    const language = searchParams.get("lang") || "zh";
 
     if (language !== "zh" && language !== "en") {
       return NextResponse.json(
-        { error: "lang query parameter is required. Must be 'zh' or 'en'." },
+        { error: "lang query parameter must be 'zh' or 'en'." },
         { status: 400 },
       );
     }
 
+    // Find the article
     const article = await prisma.article.findUnique({
       where: { slug_language: { slug, language } },
-      select: { id: true, isPinned: true },
+      select: { id: true, slug: true, isPinned: true, originalId: true },
     });
 
     if (!article) {
@@ -42,13 +48,37 @@ export async function POST(
       );
     }
 
-    const updated = await prisma.article.update({
-      where: { id: article.id },
-      data: { isPinned: !article.isPinned },
-      select: { isPinned: true },
+    const newPinned = !article.isPinned;
+
+    // Collect all version IDs: the article itself, its original (if translated),
+    // and all its translations
+    const versionIds: string[] = [article.id];
+
+    // If this article is a translation, include its original
+    if (article.originalId) {
+      versionIds.push(article.originalId);
+    }
+
+    // Find all translations of this article (including those linked via originalId)
+    // and all translations of the original if applicable
+    const rootId = article.originalId || article.id;
+    const translations = await prisma.article.findMany({
+      where: { originalId: rootId },
+      select: { id: true },
+    });
+    for (const t of translations) {
+      if (!versionIds.includes(t.id)) {
+        versionIds.push(t.id);
+      }
+    }
+
+    // Update all versions at once
+    await prisma.article.updateMany({
+      where: { id: { in: versionIds } },
+      data: { isPinned: newPinned },
     });
 
-    return NextResponse.json({ isPinned: updated.isPinned });
+    return NextResponse.json({ isPinned: newPinned });
   } catch (error) {
     console.error("Toggle pinned error:", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });

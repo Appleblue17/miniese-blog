@@ -35,6 +35,42 @@ export async function proxy(request: NextRequest) {
   const isMediaGet = pathname === "/api/admin/media" && request.method === "GET";
 
   if ((isAdminPage || isAdminApi) && !isSettingsGet && !isMediaGet) {
+    // ── Check Bearer Token (for bot/Minniese automation) ──
+    const authHeader = request.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      if (token) {
+        const { prisma } = await import("@/lib/db");
+        const bcrypt = await import("bcrypt");
+
+        // Find users that have an apiToken set
+        const usersWithToken = await prisma.user.findMany({
+          where: { apiToken: { not: null } },
+          select: { id: true, apiToken: true, roles: true },
+        });
+
+        let authorized = false;
+        for (const user of usersWithToken) {
+          if (user.apiToken && (await bcrypt.compare(token, user.apiToken))) {
+            if (user.roles.includes("admin")) {
+              authorized = true;
+            }
+            break;
+          }
+        }
+
+        if (authorized) {
+          return NextResponse.next();
+        }
+
+        if (isAdminApi) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        // Fall through to session check for admin pages (non-API)
+      }
+    }
+
+    // ── Check Session (for browser users) ──
     const { auth } = await import("@/auth");
     const session = await auth();
 

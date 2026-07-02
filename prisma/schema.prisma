@@ -189,6 +189,7 @@ model User {
   password      String?
   name          String?
   roles         String[]  @default(["user"])
+  apiToken      String?   @unique
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
